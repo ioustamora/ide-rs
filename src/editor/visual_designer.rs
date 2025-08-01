@@ -1,35 +1,145 @@
-//! Advanced Visual Form Designer - RAD Studio inspired WYSIWYG designer
+//! # Advanced Visual Form Designer
 //!
-//! This module provides a professional visual form designer with:
-//! - Grid-based layout system with snap-to-grid
-//! - Multi-select and group operations
-//! - Alignment and distribution tools
-//! - Visual guides and rulers
-//! - Undo/Redo system
-//! - Real-time property preview
+//! Professional WYSIWYG visual designer inspired by RAD Studio and Delphi's form designer.
+//! This module implements a comprehensive visual editing system that enables drag-and-drop
+//! component placement with precision tools and professional-grade layout capabilities.
+//!
+//! ## Core Features
+//!
+//! - **Grid System**: Configurable grid with snap-to-grid functionality
+//! - **Multi-Selection**: Advanced selection system supporting multiple components
+//! - **Alignment Tools**: Professional alignment and distribution operations
+//! - **Visual Guides**: Dynamic alignment guides and rulers for precision layout
+//! - **Undo/Redo**: Complete operation history with atomic transactions
+//! - **Smart Editing**: Intelligent editing assistance and magnetic alignment
+//! - **Performance**: Spatial indexing for efficient hit-testing and rendering
+//!
+//! ## Architecture Overview
+//!
+//! The visual designer follows a component-based architecture where each system
+//! handles a specific aspect of the visual editing experience:
+//!
+//! ```
+//! VisualDesigner (main coordinator)
+//!     ├── GridSettings (snap-to-grid system)
+//!     ├── ComponentSelection (multi-select management)
+//!     ├── DesignHistory (undo/redo operations)
+//!     ├── GuideSystem (visual alignment aids)
+//!     ├── LayoutManager (spatial indexing and positioning)
+//!     └── SmartEditingSystem (intelligent assistance)
+//! ```
+//!
+//! ## Performance Considerations
+//!
+//! - **Spatial Indexing**: Components are spatially indexed for O(log n) hit-testing
+//! - **Dirty Regions**: Only modified areas are re-rendered when possible
+//! - **Event Batching**: Multiple operations are batched to reduce state updates
+//! - **Memory Pooling**: Frequently allocated objects are pooled for reuse
 
 use eframe::egui;
 use egui::NumExt; // For at_least method on Vec2
 use crate::rcl::ui::component::Component;
-use crate::editor::smart_editing::{SmartEditingSystem, SmartEditingResult};
+use crate::editor::smart_editing::SmartEditingSystem;
+use crate::editor::advanced_alignment::AdvancedAlignment;
 use std::collections::HashMap;
 
-/// Visual designer state and operations
+/// # Visual Designer State Container
+/// 
+/// Central coordinator for all visual design operations. This struct maintains the state
+/// of the visual editing environment and orchestrates interactions between different
+/// subsystems like grid management, component selection, and layout operations.
+/// 
+/// ## State Management
+/// 
+/// The visual designer maintains several types of state:
+/// - **Transient State**: Current selection, drag operations, hover states
+/// - **Persistent State**: Component positions, grid settings, design preferences
+/// - **History State**: Undo/redo operations with full state snapshots
+/// 
+/// ## Coordinate System
+/// 
+/// The designer uses a screen-space coordinate system where:
+/// - Origin (0,0) is at the top-left of the design canvas
+/// - X increases rightward, Y increases downward
+/// - All measurements are in logical pixels (egui units)
+/// - Grid snapping is applied in this coordinate space
+/// 
+/// ## Thread Safety
+/// 
+/// This struct is not thread-safe as it's designed to operate on the main UI thread.
+/// All operations should be performed within the egui update context.
 pub struct VisualDesigner {
-    /// Grid settings for alignment
+    // ==================================================================================
+    // LAYOUT AND POSITIONING SYSTEMS
+    // ==================================================================================
+    
+    /// Grid system for precise component alignment and snap-to-grid functionality.
+    /// 
+    /// Provides visual grid overlay and automatic snapping of component positions
+    /// to grid intersections. Essential for professional layout consistency.
     pub grid: GridSettings,
-    /// Currently selected components
-    pub selection: ComponentSelection,
-    /// Undo/Redo history
-    pub history: DesignHistory,
-    /// Visual guides and rulers
-    pub guides: GuideSystem,
-    /// Component positioning and layout
+    
+    /// Component positioning and spatial indexing system.
+    /// 
+    /// Manages the spatial relationships between components and provides efficient
+    /// hit-testing through spatial data structures. Maintains component bounds,
+    /// z-order, and collision detection.
     pub layout: LayoutManager,
-    /// Design-time properties
-    pub design_props: HashMap<usize, DesignTimeProperties>,
-    /// Smart editing system
+
+    // ==================================================================================
+    // SELECTION AND INTERACTION SYSTEMS  
+    // ==================================================================================
+    
+    /// Multi-component selection state and operations.
+    /// 
+    /// Tracks which components are currently selected and provides operations
+    /// for bulk manipulation of selected components. Supports various selection
+    /// modes including additive and toggle selection.
+    pub selection: ComponentSelection,
+    
+    /// Smart editing assistance system.
+    /// 
+    /// Provides intelligent editing aids such as:
+    /// - Magnetic alignment between components
+    /// - Automatic spacing suggestions
+    /// - Smart resizing with aspect ratio preservation
     pub smart_editing: SmartEditingSystem,
+
+    // ==================================================================================
+    // VISUAL AIDS AND ASSISTANCE
+    // ==================================================================================
+    
+    /// Dynamic visual guides and ruler system.
+    /// 
+    /// Renders alignment guides, rulers, and measurement overlays to assist
+    /// with precise component positioning. Shows distances, alignments, and
+    /// provides visual feedback during operations.
+    pub guides: GuideSystem,
+    
+    /// Professional alignment and distribution tools.
+    /// 
+    /// Advanced alignment system inspired by professional design tools,
+    /// providing operations like align left/right/center, distribute evenly,
+    /// make same size, etc.
+    pub advanced_alignment: AdvancedAlignment,
+
+    // ==================================================================================
+    // HISTORY AND STATE MANAGEMENT
+    // ==================================================================================
+    
+    /// Complete undo/redo operation history.
+    /// 
+    /// Maintains a history of all design operations with full state snapshots
+    /// to enable atomic undo/redo operations. Each operation is stored as a
+    /// complete transaction that can be reversed.
+    pub history: DesignHistory,
+    
+    /// Design-time properties for enhanced IDE integration.
+    /// 
+    /// Stores additional metadata for components that is only relevant during
+    /// design time, such as component names, locked state, and custom properties
+    /// that don't affect runtime behavior.
+    pub design_props: HashMap<usize, DesignTimeProperties>,
 }
 
 /// Grid system for component alignment
@@ -284,6 +394,7 @@ impl VisualDesigner {
             layout: LayoutManager::default(),
             design_props: HashMap::new(),
             smart_editing: SmartEditingSystem::new(),
+            advanced_alignment: AdvancedAlignment::new(),
         }
     }
 
@@ -325,30 +436,55 @@ impl VisualDesigner {
         for (idx, component) in components.iter_mut().enumerate() {
             // Get or initialize component position and size
             let pos = self.layout.positions.get(&idx).copied().unwrap_or_else(|| {
-                // Default positioning: spread components out if no position set
-                let default_pos = egui::pos2(50.0 + (idx as f32 * 120.0) % 400.0, 50.0 + (idx as f32 / 4.0).floor() * 50.0);
-                self.layout.positions.insert(idx, default_pos);
-                default_pos
+                // Improved default positioning: staggered grid layout to prevent overlaps
+                let columns = 3;
+                let col = idx % columns;
+                let row = idx / columns;
+                let spacing_x = 150.0;
+                let spacing_y = 60.0;
+                let start_x = 50.0;
+                let start_y = 50.0;
+                
+                let default_pos = egui::pos2(
+                    start_x + (col as f32 * spacing_x),
+                    start_y + (row as f32 * spacing_y)
+                );
+                
+                // Snap to grid if enabled
+                let final_pos = if self.grid.snap_enabled {
+                    self.snap_to_grid(default_pos)
+                } else {
+                    default_pos
+                };
+                
+                self.layout.positions.insert(idx, final_pos);
+                final_pos
             });
             
             let size = self.layout.sizes.get(&idx).copied().unwrap_or_else(|| {
-                // Default size based on component type
+                // Improved default sizes with better proportions
                 let default_size = match component.name() {
-                    "Button" => egui::vec2(80.0, 30.0),
-                    "Label" => egui::vec2(60.0, 20.0),
-                    "TextBox" => egui::vec2(120.0, 25.0),
-                    "Checkbox" => egui::vec2(100.0, 20.0),
-                    "Slider" => egui::vec2(120.0, 20.0),
-                    "Dropdown" => egui::vec2(100.0, 25.0),
-                    _ => egui::vec2(100.0, 30.0),
+                    "Button" => egui::vec2(100.0, 32.0),
+                    "Label" => egui::vec2(80.0, 24.0),
+                    "TextBox" => egui::vec2(140.0, 28.0),
+                    "Checkbox" => egui::vec2(120.0, 24.0),
+                    "Slider" => egui::vec2(140.0, 24.0),
+                    "Dropdown" => egui::vec2(120.0, 28.0),
+                    _ => egui::vec2(100.0, 32.0),
                 };
                 self.layout.sizes.insert(idx, default_size);
                 default_size
             });
             
-            // Create a child UI at the component's position
+            // Create a child UI at the component's position with proper padding
             let component_rect = egui::Rect::from_min_size(pos, size);
-            let mut child_ui = ui.child_ui(component_rect, egui::Layout::left_to_right(egui::Align::Center));
+            let mut child_ui = ui.child_ui(
+                component_rect, 
+                egui::Layout::left_to_right(egui::Align::Center)
+            );
+            
+            // Add some visual padding to prevent components from touching
+            child_ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
             
             // Render the component in design mode (non-editable)
             component.render(&mut child_ui);
@@ -358,46 +494,56 @@ impl VisualDesigner {
     /// Draw the grid system
     fn draw_grid(&self, ui: &mut egui::Ui, canvas_rect: egui::Rect) {
         let painter = ui.painter();
-        let grid_size = self.grid.size;
+        let grid_size = self.grid.size.max(1.0); // Prevent division by zero
         
-        // Vertical grid lines
-        let mut x = canvas_rect.min.x;
-        let mut line_count = 0;
-        while x <= canvas_rect.max.x {
-            let is_major = line_count % self.grid.major_lines == 0;
+        // Calculate grid bounds to avoid drawing too many lines
+        let max_lines = 1000; // Reasonable limit to prevent performance issues
+        let h_lines = ((canvas_rect.width() / grid_size) as i32).min(max_lines);
+        let v_lines = ((canvas_rect.height() / grid_size) as i32).min(max_lines);
+        
+        // Draw vertical grid lines
+        for i in 0..=h_lines {
+            let x = canvas_rect.min.x + (i as f32 * grid_size);
+            if x > canvas_rect.max.x { break; }
+            
+            let is_major = i % (self.grid.major_lines as i32) == 0;
             let color = if is_major {
-                self.grid.color.gamma_multiply(2.0)
+                self.grid.color.gamma_multiply(1.8)
             } else {
                 self.grid.color
             };
             
             painter.line_segment(
                 [egui::pos2(x, canvas_rect.min.y), egui::pos2(x, canvas_rect.max.y)],
-                egui::Stroke::new(if is_major { 1.0 } else { 0.5 }, color)
+                egui::Stroke::new(if is_major { 1.2 } else { 0.6 }, color)
             );
-            
-            x += grid_size;
-            line_count += 1;
         }
         
-        // Horizontal grid lines
-        let mut y = canvas_rect.min.y;
-        line_count = 0;
-        while y <= canvas_rect.max.y {
-            let is_major = line_count % self.grid.major_lines == 0;
+        // Draw horizontal grid lines
+        for i in 0..=v_lines {
+            let y = canvas_rect.min.y + (i as f32 * grid_size);
+            if y > canvas_rect.max.y { break; }
+            
+            let is_major = i % (self.grid.major_lines as i32) == 0;
             let color = if is_major {
-                self.grid.color.gamma_multiply(2.0)
+                self.grid.color.gamma_multiply(1.8)
             } else {
                 self.grid.color
             };
             
             painter.line_segment(
                 [egui::pos2(canvas_rect.min.x, y), egui::pos2(canvas_rect.max.x, y)],
-                egui::Stroke::new(if is_major { 1.0 } else { 0.5 }, color)
+                egui::Stroke::new(if is_major { 1.2 } else { 0.6 }, color)
             );
-            
-            y += grid_size;
-            line_count += 1;
+        }
+        
+        // Draw origin indicator at (0,0) relative to canvas
+        if canvas_rect.contains(egui::pos2(canvas_rect.min.x, canvas_rect.min.y)) {
+            painter.circle_filled(
+                egui::pos2(canvas_rect.min.x, canvas_rect.min.y),
+                3.0,
+                egui::Color32::from_rgb(255, 100, 100)
+            );
         }
     }
 
@@ -978,15 +1124,17 @@ impl VisualDesigner {
 
     /// Snap position to grid if enabled
     pub fn snap_to_grid(&self, pos: egui::Pos2) -> egui::Pos2 {
-        if !self.grid.snap_enabled {
+        if !self.grid.snap_enabled || self.grid.size <= 0.0 {
             return pos;
         }
         
-        let grid_size = self.grid.size;
-        egui::pos2(
-            (pos.x / grid_size).round() * grid_size,
-            (pos.y / grid_size).round() * grid_size
-        )
+        let grid_size = self.grid.size.max(1.0); // Ensure minimum grid size
+        
+        // Ensure snapped position is not negative
+        let snapped_x = ((pos.x / grid_size).round() * grid_size).max(0.0);
+        let snapped_y = ((pos.y / grid_size).round() * grid_size).max(0.0);
+        
+        egui::pos2(snapped_x, snapped_y)
     }
 
     /// Add operation to history for undo/redo

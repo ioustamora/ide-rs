@@ -22,3 +22,6 @@ pub mod live_feedback;
 pub mod smart_editing;
 pub mod hierarchy_manager;
 pub mod modern_ide_integration;
+pub mod multi_device_preview;
+pub mod advanced_alignment;
+pub mod template_system;

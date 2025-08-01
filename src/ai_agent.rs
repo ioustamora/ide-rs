@@ -1,7 +1,35 @@
-//! Enhanced AI Agent module for RAD IDE
+//! # AI Agent System - Intelligent Development Assistant
 //!
-//! This module provides comprehensive AI assistance for code generation,
-//! debugging, architecture suggestions, and UI component creation.
+//! This module implements a sophisticated AI assistant specifically designed for software
+//! development tasks within the RAD IDE. The AI agent provides context-aware assistance
+//! across multiple development domains including code generation, debugging, architecture 
+//! design, and UI development.
+//!
+//! ## Core Capabilities
+//!
+//! - **Code Generation**: Generates code from natural language descriptions
+//! - **Bug Analysis**: Analyzes error messages and suggests fixes
+//! - **Code Review**: Provides code quality feedback and improvement suggestions  
+//! - **Architecture Guidance**: Suggests architectural patterns and best practices
+//! - **UI Design**: Assists with component selection and user interface design
+//! - **Test Generation**: Creates unit tests and integration test scenarios
+//!
+//! ## Context Awareness
+//!
+//! The AI agent maintains rich context about the current development session:
+//! - Project structure and dependencies
+//! - Currently open files and selected code
+//! - Recent error messages and compiler output
+//! - Conversation history for contextual responses
+//! - Specialized knowledge for Rust and RAD development
+//!
+//! ## Integration with Ollama
+//!
+//! The system integrates with Ollama for local AI model execution, providing:
+//! - Privacy-preserving local AI processing
+//! - Customizable model selection (Code Llama, Llama 2, etc.)
+//! - Offline capability for secure development environments
+//! - Specialized prompt engineering for development tasks
 
 use ollama_rs::Ollama;
 use ollama_rs::generation::completion::request::GenerationRequest;

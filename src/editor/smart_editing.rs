@@ -7,7 +7,7 @@
 //! - Visual guides for better alignment
 
 use egui::*;
-use crate::editor::visual_designer::{VisualDesigner, ComponentSelection};
+use crate::editor::visual_designer::VisualDesigner;
 use std::collections::HashMap;
 
 /// Smart editing system for enhanced visual design experience

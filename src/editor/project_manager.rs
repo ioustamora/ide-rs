@@ -1,11 +1,46 @@
-//! Project Management System for RAD IDE
+//! # Project Management System
 //!
-//! This module provides comprehensive project management functionality including:
-//! - Project creation, loading, and saving
-//! - File system integration and browsing
-//! - Cargo project integration
-//! - Project templates and scaffolding
-//! - Version control integration hooks
+//! Comprehensive project lifecycle management for the RAD IDE, handling everything from
+//! project creation to deployment. This system provides a unified interface for managing
+//! Rust projects with integrated visual design data and build configuration.
+//!
+//! ## Core Responsibilities
+//!
+//! - **Project Lifecycle**: Create, open, save, and close projects with full state management
+//! - **File System Integration**: Browse, manage, and organize project files and directories
+//! - **Build System**: Integration with Cargo for building, testing, and running projects
+//! - **Template System**: Project scaffolding with predefined templates and configurations
+//! - **Serialization**: Persist project state, component layouts, and IDE-specific data
+//! - **Version Control**: Hooks for Git integration and collaborative development
+//!
+//! ## Project Structure
+//!
+//! Each RAD IDE project contains:
+//! ```
+//! project.ide          // IDE-specific metadata and designer state
+//! Cargo.toml           // Standard Rust project configuration
+//! src/                 // Source code (generated + custom)
+//! ├── main.rs          // Application entry point
+//! ├── components/      // Generated component code
+//! └── lib.rs           // Library code
+//! assets/              // UI assets (images, fonts, etc.)
+//! docs/                // Project documentation
+//! ```
+//!
+//! ## Serialization Strategy
+//!
+//! The project uses a hybrid serialization approach:
+//! - **IDE Data**: Stored in `.ide` files using serde with JSON/binary formats
+//! - **Code Assets**: Standard Rust files generated from visual components  
+//! - **Build Config**: Standard Cargo.toml with IDE-specific metadata
+//! - **Version Control**: Git-friendly structure with proper .gitignore
+//!
+//! ## Performance Optimizations
+//!
+//! - **Lazy Loading**: Project data is loaded on-demand to reduce startup time
+//! - **Incremental Saves**: Only modified components are serialized during saves
+//! - **Background Operations**: File operations use async I/O where possible
+//! - **Caching**: Frequently accessed project data is cached in memory
 
 use std::path::{Path, PathBuf};
 use std::fs;

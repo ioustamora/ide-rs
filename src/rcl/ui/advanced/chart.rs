@@ -5,7 +5,7 @@
 
 use egui::{Ui, Vec2, Pos2, Color32, Stroke, Rect};
 use crate::rcl::ui::component::Component;
-use std::collections::HashMap;
+// use std::collections::HashMap;
 
 /// Main chart component with multiple chart types
 pub struct Chart {
