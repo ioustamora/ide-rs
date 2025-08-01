@@ -18,7 +18,7 @@ impl Component for Image {
             ui.text_edit_singleline(&mut self.path);
             // TODO: Load texture from path
         } else if let Some(texture) = &self.texture {
-            ui.image(texture, [128.0, 128.0]);
+            ui.add(egui::Image::new(texture).max_size(egui::Vec2::new(128.0, 128.0)));
         } else {
             ui.label("No image loaded");
         }

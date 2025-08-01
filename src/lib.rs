@@ -2,3 +2,6 @@
 pub mod rcl;
 pub mod editor;
 pub mod ai_agent;
+
+// Re-export editor modules for easy access
+pub use editor::project_manager;

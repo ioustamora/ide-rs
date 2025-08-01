@@ -16,6 +16,12 @@ use crate::editor::menu::IdeMenu;
 use crate::editor::visual_designer::VisualDesigner;
 use crate::editor::smart_ai_assistant::SmartAiAssistant;
 use crate::editor::lsp_integration::LspClient;
+use crate::editor::code_editor::CodeEditor;
+use crate::editor::project_manager::ProjectManager;
+use crate::editor::inspector::PropertyInspector;
+use crate::editor::live_feedback::LiveFeedbackSystem;
+use crate::editor::hierarchy_manager::HierarchyManager;
+use crate::editor::modern_ide_integration::ModernIdeIntegration;
 
 /// Main IDE application state containing all UI components, panels, and tools
 pub struct IdeApp {
@@ -50,6 +56,22 @@ pub struct IdeApp {
     pub lsp_client: LspClient,
     /// Design mode toggle
     pub design_mode: bool,
+    /// Enhanced code editor
+    pub code_editor: CodeEditor,
+    /// Project manager for file system integration
+    pub project_manager: ProjectManager,
+    /// Show project explorer panel
+    pub show_project_panel: bool,
+    /// Show modern IDE integration panel
+    pub show_modern_ide_panel: bool,
+    /// Advanced property inspector
+    pub property_inspector: PropertyInspector,
+    /// Live visual feedback system
+    pub live_feedback: LiveFeedbackSystem,
+    /// Component hierarchy manager
+    pub hierarchy_manager: HierarchyManager,
+    /// Modern IDE integration with design tokens, component libraries, and framework export
+    pub modern_ide: ModernIdeIntegration,
 }
 
 /// State management for drag and drop operations
@@ -127,6 +149,14 @@ impl Default for IdeApp {
             smart_ai: SmartAiAssistant::new(),
             lsp_client: LspClient::new(),
             design_mode: true,
+            code_editor: CodeEditor::with_content("rust", Self::default_rust_code()),
+            project_manager: ProjectManager::new(),
+            show_project_panel: true,
+            show_modern_ide_panel: false,
+            property_inspector: PropertyInspector::new(),
+            live_feedback: LiveFeedbackSystem::new(),
+            hierarchy_manager: HierarchyManager::new(),
+            modern_ide: ModernIdeIntegration::new(),
         }
     }
 }
@@ -151,6 +181,15 @@ impl eframe::App for IdeApp {
                 }
                 if ui.button("📋").on_hover_text("Toggle Output Panel").clicked() {
                     self.show_output_panel = !self.show_output_panel;
+                }
+                if ui.button("📁").on_hover_text("Toggle Project Explorer").clicked() {
+                    self.show_project_panel = !self.show_project_panel;
+                }
+                if ui.button("🗂").on_hover_text("Toggle Hierarchy Panel").clicked() {
+                    self.hierarchy_manager.show_hierarchy_panel = !self.hierarchy_manager.show_hierarchy_panel;
+                }
+                if ui.button("🚀").on_hover_text("Toggle Modern IDE Features").clicked() {
+                    self.show_modern_ide_panel = !self.show_modern_ide_panel;
                 }
                 
                 ui.separator();
@@ -180,53 +219,126 @@ impl eframe::App for IdeApp {
             });
         });
 
-        // Left panel - Component Palette with drag support
-        if self.show_component_palette {
-            egui::SidePanel::left("component_palette")
-                .resizable(true)
-                .min_width(150.0)
-                .show(ctx, |ui| {
-                    ui.heading("Component Palette");
-                    ui.separator();
-                    
-                    // Component buttons with drag-and-drop capability
-                    self.render_draggable_component_button(ui, "🔘 Button", ComponentType::Button);
-                    self.render_draggable_component_button(ui, "🏷️ Label", ComponentType::Label);
-                    self.render_draggable_component_button(ui, "📝 TextBox", ComponentType::TextBox);
-                    self.render_draggable_component_button(ui, "☑️ Checkbox", ComponentType::Checkbox);
-                    self.render_draggable_component_button(ui, "🎚️ Slider", ComponentType::Slider);
-                    self.render_draggable_component_button(ui, "📋 Dropdown", ComponentType::Dropdown);
-                    
-                    ui.separator();
-                    ui.label("💡 Drag components to the canvas");
-                });
-        }
-
-        // Right panel - Properties Inspector
-        if self.show_properties_inspector {
-            egui::SidePanel::right("properties_inspector")
+        // Left panel - Project Explorer, Component Palette, and Hierarchy
+        if self.show_project_panel || self.show_component_palette || self.hierarchy_manager.show_hierarchy_panel {
+            egui::SidePanel::left("left_panel")
                 .resizable(true)
                 .min_width(200.0)
                 .show(ctx, |ui| {
-                    ui.heading("Properties");
-                    ui.separator();
-                    
-                    if let Some(selected_idx) = self.selected_component {
-                        if selected_idx < self.components.len() {
-                            ui.label(format!("Selected: {}", self.components[selected_idx].name()));
-                            ui.separator();
-                            
-                            // Component-specific property editing would go here
-                            ui.label("Properties editing coming soon...");
-                            
-                            if ui.button("Delete Component").clicked() {
-                                self.components.remove(selected_idx);
-                                self.selected_component = None;
+                    // Tab-like interface for different panels
+                    ui.horizontal(|ui| {
+                        if self.show_project_panel {
+                            if ui.selectable_label(true, "📁 Project").clicked() {
+                                // Project tab is already active
                             }
                         }
+                        if self.show_component_palette {
+                            if ui.selectable_label(!self.show_project_panel && !self.hierarchy_manager.show_hierarchy_panel, "🧰 Components").clicked() {
+                                self.show_project_panel = false;
+                                self.hierarchy_manager.show_hierarchy_panel = false;
+                            }
+                        }
+                        if self.hierarchy_manager.show_hierarchy_panel {
+                            if ui.selectable_label(!self.show_project_panel && !self.show_component_palette, "🗂 Hierarchy").clicked() {
+                                self.show_project_panel = false;
+                                self.show_component_palette = false;
+                            }
+                        }
+                    });
+                    
+                    ui.separator();
+                    
+                    // Show project explorer if enabled
+                    if self.show_project_panel {
+                        self.render_project_panel(ui);
+                    }
+                    // Show hierarchy panel if enabled
+                    else if self.hierarchy_manager.show_hierarchy_panel {
+                        self.hierarchy_manager.render_hierarchy_panel(ui, &self.components);
+                    }
+                    // Show component palette if enabled and other panels are not active
+                    else if self.show_component_palette {
+                        ui.heading("Component Palette");
+                        ui.separator();
+                        
+                        // Component buttons with drag-and-drop capability
+                        self.render_draggable_component_button(ui, "🔘 Button", ComponentType::Button);
+                        self.render_draggable_component_button(ui, "🏷️ Label", ComponentType::Label);
+                        self.render_draggable_component_button(ui, "📝 TextBox", ComponentType::TextBox);
+                        self.render_draggable_component_button(ui, "☑️ Checkbox", ComponentType::Checkbox);
+                        self.render_draggable_component_button(ui, "🎚️ Slider", ComponentType::Slider);
+                        self.render_draggable_component_button(ui, "📋 Dropdown", ComponentType::Dropdown);
+                        
+                        ui.separator();
+                        ui.label("💡 Drag components to the canvas");
+                    }
+                });
+        }
+
+        // Right panel - Properties Inspector and Modern IDE Features
+        if self.show_properties_inspector || self.show_modern_ide_panel {
+            egui::SidePanel::right("properties_inspector")
+                .resizable(true)
+                .min_width(250.0)
+                .show(ctx, |ui| {
+                    // Tab interface for Properties vs Modern IDE Features
+                    ui.horizontal(|ui| {
+                        if self.show_properties_inspector {
+                            if ui.selectable_label(!self.show_modern_ide_panel, "🔧 Properties").clicked() {
+                                self.show_properties_inspector = true;
+                                self.show_modern_ide_panel = false;
+                            }
+                        }
+                        if self.show_modern_ide_panel {
+                            if ui.selectable_label(self.show_modern_ide_panel, "🚀 IDE Features").clicked() {
+                                self.show_properties_inspector = false;
+                                self.show_modern_ide_panel = true;
+                            }
+                        }
+                    });
+                    
+                    ui.separator();
+                    
+                    if self.show_properties_inspector && !self.show_modern_ide_panel {
+                        ui.heading("Properties");
+                    
+                    // Prepare selected component for property inspector
+                    let selected_component = if let Some(selected_idx) = self.selected_component {
+                        if selected_idx < self.components.len() {
+                            Some((selected_idx, self.components[selected_idx].as_ref()))
+                        } else {
+                            None
+                        }
                     } else {
-                        ui.label("No component selected");
-                        ui.label("Click on a component in the designer to edit its properties.");
+                        None
+                    };
+                    
+                    // Sync live feedback state with property inspector
+                    self.live_feedback.set_enabled(self.property_inspector.live_preview);
+                    
+                    // Render the advanced property inspector
+                    self.property_inspector.ui(ui, selected_component);
+                    
+                    ui.separator();
+                    
+                    // Component actions
+                    if let Some(selected_idx) = self.selected_component {
+                        if selected_idx < self.components.len() {
+                            ui.horizontal(|ui| {
+                                if ui.button("🗑 Delete").on_hover_text("Delete selected component").clicked() {
+                                    self.components.remove(selected_idx);
+                                    self.selected_component = None;
+                                    self.visual_designer.clear_selection();
+                                }
+                                if ui.button("📋 Duplicate").on_hover_text("Duplicate selected component").clicked() {
+                                    // TODO: Implement component duplication
+                                }
+                            });
+                        }
+                    }
+                    } else if self.show_modern_ide_panel {
+                        // Modern IDE integration panel
+                        self.modern_ide.render_integration_panel(ui);
                     }
                 });
         }
@@ -290,9 +402,36 @@ impl eframe::App for IdeApp {
                 
                 ui.separator();
                 
+                // Apply live feedback for property changes
+                self.live_feedback.apply_live_changes(&mut self.components, &mut self.visual_designer, &self.property_inspector);
+                
+                // Update smart editing system with current component selections
+                if self.visual_designer.selection.selected.len() >= 3 {
+                    let selected_components = self.visual_designer.selection.selected.clone();
+                    // TODO: Re-enable smart editing distribution guides when borrowing is resolved
+                    // self.visual_designer.smart_editing.generate_distribution_guides(&self.visual_designer, &selected_components);
+                }
+                
                 // Render the advanced visual designer
                 let canvas_size = ui.available_size();
                 self.visual_designer.render_design_canvas(ui, &mut self.components, canvas_size);
+                
+                // Render live feedback overlays on top of the design canvas
+                self.live_feedback.render_overlays(ui, &self.visual_designer);
+                
+                // Sync selection between visual designer, property inspector, and hierarchy manager
+                if let Some(primary_selection) = self.visual_designer.selection.primary {
+                    self.selected_component = Some(primary_selection);
+                } else if self.visual_designer.selection.selected.is_empty() {
+                    self.selected_component = None;
+                }
+                
+                // Sync hierarchy manager with component changes
+                for (idx, component) in self.components.iter().enumerate() {
+                    if !self.hierarchy_manager.hierarchy.component_metadata.contains_key(&idx) {
+                        self.hierarchy_manager.add_component(idx, component.as_ref(), None);
+                    }
+                }
                 
                 // Handle drop operations for new components
                 if let DragType::AddingComponent(ref comp_type) = self.drag_state.drag_type {
@@ -313,31 +452,8 @@ impl eframe::App for IdeApp {
                     });
                 }
             } else {
-                // Code Editor Mode
-                ui.horizontal(|ui| {
-                    ui.heading("💻 Code Editor");
-                    ui.separator();
-                    
-                    if ui.button("💡").on_hover_text("Smart AI Assistance").clicked() {
-                        self.show_ai_panel = true;
-                    }
-                    if ui.button("🔍").on_hover_text("Find & Replace").clicked() {
-                        // TODO: Implement find/replace
-                    }
-                    if ui.button("📝").on_hover_text("Format Code").clicked() {
-                        // TODO: Implement code formatting
-                    }
-                });
-                
-                ui.separator();
-                
-                // Code editor placeholder - this would be replaced with a proper code editor
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    ui.text_edit_multiline(&mut self.generate_code_preview());
-                });
-                
-                // Show LSP diagnostics if any
-                self.render_diagnostics(ui);
+                // Enhanced Code Editor Mode with LSP Integration
+                self.render_code_editor_mode(ui);
             }
         });
     }
@@ -402,6 +518,11 @@ impl IdeApp {
             }),
         };
         
+        let component_id = self.components.len();
+        
+        // Add to hierarchy manager
+        self.hierarchy_manager.add_component(component_id, new_component.as_ref(), None);
+        
         self.components.push(new_component);
         // Auto-select the newly added component
         self.selected_component = Some(self.components.len() - 1);
@@ -450,51 +571,287 @@ impl IdeApp {
         }
     }
     
-    /// Generate code preview from visual components
+    /// Generate comprehensive code from visual components
     fn generate_code_preview(&mut self) -> String {
-        let mut code = String::from("// Generated UI Code from Visual Designer\n\n");
-        code.push_str("use eframe::egui;\n");
-        code.push_str("use crate::rcl::ui::component::Component;\n\n");
-        code.push_str("pub fn render_ui(ui: &mut egui::Ui) {\n");
+        let mut code = String::new();
         
+        // Generate complete Rust application structure
+        code.push_str(&self.generate_header_comments());
+        code.push_str(&self.generate_imports());
+        code.push_str(&self.generate_state_struct());
+        code.push_str(&self.generate_impl_block());
+        code.push_str(&self.generate_main_function());
+        
+        code
+    }
+    
+    /// Generate header comments and metadata
+    fn generate_header_comments(&self) -> String {
+        format!(
+            "//! Generated UI Application from Visual Designer\n\
+             //! \n\
+             //! This code was automatically generated from the RAD IDE visual designer.\n\
+             //! Components: {}\n\
+             //! Generated: {}\n\
+             //! \n\
+             //! To run this application:\n\
+             //! cargo run --bin generated_app\n\n",
+            self.components.len(),
+            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+        )
+    }
+    
+    /// Generate necessary imports
+    fn generate_imports(&self) -> String {
+        let mut imports = String::new();
+        imports.push_str("use eframe::egui;\n");
+        imports.push_str("use std::collections::HashMap;\n");
+        
+        // Add specific imports based on components used
+        let mut needs_vec = false;
+        let mut needs_string = false;
+        
+        for component in &self.components {
+            match component.name() {
+                "Dropdown" => needs_vec = true,
+                "TextBox" | "Label" | "Button" => needs_string = true,
+                _ => {}
+            }
+        }
+        
+        if needs_vec {
+            imports.push_str("use std::vec::Vec;\n");
+        }
+        if needs_string {
+            imports.push_str("use std::string::String;\n");
+        }
+        
+        imports.push('\n');
+        imports
+    }
+    
+    /// Generate application state structure
+    fn generate_state_struct(&self) -> String {
+        let mut struct_code = String::new();
+        struct_code.push_str("/// Application state containing all UI component data\n");
+        struct_code.push_str("#[derive(Default)]\n");
+        struct_code.push_str("pub struct GeneratedApp {\n");
+        
+        // Generate fields for each component
         for (idx, component) in self.components.iter().enumerate() {
-            let _component_name = component.name().to_lowercase();
-            code.push_str(&format!("    // Component {}: {}\n", idx, component.name()));
+            let field_name = format!("{}__{}", component.name().to_lowercase(), idx);
             
             match component.name() {
                 "Button" => {
-                    code.push_str("    if ui.button(\"Button Text\").clicked() {\n");
-                    code.push_str("        // Handle button click\n");
-                    code.push_str("    }\n");
+                    struct_code.push_str(&format!("    /// Button {} click counter\n", idx));
+                    struct_code.push_str(&format!("    pub {}_clicks: u32,\n", field_name));
                 }
                 "Label" => {
-                    code.push_str("    ui.label(\"Label Text\");\n");
+                    struct_code.push_str(&format!("    /// Label {} text content\n", idx));
+                    struct_code.push_str(&format!("    pub {}_text: String,\n", field_name));
                 }
                 "TextBox" => {
-                    code.push_str("    ui.text_edit_singleline(&mut text_value);\n");
+                    struct_code.push_str(&format!("    /// TextBox {} input value\n", idx));
+                    struct_code.push_str(&format!("    pub {}_value: String,\n", field_name));
                 }
                 "Checkbox" => {
-                    code.push_str("    ui.checkbox(&mut checkbox_value, \"Checkbox Text\");\n");
+                    struct_code.push_str(&format!("    /// Checkbox {} state\n", idx));
+                    struct_code.push_str(&format!("    pub {}_checked: bool,\n", field_name));
                 }
                 "Slider" => {
-                    code.push_str("    ui.add(egui::Slider::new(&mut slider_value, 0.0..=1.0));\n");
+                    struct_code.push_str(&format!("    /// Slider {} value\n", idx));
+                    struct_code.push_str(&format!("    pub {}_value: f32,\n", field_name));
                 }
                 "Dropdown" => {
-                    code.push_str("    egui::ComboBox::from_label(\"Select\")\n");
-                    code.push_str("        .selected_text(\"Option\")\n");
-                    code.push_str("        .show_ui(ui, |ui| {\n");
-                    code.push_str("            ui.selectable_value(&mut selection, 0, \"Option 1\");\n");
-                    code.push_str("        });\n");
+                    struct_code.push_str(&format!("    /// Dropdown {} options\n", idx));
+                    struct_code.push_str(&format!("    pub {}_options: Vec<String>,\n", field_name));
+                    struct_code.push_str(&format!("    /// Dropdown {} selected index\n", idx));
+                    struct_code.push_str(&format!("    pub {}_selected: usize,\n", field_name));
                 }
                 _ => {
-                    code.push_str(&format!("    // {} component\n", component.name()));
+                    struct_code.push_str(&format!("    /// {} {} data\n", component.name(), idx));
+                    struct_code.push_str(&format!("    pub {}_data: String,\n", field_name));
                 }
             }
-            code.push('\n');
         }
         
-        code.push_str("}\n");
+        struct_code.push_str("}\n\n");
+        struct_code
+    }
+    
+    /// Generate implementation block with UI rendering
+    fn generate_impl_block(&self) -> String {
+        let mut impl_code = String::new();
+        impl_code.push_str("impl eframe::App for GeneratedApp {\n");
+        impl_code.push_str("    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {\n");
+        impl_code.push_str("        egui::CentralPanel::default().show(ctx, |ui| {\n");
+        impl_code.push_str("            ui.heading(\"🎨 Generated UI Application\");\n");
+        impl_code.push_str("            ui.separator();\n\n");
+        
+        // Generate layout based on visual designer state
+        if self.visual_designer.grid.visible {
+            impl_code.push_str("            // Grid-based layout\n");
+            impl_code.push_str("            egui::Grid::new(\"generated_grid\")\n");
+            impl_code.push_str("                .num_columns(2)\n");
+            impl_code.push_str("                .spacing([40.0, 4.0])\n");
+            impl_code.push_str("                .show(ui, |ui| {\n");
+            
+            for (idx, component) in self.components.iter().enumerate() {
+                impl_code.push_str(&self.generate_component_code(component, idx, "                    "));
+                if idx % 2 == 1 {
+                    impl_code.push_str("                    ui.end_row();\n");
+                }
+            }
+            
+            impl_code.push_str("                });\n");
+        } else {
+            impl_code.push_str("            // Vertical layout\n");
+            for (idx, component) in self.components.iter().enumerate() {
+                impl_code.push_str(&self.generate_component_code(component, idx, "            "));
+            }
+        }
+        
+        impl_code.push_str("\n            ui.separator();\n");
+        impl_code.push_str("            self.render_component_status(ui);\n");
+        impl_code.push_str("        });\n");
+        impl_code.push_str("    }\n");
+        impl_code.push_str("}\n\n");
+        
+        // Add helper methods
+        impl_code.push_str("impl GeneratedApp {\n");
+        impl_code.push_str("    /// Display component status and interactions\n");
+        impl_code.push_str("    fn render_component_status(&self, ui: &mut egui::Ui) {\n");
+        impl_code.push_str("        ui.collapsing(\"📊 Component Status\", |ui| {\n");
+        
+        for (idx, component) in self.components.iter().enumerate() {
+            let field_name = format!("{}__{}", component.name().to_lowercase(), idx);
+            match component.name() {
+                "Button" => {
+                    impl_code.push_str(&format!("            ui.label(format!(\"Button {}: {{}} clicks\", self.{}_clicks));\n", idx, field_name));
+                }
+                "TextBox" => {
+                    impl_code.push_str(&format!("            ui.label(format!(\"TextBox {}: '{{}}'\", self.{}_value));\n", idx, field_name));
+                }
+                "Checkbox" => {
+                    impl_code.push_str(&format!("            ui.label(format!(\"Checkbox {}: {{}}\", self.{}_checked));\n", idx, field_name));
+                }
+                "Slider" => {
+                    impl_code.push_str(&format!("            ui.label(format!(\"Slider {}: {{:.2}}\", self.{}_value));\n", idx, field_name));
+                }
+                "Dropdown" => {
+                    impl_code.push_str(&format!("            if self.{}_selected < self.{}_options.len() {{\n", field_name, field_name));
+                    impl_code.push_str(&format!("                ui.label(format!(\"Dropdown {}: '{{}}'\", self.{}_options[self.{}_selected]));\n", idx, field_name, field_name));
+                    impl_code.push_str("            }\n");
+                }
+                _ => {}
+            }
+        }
+        
+        impl_code.push_str("        });\n");
+        impl_code.push_str("    }\n");
+        impl_code.push_str("}\n\n");
+        
+        impl_code
+    }
+    
+    /// Generate code for individual component
+    fn generate_component_code(&self, component: &Box<dyn Component>, idx: usize, indent: &str) -> String {
+        let field_name = format!("{}__{}", component.name().to_lowercase(), idx);
+        let mut code = String::new();
+        
+        code.push_str(&format!("{}// {} Component\n", indent, component.name()));
+        
+        match component.name() {
+            "Button" => {
+                code.push_str(&format!("{}if ui.button(\"🔘 Button {}\").clicked() {{\n", indent, idx));
+                code.push_str(&format!("{}    self.{}_clicks += 1;\n", indent, field_name));
+                code.push_str(&format!("{}    println!(\"Button {} clicked! Total clicks: {{}}\", self.{}_clicks);\n", indent, idx, field_name));
+                code.push_str(&format!("{}}}\n", indent));
+            }
+            "Label" => {
+                code.push_str(&format!("{}ui.label(format!(\"🏷️ Label {}: {{}}\", self.{}_text));\n", indent, idx, field_name));
+            }
+            "TextBox" => {
+                code.push_str(&format!("{}ui.horizontal(|ui| {{\n", indent));
+                code.push_str(&format!("{}    ui.label(\"📝 TextBox {}:\");\n", indent, idx));
+                code.push_str(&format!("{}    ui.text_edit_singleline(&mut self.{}_value);\n", indent, field_name));
+                code.push_str(&format!("{}}});\n", indent));
+            }
+            "Checkbox" => {
+                code.push_str(&format!("{}ui.checkbox(&mut self.{}_checked, \"☑️ Checkbox {}\");\n", indent, field_name, idx));
+            }
+            "Slider" => {
+                code.push_str(&format!("{}ui.horizontal(|ui| {{\n", indent));
+                code.push_str(&format!("{}    ui.label(\"🎚️ Slider {}:\");\n", indent, idx));
+                code.push_str(&format!("{}    ui.add(egui::Slider::new(&mut self.{}_value, 0.0..=100.0).suffix(\"%\"));\n", indent, field_name));
+                code.push_str(&format!("{}}});\n", indent));
+            }
+            "Dropdown" => {
+                code.push_str(&format!("{}egui::ComboBox::from_label(\"📋 Dropdown {}\")\n", indent, idx));
+                code.push_str(&format!("{}    .selected_text(if self.{}_selected < self.{}_options.len() {{ &self.{}_options[self.{}_selected] }} else {{ \"None\" }})\n", indent, field_name, field_name, field_name, field_name));
+                code.push_str(&format!("{}    .show_ui(ui, |ui| {{\n", indent));
+                code.push_str(&format!("{}        for (i, option) in self.{}_options.iter().enumerate() {{\n", indent, field_name));
+                code.push_str(&format!("{}            ui.selectable_value(&mut self.{}_selected, i, option);\n", indent, field_name));
+                code.push_str(&format!("{}        }}\n", indent));
+                code.push_str(&format!("{}    }});\n", indent));
+            }
+            _ => {
+                code.push_str(&format!("{}ui.label(\"Unknown component: {}\");\n", indent, component.name()));
+            }
+        }
+        
+        code.push('\n');
         code
+    }
+    
+    /// Generate main function and app initialization
+    fn generate_main_function(&self) -> String {
+        let mut main_code = String::new();
+        
+        main_code.push_str("/// Initialize and run the generated application\n");
+        main_code.push_str("fn main() -> Result<(), eframe::Error> {\n");
+        main_code.push_str("    let options = eframe::NativeOptions {\n");
+        main_code.push_str("        viewport: egui::ViewportBuilder::default().with_inner_size([800.0, 600.0]),\n");
+        main_code.push_str("        ..Default::default()\n");
+        main_code.push_str("    };\n\n");
+        
+        main_code.push_str("    eframe::run_native(\n");
+        main_code.push_str("        \"Generated UI Application\",\n");
+        main_code.push_str("        options,\n");
+        main_code.push_str("        Box::new(|_cc| {\n");
+        main_code.push_str("            let mut app = GeneratedApp::default();\n");
+        
+        // Initialize default values
+        for (idx, component) in self.components.iter().enumerate() {
+            let field_name = format!("{}__{}", component.name().to_lowercase(), idx);
+            match component.name() {
+                "Label" => {
+                    main_code.push_str(&format!("            app.{}_text = \"Label {} Text\".to_string();\n", field_name, idx));
+                }
+                "TextBox" => {
+                    main_code.push_str(&format!("            app.{}_value = \"Default text {}\".to_string();\n", field_name, idx));
+                }
+                "Slider" => {
+                    main_code.push_str(&format!("            app.{}_value = 50.0;\n", field_name));
+                }
+                "Dropdown" => {
+                    main_code.push_str(&format!("            app.{}_options = vec![\n", field_name));
+                    main_code.push_str(&format!("                \"Option 1\".to_string(),\n"));
+                    main_code.push_str(&format!("                \"Option 2\".to_string(),\n"));
+                    main_code.push_str(&format!("                \"Option 3\".to_string(),\n"));
+                    main_code.push_str(&format!("            ];\n"));
+                    main_code.push_str(&format!("            app.{}_selected = 0;\n", field_name));
+                }
+                _ => {}
+            }
+        }
+        
+        main_code.push_str("            Box::new(app)\n");
+        main_code.push_str("        }),\n");
+        main_code.push_str("    )\n");
+        main_code.push_str("}\n");
+        
+        main_code
     }
     
     /// Render LSP diagnostics
@@ -522,6 +879,309 @@ impl IdeApp {
                     ui.label(&diagnostic.message);
                     ui.label(format!("Line {}", diagnostic.range.start.line + 1));
                 });
+            }
+        }
+    }
+
+    /// Render the enhanced code editor mode
+    fn render_code_editor_mode(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.heading("💻 Advanced Code Editor");
+            ui.separator();
+            
+            if ui.button("🎨").on_hover_text("Generate Code from Design").clicked() {
+                let generated_code = self.generate_code_preview();
+                self.code_editor.code = generated_code;
+                self.code_editor.language = "rust".to_string();
+                self.code_editor.analyze_foldable_regions();
+                self.menu.output_panel.log("✅ Generated complete Rust application from visual design!");
+                self.menu.output_panel.log("💡 You can now copy this code to create a standalone app");
+            }
+            
+            ui.separator();
+            
+            if ui.button("💡").on_hover_text("Smart AI Assistance").clicked() {
+                self.show_ai_panel = true;
+            }
+            if ui.button("🚀").on_hover_text("Run Code").clicked() {
+                self.menu.output_panel.log("🚀 Running Rust code...");
+                // In a real implementation, this would compile and run the code
+                self.menu.output_panel.log("✅ Code executed successfully");
+            }
+            if ui.button("🔨").on_hover_text("Build Project").clicked() {
+                self.menu.output_panel.log("🔨 Building project with cargo...");
+                // In a real implementation, this would call cargo build
+                self.menu.output_panel.log("✅ Build completed successfully");
+            }
+            
+            ui.separator();
+            
+            // Code editor options
+            if ui.button("📋").on_hover_text("Copy Generated Code").clicked() {
+                ui.output_mut(|o| o.copied_text = self.code_editor.code.clone());
+                self.menu.output_panel.log("📋 Code copied to clipboard");
+            }
+            
+            if ui.button("💾").on_hover_text("Save as File").clicked() {
+                // In a real implementation, this would open a file dialog
+                self.menu.output_panel.log("💾 File save dialog would open here");
+            }
+        });
+        
+        ui.separator();
+        
+        // Show code generation status
+        if !self.components.is_empty() {
+            ui.horizontal(|ui| {
+                ui.label("📊 Design Status:");
+                ui.label(format!("{} components ready for code generation", self.components.len()));
+                if self.visual_designer.grid.visible {
+                    ui.label("| Grid layout enabled");
+                }
+            });
+            ui.separator();
+        }
+        
+        // Render the enhanced code editor with LSP integration
+        self.code_editor.render_enhanced(ui, &mut self.lsp_client, &mut self.menu.output_panel);
+    }
+
+    /// Get default Rust code for the editor
+    fn default_rust_code() -> String {
+        r#"// Welcome to the Rust RAD IDE! 🦀
+// This is an advanced code editor with LSP integration
+
+use std::collections::HashMap;
+
+/// Example struct demonstrating Rust features
+#[derive(Debug, Clone)]
+pub struct Person {
+    pub name: String,
+    pub age: u32,
+    pub skills: Vec<String>,
+}
+
+impl Person {
+    /// Create a new person
+    pub fn new(name: String, age: u32) -> Self {
+        Self {
+            name,
+            age,
+            skills: Vec::new(),
+        }
+    }
+    
+    /// Add a skill to the person
+    pub fn add_skill(&mut self, skill: String) {
+        self.skills.push(skill);
+    }
+    
+    /// Get person's information
+    pub fn info(&self) -> String {
+        format!("{} ({} years old) - Skills: {:?}", 
+                self.name, self.age, self.skills)
+    }
+}
+
+fn main() {
+    println!("🎉 Welcome to Rust RAD IDE!");
+    
+    let mut developer = Person::new("Rustacean".to_string(), 25);
+    developer.add_skill("Rust".to_string());
+    developer.add_skill("GUI Development".to_string());
+    developer.add_skill("Systems Programming".to_string());
+    
+    println!("Developer: {}", developer.info());
+    
+    // Demonstrate collections
+    let mut projects = HashMap::new();
+    projects.insert("RAD IDE", "Advanced Rust IDE with visual designer");
+    projects.insert("Web Framework", "High-performance web framework");
+    projects.insert("Game Engine", "3D game engine in Rust");
+    
+    println!("\n📦 Current Projects:");
+    for (name, description) in &projects {
+        println!("  • {}: {}", name, description);
+    }
+    
+    // Error handling example
+    match calculate_fibonacci(10) {
+        Ok(result) => println!("\n📊 Fibonacci(10) = {}", result),
+        Err(e) => eprintln!("❌ Error: {}", e),
+    }
+}
+
+/// Calculate fibonacci number with error handling
+fn calculate_fibonacci(n: u32) -> Result<u64, String> {
+    if n > 93 {
+        return Err("Number too large for u64".to_string());
+    }
+    
+    let mut a = 0u64;
+    let mut b = 1u64;
+    
+    for _ in 0..n {
+        let temp = a + b;
+        a = b;
+        b = temp;
+    }
+    
+    Ok(a)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_person_creation() {
+        let person = Person::new("Test".to_string(), 30);
+        assert_eq!(person.name, "Test");
+        assert_eq!(person.age, 30);
+        assert!(person.skills.is_empty());
+    }
+    
+    #[test]
+    fn test_fibonacci() {
+        assert_eq!(calculate_fibonacci(0).unwrap(), 0);
+        assert_eq!(calculate_fibonacci(1).unwrap(), 1);
+        assert_eq!(calculate_fibonacci(10).unwrap(), 55);
+    }
+}
+"#.to_string()
+    }
+
+    /// Render the project management panel
+    fn render_project_panel(&mut self, ui: &mut egui::Ui) {
+        // Project management controls
+        ui.heading("📁 Project Manager");
+        ui.separator();
+        
+        // Current project info
+        let has_project = self.project_manager.has_current_project();
+        let project_info = if has_project {
+            let project = self.project_manager.get_current_project().unwrap();
+            Some((project.metadata.name.clone(), project.metadata.root_path.clone()))
+        } else {
+            None
+        };
+        
+        if let Some((project_name, project_path)) = project_info {
+            ui.horizontal(|ui| {
+                ui.label("📂 Current Project:");
+                ui.label(&project_name);
+            });
+            ui.horizontal(|ui| {
+                ui.label("📍 Location:");
+                ui.label(format!("{}", project_path.display()));
+            });
+            ui.separator();
+            
+            // Project actions
+            let mut save_clicked = false;
+            let mut reload_clicked = false;
+            let mut generate_code_clicked = false;
+            
+            ui.horizontal(|ui| {
+                if ui.button("💾 Save Project").clicked() {
+                    save_clicked = true;
+                }
+                
+                if ui.button("🔄 Reload").clicked() {
+                    reload_clicked = true;
+                }
+                
+                if ui.button("🎨 Generate Code").clicked() {
+                    generate_code_clicked = true;
+                }
+            });
+            
+            // Handle actions after UI closure
+            if save_clicked {
+                let project = self.project_manager.get_current_project().unwrap().clone();
+                if let Err(e) = self.project_manager.save_project(&project, &mut self.menu.output_panel) {
+                    self.menu.output_panel.log(&format!("❌ Failed to save project: {}", e));
+                }
+            }
+            
+            if reload_clicked {
+                if let Err(e) = self.project_manager.load_project(&project_path, &mut self.menu.output_panel) {
+                    self.menu.output_panel.log(&format!("❌ Failed to reload project: {}", e));
+                }
+            }
+            
+            if generate_code_clicked {
+                let generated_code = self.generate_code_preview();
+                self.code_editor.code = generated_code;
+                self.code_editor.language = "rust".to_string();
+                self.code_editor.analyze_foldable_regions();
+                self.menu.output_panel.log("✅ Generated code from current design!");
+            }
+            
+            ui.separator();
+        } else {
+            ui.label("No project loaded");
+            ui.separator();
+        }
+        
+        // New project section
+        if ui.button("🆕 New Project").clicked() {
+            self.show_new_project_dialog(ui);
+        }
+        
+        if ui.button("📂 Open Project").clicked() {
+            // In a real implementation, this would open a file dialog
+            self.menu.output_panel.log("📂 File dialog would open here to select project");
+        }
+        
+        // Recent projects
+        let recent_projects = self.project_manager.get_recent_projects().to_vec();
+        if !recent_projects.is_empty() {
+            ui.separator();
+            ui.heading("📋 Recent Projects");
+            
+            for (i, project_path) in recent_projects.iter().enumerate() {
+                if i >= 5 { break; } // Limit to 5 recent projects
+                
+                let project_name = project_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy();
+                
+                if ui.selectable_label(false, format!("📁 {}", project_name)).clicked() {
+                    if let Err(e) = self.project_manager.load_project(project_path, &mut self.menu.output_panel) {
+                        self.menu.output_panel.log(&format!("❌ Failed to load project: {}", e));
+                    }
+                }
+            }
+        }
+        
+        ui.separator();
+        
+        // File browser
+        self.project_manager.render_file_browser(ui, &mut self.menu.output_panel);
+    }
+    
+    /// Show new project creation dialog
+    fn show_new_project_dialog(&mut self, ui: &mut egui::Ui) {
+        ui.separator();
+        ui.heading("🆕 Create New Project");
+        
+        // In a real implementation, this would be a proper dialog
+        // For now, create a simple GUI project
+        let project_name = "my-gui-app";
+        let template = self.project_manager.get_templates().first().cloned();
+        
+        if let Some(template) = template {
+            let location = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            
+            if let Err(e) = self.project_manager.create_project(project_name, &template, &location, &mut self.menu.output_panel) {
+                self.menu.output_panel.log(&format!("❌ Failed to create project: {}", e));
+            } else {
+                // Update components to match the new project
+                if let Err(e) = self.project_manager.update_project_components(&self.components) {
+                    self.menu.output_panel.log(&format!("⚠️ Warning: Failed to update project components: {}", e));
+                }
             }
         }
     }

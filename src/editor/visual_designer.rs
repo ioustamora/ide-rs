@@ -9,7 +9,9 @@
 //! - Real-time property preview
 
 use eframe::egui;
+use egui::NumExt; // For at_least method on Vec2
 use crate::rcl::ui::component::Component;
+use crate::editor::smart_editing::{SmartEditingSystem, SmartEditingResult};
 use std::collections::HashMap;
 
 /// Visual designer state and operations
@@ -26,6 +28,8 @@ pub struct VisualDesigner {
     pub layout: LayoutManager,
     /// Design-time properties
     pub design_props: HashMap<usize, DesignTimeProperties>,
+    /// Smart editing system
+    pub smart_editing: SmartEditingSystem,
 }
 
 /// Grid system for component alignment
@@ -49,10 +53,14 @@ pub struct ComponentSelection {
     pub selected: Vec<usize>,
     /// Primary selection (for properties editing)
     pub primary: Option<usize>,
-    /// Selection rectangle
+    /// Selection rectangle for multi-select
     pub selection_rect: Option<egui::Rect>,
     /// Multi-select mode
     pub multi_select_mode: bool,
+    /// Currently dragging components
+    pub dragging: Option<DragOperation>,
+    /// Hover state for visual feedback
+    pub hover_component: Option<usize>,
 }
 
 /// Undo/Redo system for design operations
@@ -147,6 +155,45 @@ pub enum AlignmentOperation {
     SameSize,
 }
 
+/// Active drag operation
+#[derive(Clone)]
+pub struct DragOperation {
+    /// Components being dragged
+    pub component_indices: Vec<usize>,
+    /// Original positions before drag started
+    pub original_positions: Vec<egui::Pos2>,
+    /// Current drag offset from start
+    pub drag_offset: egui::Vec2,
+    /// Drag start position
+    pub start_pos: egui::Pos2,
+    /// Type of drag operation
+    pub drag_type: DragOperationType,
+}
+
+/// Types of drag operations
+#[derive(Clone, Copy)]
+pub enum DragOperationType {
+    /// Moving components
+    Move,
+    /// Resizing a component
+    Resize { handle: ResizeHandle },
+    /// Creating selection rectangle
+    SelectionRect,
+}
+
+/// Resize handle types
+#[derive(Clone, Copy)]
+pub enum ResizeHandle {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+    TopCenter,
+    BottomCenter,
+    LeftCenter,
+    RightCenter,
+}
+
 /// Design-time properties for components
 #[derive(Clone)]
 pub struct DesignTimeProperties {
@@ -179,6 +226,8 @@ impl Default for ComponentSelection {
             primary: None,
             selection_rect: None,
             multi_select_mode: false,
+            dragging: None,
+            hover_component: None,
         }
     }
 }
@@ -234,6 +283,7 @@ impl VisualDesigner {
             guides: GuideSystem::default(),
             layout: LayoutManager::default(),
             design_props: HashMap::new(),
+            smart_editing: SmartEditingSystem::new(),
         }
     }
 
@@ -254,14 +304,55 @@ impl VisualDesigner {
         // Draw guides
         self.draw_guides(ui, canvas_rect);
         
-        // Handle component interaction
+        // Render actual components at their positions
+        self.render_components_at_positions(ui, components);
+        
+        // Handle component interaction (must be after rendering for proper hit testing)
         self.handle_component_interaction(ui, components, canvas_rect);
         
-        // Draw selection indicators
+        // Draw selection indicators on top
         self.draw_selection_indicators(ui, components);
         
         // Draw alignment helpers
         self.draw_alignment_helpers(ui, components);
+        
+        // Render smart editing guides
+        self.smart_editing.render_guides(ui, canvas_rect);
+    }
+    
+    /// Render components at their design-time positions
+    fn render_components_at_positions(&mut self, ui: &mut egui::Ui, components: &mut [Box<dyn Component>]) {
+        for (idx, component) in components.iter_mut().enumerate() {
+            // Get or initialize component position and size
+            let pos = self.layout.positions.get(&idx).copied().unwrap_or_else(|| {
+                // Default positioning: spread components out if no position set
+                let default_pos = egui::pos2(50.0 + (idx as f32 * 120.0) % 400.0, 50.0 + (idx as f32 / 4.0).floor() * 50.0);
+                self.layout.positions.insert(idx, default_pos);
+                default_pos
+            });
+            
+            let size = self.layout.sizes.get(&idx).copied().unwrap_or_else(|| {
+                // Default size based on component type
+                let default_size = match component.name() {
+                    "Button" => egui::vec2(80.0, 30.0),
+                    "Label" => egui::vec2(60.0, 20.0),
+                    "TextBox" => egui::vec2(120.0, 25.0),
+                    "Checkbox" => egui::vec2(100.0, 20.0),
+                    "Slider" => egui::vec2(120.0, 20.0),
+                    "Dropdown" => egui::vec2(100.0, 25.0),
+                    _ => egui::vec2(100.0, 30.0),
+                };
+                self.layout.sizes.insert(idx, default_size);
+                default_size
+            });
+            
+            // Create a child UI at the component's position
+            let component_rect = egui::Rect::from_min_size(pos, size);
+            let mut child_ui = ui.child_ui(component_rect, egui::Layout::left_to_right(egui::Align::Center));
+            
+            // Render the component in design mode (non-editable)
+            component.render(&mut child_ui);
+        }
     }
 
     /// Draw the grid system
@@ -409,47 +500,377 @@ impl VisualDesigner {
     }
 
     /// Handle component interaction (selection, moving, resizing)
-    fn handle_component_interaction(&mut self, ui: &mut egui::Ui, components: &mut [Box<dyn Component>], _canvas_rect: egui::Rect) {
-        // Component interaction logic will be implemented here
-        // This includes:
-        // - Click to select
-        // - Drag to move
-        // - Resize handles
-        // - Multi-select with Ctrl+click or drag rectangle
+    fn handle_component_interaction(&mut self, ui: &mut egui::Ui, components: &mut [Box<dyn Component>], canvas_rect: egui::Rect) {
+        let pointer_pos = ui.input(|i| i.pointer.hover_pos());
+        let pointer_down = ui.input(|i| i.pointer.primary_down());
+        let pointer_released = ui.input(|i| i.pointer.primary_released());
+        let ctrl_held = ui.input(|i| i.modifiers.ctrl);
         
-        // For now, placeholder implementation
-        for (idx, _component) in components.iter().enumerate() {
+        // Handle active drag operations
+        if self.selection.dragging.is_some() {
+            let drag_finished = self.handle_active_drag_state(pointer_pos, pointer_released);
+            if drag_finished {
+                self.finish_drag_operation();
+            }
+            return;
+        }
+        
+        // Reset hover state
+        self.selection.hover_component = None;
+        
+        // Check for component interaction in reverse order (top-to-bottom)
+        let mut hit_component = None;
+        for (idx, _component) in components.iter().enumerate().rev() {
             if let Some(pos) = self.layout.positions.get(&idx) {
                 let size = self.layout.sizes.get(&idx).cloned().unwrap_or(egui::vec2(100.0, 30.0));
                 let component_rect = egui::Rect::from_min_size(*pos, size);
                 
-                // Simple click to select for now
-                let response = ui.allocate_rect(component_rect, egui::Sense::click_and_drag());
-                if response.clicked() {
-                    self.select_component(idx);
+                if let Some(pointer_pos) = pointer_pos {
+                    if component_rect.contains(pointer_pos) {
+                        self.selection.hover_component = Some(idx);
+                        hit_component = Some(idx);
+                        
+                        // Handle component interaction
+                        let response = ui.allocate_rect(component_rect, egui::Sense::click_and_drag());
+                        
+                        if response.clicked() {
+                            if ctrl_held {
+                                self.toggle_component_selection(idx);
+                            } else {
+                                self.select_single_component(idx);
+                            }
+                        } else if response.drag_started() {
+                            self.start_component_drag(idx, pointer_pos);
+                        }
+                        
+                        // Check for resize handle interaction if component is selected
+                        if self.selection.selected.contains(&idx) {
+                            if let Some(handle) = self.check_resize_handle_hit(component_rect, pointer_pos) {
+                                if pointer_down {
+                                    self.start_resize_drag(idx, handle, pointer_pos);
+                                }
+                            }
+                        }
+                        
+                        break; // Only handle the topmost component
+                    }
                 }
             }
         }
+        
+        // Handle selection rectangle or canvas click
+        if hit_component.is_none() && pointer_pos.is_some() {
+            let canvas_response = ui.allocate_rect(canvas_rect, egui::Sense::click_and_drag());
+            
+            if canvas_response.clicked() && !ctrl_held {
+                self.clear_selection();
+            } else if canvas_response.drag_started() {
+                self.start_selection_rect_drag(pointer_pos.unwrap());
+            }
+        }
+    }
+    
+    /// Handle active drag operation state
+    fn handle_active_drag_state(&mut self, pointer_pos: Option<egui::Pos2>, pointer_released: bool) -> bool {
+        if let Some(current_pos) = pointer_pos {
+            if let Some(ref drag_op) = self.selection.dragging {
+                let drag_offset = current_pos - drag_op.start_pos;
+                let drag_type = drag_op.drag_type;
+                let component_indices = drag_op.component_indices.clone();
+                let original_positions = drag_op.original_positions.clone();
+                
+                // Update drag offset
+                if let Some(ref mut drag_op) = self.selection.dragging {
+                    drag_op.drag_offset = drag_offset;
+                }
+                
+                match drag_type {
+                    DragOperationType::Move => {
+                        for (i, &component_idx) in component_indices.iter().enumerate() {
+                            if let Some(original_pos) = original_positions.get(i) {
+                                let new_pos = *original_pos + drag_offset;
+                                
+                                // Apply grid snapping
+                                let final_pos = if self.grid.snap_enabled {
+                                    self.snap_to_grid(new_pos)
+                                } else {
+                                    new_pos
+                                };
+                                
+                                self.layout.positions.insert(component_idx, final_pos);
+                            }
+                        }
+                    }
+                    DragOperationType::Resize { handle } => {
+                        if let Some(&component_idx) = component_indices.first() {
+                            if let (Some(original_pos), Some(current_size)) = (
+                                original_positions.first(),
+                                self.layout.sizes.get(&component_idx).copied()
+                            ) {
+                                let (new_pos, new_size) = self.calculate_resize(*original_pos, current_size, drag_offset, handle);
+                                self.layout.positions.insert(component_idx, new_pos);
+                                self.layout.sizes.insert(component_idx, new_size);
+                            }
+                        }
+                    }
+                    DragOperationType::SelectionRect => {
+                        let start_pos = if let Some(ref drag_op) = self.selection.dragging {
+                            drag_op.start_pos
+                        } else {
+                            return pointer_released;
+                        };
+                        
+                        let min_x = start_pos.x.min(current_pos.x);
+                        let min_y = start_pos.y.min(current_pos.y);
+                        let max_x = start_pos.x.max(current_pos.x);
+                        let max_y = start_pos.y.max(current_pos.y);
+                        
+                        self.selection.selection_rect = Some(egui::Rect::from_min_max(
+                            egui::pos2(min_x, min_y),
+                            egui::pos2(max_x, max_y)
+                        ));
+                    }
+                }
+            }
+        }
+        
+        pointer_released
+    }
+    
+    /// Start dragging selected components
+    fn start_component_drag(&mut self, component_idx: usize, start_pos: egui::Pos2) {
+        if !self.selection.selected.contains(&component_idx) {
+            self.select_single_component(component_idx);
+        }
+        
+        let original_positions: Vec<egui::Pos2> = self.selection.selected
+            .iter()
+            .filter_map(|&idx| self.layout.positions.get(&idx).copied())
+            .collect();
+            
+        self.selection.dragging = Some(DragOperation {
+            component_indices: self.selection.selected.clone(),
+            original_positions,
+            drag_offset: egui::Vec2::ZERO,
+            start_pos,
+            drag_type: DragOperationType::Move,
+        });
+    }
+    
+    /// Start resizing a component
+    fn start_resize_drag(&mut self, component_idx: usize, handle: ResizeHandle, start_pos: egui::Pos2) {
+        if let Some(original_pos) = self.layout.positions.get(&component_idx).copied() {
+            self.selection.dragging = Some(DragOperation {
+                component_indices: vec![component_idx],
+                original_positions: vec![original_pos],
+                drag_offset: egui::Vec2::ZERO,
+                start_pos,
+                drag_type: DragOperationType::Resize { handle },
+            });
+        }
+    }
+    
+    /// Start selection rectangle drag
+    fn start_selection_rect_drag(&mut self, start_pos: egui::Pos2) {
+        self.selection.dragging = Some(DragOperation {
+            component_indices: Vec::new(),
+            original_positions: Vec::new(),
+            drag_offset: egui::Vec2::ZERO,
+            start_pos,
+            drag_type: DragOperationType::SelectionRect,
+        });
+        
+        self.selection.selection_rect = Some(egui::Rect::from_min_size(start_pos, egui::Vec2::ZERO));
+    }
+    
+    
+    /// Finish drag operation and commit changes
+    fn finish_drag_operation(&mut self) {
+        if let Some(drag_op) = self.selection.dragging.take() {
+            match drag_op.drag_type {
+                DragOperationType::Move => {
+                    // Create undo operation for move
+                    let operation = DesignOperation::Move {
+                        component_ids: drag_op.component_indices.clone(),
+                        old_positions: drag_op.original_positions.clone(),
+                        new_positions: drag_op.component_indices
+                            .iter()
+                            .filter_map(|&idx| self.layout.positions.get(&idx).copied())
+                            .collect(),
+                    };
+                    self.add_to_history(operation);
+                }
+                DragOperationType::Resize { .. } => {
+                    // Handle resize completion
+                    // TODO: Add resize to history
+                }
+                DragOperationType::SelectionRect => {
+                    // Select components within rectangle
+                    if let Some(selection_rect) = self.selection.selection_rect {
+                        self.select_components_in_rect(selection_rect);
+                    }
+                    self.selection.selection_rect = None;
+                }
+            }
+        }
+    }
+    
+    /// Calculate new position and size during resize
+    fn calculate_resize(&self, original_pos: egui::Pos2, original_size: egui::Vec2, offset: egui::Vec2, handle: ResizeHandle) -> (egui::Pos2, egui::Vec2) {
+        let min_size = egui::vec2(20.0, 20.0); // Minimum component size
+        
+        match handle {
+            ResizeHandle::TopLeft => {
+                let new_pos = original_pos + egui::vec2(offset.x, offset.y);
+                let new_size = original_size - egui::vec2(offset.x, offset.y);
+                (new_pos, new_size.at_least(min_size))
+            }
+            ResizeHandle::TopRight => {
+                let new_pos = original_pos + egui::vec2(0.0, offset.y);
+                let new_size = original_size + egui::vec2(offset.x, -offset.y);
+                (new_pos, new_size.at_least(min_size))
+            }
+            ResizeHandle::BottomLeft => {
+                let new_pos = original_pos + egui::vec2(offset.x, 0.0);
+                let new_size = original_size + egui::vec2(-offset.x, offset.y);
+                (new_pos, new_size.at_least(min_size))
+            }
+            ResizeHandle::BottomRight => {
+                let new_size = original_size + offset;
+                (original_pos, new_size.at_least(min_size))
+            }
+            ResizeHandle::TopCenter => {
+                let new_pos = original_pos + egui::vec2(0.0, offset.y);
+                let new_size = original_size + egui::vec2(0.0, -offset.y);
+                (new_pos, new_size.at_least(min_size))
+            }
+            ResizeHandle::BottomCenter => {
+                let new_size = original_size + egui::vec2(0.0, offset.y);
+                (original_pos, new_size.at_least(min_size))
+            }
+            ResizeHandle::LeftCenter => {
+                let new_pos = original_pos + egui::vec2(offset.x, 0.0);
+                let new_size = original_size + egui::vec2(-offset.x, 0.0);
+                (new_pos, new_size.at_least(min_size))
+            }
+            ResizeHandle::RightCenter => {
+                let new_size = original_size + egui::vec2(offset.x, 0.0);
+                (original_pos, new_size.at_least(min_size))
+            }
+        }
+    }
+    
+    /// Check if pointer is over a resize handle
+    fn check_resize_handle_hit(&self, component_rect: egui::Rect, pointer_pos: egui::Pos2) -> Option<ResizeHandle> {
+        let handle_size = 6.0;
+        let handles = [
+            (component_rect.min, ResizeHandle::TopLeft),
+            (egui::pos2(component_rect.max.x, component_rect.min.y), ResizeHandle::TopRight),
+            (component_rect.max, ResizeHandle::BottomRight),
+            (egui::pos2(component_rect.min.x, component_rect.max.y), ResizeHandle::BottomLeft),
+            (egui::pos2(component_rect.center().x, component_rect.min.y), ResizeHandle::TopCenter),
+            (egui::pos2(component_rect.max.x, component_rect.center().y), ResizeHandle::RightCenter),
+            (egui::pos2(component_rect.center().x, component_rect.max.y), ResizeHandle::BottomCenter),
+            (egui::pos2(component_rect.min.x, component_rect.center().y), ResizeHandle::LeftCenter),
+        ];
+        
+        for (handle_pos, handle_type) in handles {
+            let handle_rect = egui::Rect::from_center_size(handle_pos, egui::vec2(handle_size, handle_size));
+            if handle_rect.contains(pointer_pos) {
+                return Some(handle_type);
+            }
+        }
+        
+        None
+    }
+    
+    /// Select components within a rectangle
+    fn select_components_in_rect(&mut self, selection_rect: egui::Rect) {
+        self.selection.selected.clear();
+        
+        for (idx, pos) in &self.layout.positions {
+            let size = self.layout.sizes.get(idx).cloned().unwrap_or(egui::vec2(100.0, 30.0));
+            let component_rect = egui::Rect::from_min_size(*pos, size);
+            
+            if selection_rect.intersects(component_rect) {
+                self.selection.selected.push(*idx);
+            }
+        }
+        
+        self.selection.primary = self.selection.selected.first().copied();
     }
 
     /// Draw selection indicators around selected components
     fn draw_selection_indicators(&self, ui: &mut egui::Ui, _components: &[Box<dyn Component>]) {
         let painter = ui.painter();
         
+        // Draw selection rectangle if active
+        if let Some(selection_rect) = self.selection.selection_rect {
+            painter.rect_stroke(
+                selection_rect,
+                0.0,
+                egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(0, 120, 255, 128))
+            );
+            painter.rect_filled(
+                selection_rect,
+                0.0,
+                egui::Color32::from_rgba_unmultiplied(0, 120, 255, 32)
+            );
+        }
+        
+        // Draw hover indicator
+        if let Some(hover_idx) = self.selection.hover_component {
+            if !self.selection.selected.contains(&hover_idx) {
+                if let Some(pos) = self.layout.positions.get(&hover_idx) {
+                    let size = self.layout.sizes.get(&hover_idx).cloned().unwrap_or(egui::vec2(100.0, 30.0));
+                    let rect = egui::Rect::from_min_size(*pos, size);
+                    
+                    painter.rect_stroke(
+                        rect.expand(1.0),
+                        1.0,
+                        egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(0, 120, 255, 128))
+                    );
+                }
+            }
+        }
+        
+        // Draw selected components
         for &component_idx in &self.selection.selected {
             if let Some(pos) = self.layout.positions.get(&component_idx) {
                 let size = self.layout.sizes.get(&component_idx).cloned().unwrap_or(egui::vec2(100.0, 30.0));
                 let rect = egui::Rect::from_min_size(*pos, size);
                 
+                // Different color for primary selection
+                let is_primary = Some(component_idx) == self.selection.primary;
+                let selection_color = if is_primary {
+                    egui::Color32::from_rgb(0, 120, 255)
+                } else {
+                    egui::Color32::from_rgb(120, 120, 255)
+                };
+                
                 // Draw selection rectangle
                 painter.rect_stroke(
                     rect.expand(2.0),
                     2.0,
-                    egui::Stroke::new(2.0, egui::Color32::from_rgb(0, 120, 255))
+                    egui::Stroke::new(2.0, selection_color)
                 );
                 
-                // Draw resize handles without borrowing ui mutably
-                self.draw_resize_handles(&painter, rect);
+                // Only draw resize handles for primary selection
+                if is_primary {
+                    self.draw_resize_handles(&painter, rect);
+                }
+                
+                // Draw drag shadow if being dragged
+                if let Some(ref drag_op) = self.selection.dragging {
+                    if drag_op.component_indices.contains(&component_idx) && matches!(drag_op.drag_type, DragOperationType::Move) {
+                        let shadow_rect = rect.translate(egui::vec2(2.0, 2.0));
+                        painter.rect_filled(
+                            shadow_rect,
+                            2.0,
+                            egui::Color32::from_rgba_unmultiplied(0, 0, 0, 64)
+                        );
+                    }
+                }
             }
         }
     }
@@ -487,17 +908,37 @@ impl VisualDesigner {
         // Placeholder for now
     }
 
-    /// Select a component
-    pub fn select_component(&mut self, component_idx: usize) {
-        if !self.selection.multi_select_mode {
-            self.selection.selected.clear();
-        }
-        
-        if !self.selection.selected.contains(&component_idx) {
-            self.selection.selected.push(component_idx);
-        }
-        
+    /// Select a single component (clears other selections)
+    pub fn select_single_component(&mut self, component_idx: usize) {
+        self.selection.selected.clear();
+        self.selection.selected.push(component_idx);
         self.selection.primary = Some(component_idx);
+    }
+    
+    /// Toggle component selection (for Ctrl+click)
+    pub fn toggle_component_selection(&mut self, component_idx: usize) {
+        if let Some(pos) = self.selection.selected.iter().position(|&idx| idx == component_idx) {
+            self.selection.selected.remove(pos);
+            if Some(component_idx) == self.selection.primary {
+                self.selection.primary = self.selection.selected.first().copied();
+            }
+        } else {
+            self.selection.selected.push(component_idx);
+            if self.selection.primary.is_none() {
+                self.selection.primary = Some(component_idx);
+            }
+        }
+    }
+    
+    /// Clear all selections
+    pub fn clear_selection(&mut self) {
+        self.selection.selected.clear();
+        self.selection.primary = None;
+    }
+    
+    /// Select a component (legacy method for compatibility)
+    pub fn select_component(&mut self, component_idx: usize) {
+        self.select_single_component(component_idx);
     }
 
     /// Apply alignment operation to selected components
