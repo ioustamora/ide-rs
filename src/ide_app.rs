@@ -996,51 +996,74 @@ impl IdeApp {
     }
     
     /// Generate application state structure
+    /// 
+    /// This algorithm generates a Rust struct that contains all the state data needed
+    /// for the UI components. Each component gets appropriate field types based on their
+    /// data requirements, ensuring type safety and proper state management in the generated code.
     fn generate_state_struct(&self) -> String {
         let mut struct_code = String::new();
         struct_code.push_str("/// Application state containing all UI component data\n");
         struct_code.push_str("#[derive(Default)]\n");
         struct_code.push_str("pub struct GeneratedApp {\n");
         
-        // Generate fields for each component
+        // Component State Generation Algorithm
+        // This generates typed fields for each UI component based on their data requirements
+        // Each component type has specific state needs that must be tracked across frames
         for (idx, component) in self.components.iter().enumerate() {
+            // Generate unique field name: component_name + index to prevent naming conflicts
+            // This ensures each component instance has its own state storage
             let field_name = format!("{}__{}", component.name().to_lowercase(), idx);
             
+            // Component-specific state generation based on UI component behavior patterns
             match component.name() {
                 "Button" => {
+                    // Buttons need click counters for tracking user interactions
+                    // This enables click analytics and interaction feedback
                     struct_code.push_str(&format!("    /// Button {} click counter\n", idx));
                     struct_code.push_str(&format!("    pub {}_clicks: u32,\n", field_name));
                 }
                 "Label" => {
+                    // Labels need text content that can be dynamically updated
+                    // This allows for data binding and dynamic text display
                     struct_code.push_str(&format!("    /// Label {} text content\n", idx));
                     struct_code.push_str(&format!("    pub {}_text: String,\n", field_name));
                 }
                 "TextBox" => {
+                    // Text boxes need string storage for user input
+                    // This maintains the text state across UI updates and redraws
                     struct_code.push_str(&format!("    /// TextBox {} input value\n", idx));
                     struct_code.push_str(&format!("    pub {}_value: String,\n", field_name));
                 }
                 "Checkbox" => {
+                    // Checkboxes need boolean state for checked/unchecked status
+                    // This provides simple binary choice state management
                     struct_code.push_str(&format!("    /// Checkbox {} state\n", idx));
                     struct_code.push_str(&format!("    pub {}_checked: bool,\n", field_name));
                 }
                 "Slider" => {
+                    // Sliders need numeric values within their defined ranges
+                    // Float type provides smooth continuous value adjustment
                     struct_code.push_str(&format!("    /// Slider {} value\n", idx));
                     struct_code.push_str(&format!("    pub {}_value: f32,\n", field_name));
                 }
                 "Dropdown" => {
+                    // Dropdowns need both the available options and current selection
+                    // This dual-field approach enables dynamic option management
                     struct_code.push_str(&format!("    /// Dropdown {} options\n", idx));
                     struct_code.push_str(&format!("    pub {}_options: Vec<String>,\n", field_name));
                     struct_code.push_str(&format!("    /// Dropdown {} selected index\n", idx));
                     struct_code.push_str(&format!("    pub {}_selected: usize,\n", field_name));
                 }
                 _ => {
+                    // Fallback for unknown component types - uses string as universal container
+                    // This ensures generated code compiles even with new component types
                     struct_code.push_str(&format!("    /// {} {} data\n", component.name(), idx));
                     struct_code.push_str(&format!("    pub {}_data: String,\n", field_name));
                 }
             }
         }
         
-        struct_code.push_str("}\n\n");
+        struct_code.push_str("}\n\n");  // Close struct definition
         struct_code
     }
     

@@ -271,44 +271,66 @@ impl SmartEditingSystem {
     }
     
     /// Merge guides that are very close to each other
+    /// 
+    /// This algorithm optimizes the guide system by consolidating nearby guides into stronger
+    /// single guides. This prevents visual clutter and creates more prominent alignment targets
+    /// when multiple components create similar guide lines. The strength calculation uses square
+    /// root to prevent over-amplification while still boosting important guides.
     fn merge_nearby_guides(&mut self) {
+        // Distance threshold for considering guides "nearby" - this prevents merger of
+        // guides that are visually distinct but still creates clean consolidation
         let merge_threshold = 2.0;
         let mut merged_guides = Vec::new();
+        // Track which guides have been processed to avoid duplicate merging
         let mut processed = vec![false; self.alignment_guides.len()];
         
+        // Process each guide as a potential merge target
         for i in 0..self.alignment_guides.len() {
+            // Skip guides that have already been merged into other guides
             if processed[i] {
                 continue;
             }
             
+            // Start with the current guide as the base for merging
             let mut guide = self.alignment_guides[i].clone();
-            let mut merge_count = 1;
+            let mut merge_count = 1;  // Count how many guides we merge (starts with self)
             
-            // Find nearby guides of the same direction
+            // Look for other guides that are close enough to merge
             for j in (i + 1)..self.alignment_guides.len() {
+                // Skip already processed guides
                 if processed[j] {
                     continue;
                 }
                 
                 let other_guide = &self.alignment_guides[j];
+                // Only merge guides of the same direction (horizontal with horizontal, etc.)
+                // and within the merge threshold distance
                 if guide.direction == other_guide.direction && 
                    (guide.position - other_guide.position).abs() < merge_threshold {
                     
-                    // Merge the guides
+                    // Merge the guides by averaging their positions (creates balanced result)
                     guide.position = (guide.position + other_guide.position) / 2.0;
+                    // Combine the list of aligned components from both guides
                     guide.aligned_components.extend(&other_guide.aligned_components);
+                    // Take the stronger of the two guide strengths (preserves importance)
                     guide.strength = guide.strength.max(other_guide.strength);
+                    // Track that we've merged another guide
                     merge_count += 1;
+                    // Mark the other guide as processed so it won't be considered again
                     processed[j] = true;
                 }
             }
             
-            // Increase strength for guides with more aligned components
+            // Boost strength based on how many guides were merged
+            // Square root prevents over-amplification while still rewarding popular alignment points
             guide.strength *= (merge_count as f32).sqrt();
+            // Add the merged guide to our final collection
             merged_guides.push(guide);
+            // Mark this guide as processed
             processed[i] = true;
         }
         
+        // Replace the original guides with the merged collection
         self.alignment_guides = merged_guides;
     }
     
@@ -337,36 +359,51 @@ impl SmartEditingSystem {
     }
     
     /// Calculate magnetism effect and return snap position
+    /// 
+    /// This is the core magnetism algorithm that creates the "magnetic" feeling when dragging
+    /// components near alignment points. It generates invisible magnetic zones around important
+    /// points (component edges, centers, grid intersections) and calculates the strongest
+    /// attraction to provide smooth, predictable snapping behavior.
     fn calculate_magnetism(&mut self, 
                           visual_designer: &VisualDesigner,
                           current_position: Pos2,
                           dragging_component: Option<usize>) -> Option<Pos2> {
+        // Clear previous magnetic zones to recalculate fresh zones for current drag operation
         self.magnet_zones.clear();
         
-        // Generate magnet zones from components
+        // Generate magnetic zones from existing components (object-to-object magnetism)
         for (component_idx, position) in &visual_designer.layout.positions {
+            // Skip the component being dragged - it shouldn't be magnetic to itself
             if Some(*component_idx) == dragging_component {
                 continue;
             }
             
+            // Get component size with fallback to reasonable default
             let size = visual_designer.layout.sizes.get(component_idx)
                 .copied().unwrap_or(Vec2::new(100.0, 30.0));
             
-            // Edge magnetism zones
+            // Create edge magnetism zones - these provide strong alignment points
+            // Left edge magnetism (at vertical center of component for better UX)
             self.add_magnet_zone(Pos2::new(position.x, position.y + size.y / 2.0), MagnetType::ComponentEdge);
+            // Right edge magnetism (at vertical center)
             self.add_magnet_zone(Pos2::new(position.x + size.x, position.y + size.y / 2.0), MagnetType::ComponentEdge);
+            // Top edge magnetism (at horizontal center)
             self.add_magnet_zone(Pos2::new(position.x + size.x / 2.0, position.y), MagnetType::ComponentEdge);
+            // Bottom edge magnetism (at horizontal center)
             self.add_magnet_zone(Pos2::new(position.x + size.x / 2.0, position.y + size.y), MagnetType::ComponentEdge);
             
-            // Center magnetism zone
+            // Center magnetism zone - useful for center-to-center alignment
+            // This creates satisfying center-to-center snapping behavior
             self.add_magnet_zone(Pos2::new(position.x + size.x / 2.0, position.y + size.y / 2.0), MagnetType::ComponentCenter);
         }
         
-        // Grid magnetism zones
+        // Generate grid magnetism zones if grid snapping is enabled
         if visual_designer.grid.snap_enabled {
             let grid_size = visual_designer.grid.size;
-            let canvas_size = Vec2::new(800.0, 600.0); // TODO: Get actual canvas size
+            let canvas_size = Vec2::new(800.0, 600.0); // TODO: Get actual canvas size from context
             
+            // Create magnetic zones at each grid intersection
+            // This provides the classic "snap to grid" behavior that users expect
             for x in (0..=(canvas_size.x as i32)).step_by(grid_size as usize) {
                 for y in (0..=(canvas_size.y as i32)).step_by(grid_size as usize) {
                     self.add_magnet_zone(Pos2::new(x as f32, y as f32), MagnetType::GridPoint);
@@ -374,14 +411,21 @@ impl SmartEditingSystem {
             }
         }
         
-        // Find the strongest magnetic attraction
+        // Find the strongest magnetic attraction using distance-based strength calculation
         let mut best_snap: Option<Pos2> = None;
         let mut best_strength = 0.0;
         
+        // Evaluate each magnetic zone to find the most attractive one
         for zone in &self.magnet_zones {
+            // Calculate distance from current position to magnetic zone center
             let distance = current_position.distance(zone.center);
+            // Only consider zones within their magnetic radius
             if distance <= zone.radius {
+                // Calculate magnetic strength - stronger when closer, using linear falloff
+                // Strength formula: base_strength * (1 - distance_ratio)
+                // This creates smooth attraction that peaks at the center and fades to zero at radius
                 let strength = zone.strength * (1.0 - distance / zone.radius);
+                // Keep track of the strongest magnetic attraction found so far
                 if strength > best_strength {
                     best_strength = strength;
                     best_snap = Some(zone.snap_position);
@@ -389,6 +433,7 @@ impl SmartEditingSystem {
             }
         }
         
+        // Return the snap position of the strongest magnetic zone, or None if no magnetism
         best_snap
     }
     
@@ -421,59 +466,80 @@ impl SmartEditingSystem {
     }
     
     /// Generate spacing suggestions for consistent component spacing
+    /// 
+    /// This algorithm analyzes the current drag position against existing components to suggest
+    /// standard spacing values. It identifies when the user is positioning a component at a
+    /// distance that's close to common design spacing values (8px, 16px, etc.) and provides
+    /// visual feedback to encourage consistent spacing patterns.
     fn generate_spacing_suggestions(&self, 
                                   visual_designer: &VisualDesigner,
                                   dragging_component: usize,
                                   current_position: Pos2) -> Vec<SpacingGuide> {
         let mut suggestions = Vec::new();
         
-        // Common spacing values to suggest
+        // Standard spacing values commonly used in UI design
+        // These follow typical design system spacing scales (8px base unit)
         let common_spacings = [8.0, 16.0, 24.0, 32.0, 48.0, 64.0];
         
+        // Analyze spacing against each existing component
         for (component_idx, position) in &visual_designer.layout.positions {
+            // Skip the component being dragged - can't have spacing with itself
             if *component_idx == dragging_component {
                 continue;
             }
             
+            // Get component size with reasonable fallback
             let size = visual_designer.layout.sizes.get(component_idx)
                 .copied().unwrap_or(Vec2::new(100.0, 30.0));
             
-            // Calculate distances
+            // Calculate actual distances from dragged component to this component
+            // Horizontal distance: from right edge of existing component to current position
             let horizontal_distance = (current_position.x - (position.x + size.x)).abs();
+            // Vertical distance: from bottom edge of existing component to current position
             let vertical_distance = (current_position.y - (position.y + size.y)).abs();
             
-            // Check for common spacing patterns
+            // Check each common spacing value to see if current positioning is close
             for &spacing in &common_spacings {
+                // Tolerance for considering a distance "close enough" to suggest
+                // 4px tolerance allows for slight imprecision while still being helpful
                 let tolerance = 4.0;
                 
-                // Horizontal spacing suggestion
+                // Horizontal spacing suggestion - when components are side-by-side
                 if (horizontal_distance - spacing).abs() < tolerance {
                     suggestions.push(SpacingGuide {
+                        // Start point: right edge of existing component at its vertical center
                         start: Pos2::new(position.x + size.x, position.y + size.y / 2.0),
+                        // End point: current drag position at same vertical level
                         end: Pos2::new(current_position.x, position.y + size.y / 2.0),
-                        spacing,
-                        components: (*component_idx, dragging_component),
+                        spacing,  // The suggested spacing value
+                        components: (*component_idx, dragging_component),  // Components involved
+                        // Confidence decreases as distance from ideal spacing increases
                         confidence: 1.0 - (horizontal_distance - spacing).abs() / tolerance,
                     });
                 }
                 
-                // Vertical spacing suggestion
+                // Vertical spacing suggestion - when components are stacked
                 if (vertical_distance - spacing).abs() < tolerance {
                     suggestions.push(SpacingGuide {
+                        // Start point: bottom edge of existing component at its horizontal center
                         start: Pos2::new(position.x + size.x / 2.0, position.y + size.y),
+                        // End point: current drag position at same horizontal level
                         end: Pos2::new(position.x + size.x / 2.0, current_position.y),
-                        spacing,
-                        components: (*component_idx, dragging_component),
+                        spacing,  // The suggested spacing value
+                        components: (*component_idx, dragging_component),  // Components involved
+                        // Confidence calculation based on how close to ideal spacing
                         confidence: 1.0 - (vertical_distance - spacing).abs() / tolerance,
                     });
                 }
             }
         }
         
-        // Sort by confidence
+        // Sort suggestions by confidence - most confident suggestions first
+        // This ensures the most relevant spacing guides are shown prominently
         suggestions.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
         
-        // Return top suggestions
+        // Return only the top 3 suggestions to avoid visual clutter
+        // Too many suggestions can be overwhelming and counterproductive
         suggestions.into_iter().take(3).collect()
     }
     

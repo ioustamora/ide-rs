@@ -414,43 +414,88 @@ impl AdvancedAlignment {
     }
 
     /// Distribute components horizontally
+    /// 
+    /// This algorithm implements professional horizontal distribution similar to Adobe Illustrator
+    /// or Figma. It evenly spaces components between the leftmost and rightmost components,
+    /// calculating optimal spacing while preserving the overall layout bounds.
     fn distribute_horizontally(&self, components: &mut [ComponentBounds]) {
+        // Need at least 3 components for distribution to make sense
+        // With 2 components, there's only one gap, so distribution is meaningless
         if components.len() < 3 { return; }
 
-        // Sort by x position
+        // Sort components by their left edge position (x coordinate)
+        // This ensures we process them from left to right in the correct order
         components.sort_by(|a, b| a.position.x.partial_cmp(&b.position.x).unwrap());
         
+        // Calculate the total distribution area boundaries
+        // Leftmost edge: x position of the first component
         let leftmost = components[0].position.x;
+        // Rightmost edge: x position + width of the last component
         let rightmost = components.last().unwrap().position.x + components.last().unwrap().size.x;
+        // Total area we have to work with
         let total_width = rightmost - leftmost;
+        
+        // Calculate how much space is taken up by the components themselves
+        // This is the sum of all component widths
         let total_component_width: f32 = components.iter().map(|c| c.size.x).sum();
+        
+        // Calculate available space for gaps between components
+        // This is the space we need to distribute evenly
         let available_space = total_width - total_component_width;
+        
+        // Calculate equal spacing between components
+        // We have (n-1) gaps between n components, so divide available space accordingly
         let spacing = available_space / (components.len() - 1) as f32;
         
-        let mut current_x = leftmost;
+        // Position each component with calculated equal spacing
+        let mut current_x = leftmost;  // Start at the leftmost position
         for component in components {
+            // Place component at current position
             component.position.x = current_x;
+            // Move to next position: current component width + calculated spacing
             current_x += component.size.x + spacing;
         }
     }
 
     /// Distribute components vertically
+    /// 
+    /// Vertical distribution algorithm - mirrors the horizontal logic but works on Y-axis.
+    /// This creates evenly spaced components from top to bottom, maintaining the overall
+    /// vertical bounds while calculating optimal spacing between components.
     fn distribute_vertically(&self, components: &mut [ComponentBounds]) {
+        // Need at least 3 components for meaningful vertical distribution
         if components.len() < 3 { return; }
 
-        // Sort by y position
+        // Sort components by their top edge position (y coordinate)
+        // This ensures we process them from top to bottom in the correct order
         components.sort_by(|a, b| a.position.y.partial_cmp(&b.position.y).unwrap());
         
+        // Calculate the total vertical distribution area boundaries
+        // Topmost edge: y position of the first (highest) component
         let topmost = components[0].position.y;
+        // Bottommost edge: y position + height of the last (lowest) component
         let bottommost = components.last().unwrap().position.y + components.last().unwrap().size.y;
+        // Total vertical area we have to work with
         let total_height = bottommost - topmost;
+        
+        // Calculate total space occupied by component heights
+        // This is the sum of all component heights
         let total_component_height: f32 = components.iter().map(|c| c.size.y).sum();
+        
+        // Calculate available vertical space for gaps between components
+        // This space will be divided evenly between all gaps
         let available_space = total_height - total_component_height;
+        
+        // Calculate equal vertical spacing between components
+        // With n components, we have (n-1) gaps to fill with equal spacing
         let spacing = available_space / (components.len() - 1) as f32;
         
-        let mut current_y = topmost;
+        // Position each component with calculated equal vertical spacing
+        let mut current_y = topmost;  // Start at the topmost position
         for component in components {
+            // Place component at current vertical position
             component.position.y = current_y;
+            // Move to next vertical position: current component height + calculated spacing
             current_y += component.size.y + spacing;
         }
     }
@@ -498,21 +543,36 @@ impl AdvancedAlignment {
     }
 
     /// Adjust spacing between components
+    /// 
+    /// This algorithm implements incremental spacing adjustment - allowing users to fine-tune
+    /// the spacing between components by a specific amount. It maintains the relative order
+    /// of components while adjusting gaps, with built-in protection against negative spacing.
     fn adjust_spacing(&self, components: &mut [ComponentBounds], adjustment: f32) {
+        // Need at least 2 components to have any spacing to adjust
         if components.len() < 2 { return; }
         
-        // Sort by x position
+        // Create index array for sorting without modifying original component order
+        // This preserves component relationships while allowing spatial sorting
         let mut sorted_indices: Vec<usize> = (0..components.len()).collect();
+        // Sort indices by component X position (left to right)
         sorted_indices.sort_by(|&a, &b| components[a].position.x.partial_cmp(&components[b].position.x).unwrap());
         
+        // Process each component pair from left to right
         for i in 1..sorted_indices.len() {
-            let prev_idx = sorted_indices[i-1];
-            let curr_idx = sorted_indices[i];
+            let prev_idx = sorted_indices[i-1];  // Previous component index
+            let curr_idx = sorted_indices[i];    // Current component index
             
+            // Calculate current spacing between these two components
+            // Spacing = left edge of current - right edge of previous
             let current_spacing = components[curr_idx].position.x - 
                                  (components[prev_idx].position.x + components[prev_idx].size.x);
+            
+            // Apply the adjustment while respecting minimum spacing constraints
+            // This prevents components from overlapping or having negative gaps
             let new_spacing = (current_spacing + adjustment).max(self.spacing.min_spacing);
             
+            // Reposition the current component to achieve the new spacing
+            // New position = previous component's right edge + desired spacing
             components[curr_idx].position.x = components[prev_idx].position.x + 
                                              components[prev_idx].size.x + new_spacing;
         }
@@ -579,41 +639,57 @@ impl AdvancedAlignment {
     }
 
     /// Snap position to nearest guide
+    /// 
+    /// This algorithm implements "magnetic" guide snapping that provides visual assistance
+    /// during component positioning. It checks proximity to various guide lines and automatically
+    /// snaps positions when they're close enough, similar to professional design tools.
     pub fn snap_to_guides(&self, mut position: Pos2, canvas_rect: Rect) -> Pos2 {
+        // Early exit if guide snapping is disabled
+        // This optimization avoids unnecessary calculations when guides aren't active
         if !self.guides.enabled {
             return position;
         }
 
-        let center_x = canvas_rect.center().x;
-        let center_y = canvas_rect.center().y;
-        let margin = self.spacing.container_margin;
+        // Calculate key reference points for guide snapping
+        let center_x = canvas_rect.center().x;  // Horizontal center line
+        let center_y = canvas_rect.center().y;  // Vertical center line
+        let margin = self.spacing.container_margin;  // Margin from edges
 
-        // Snap to center guides
+        // Snap to center guides - these provide primary alignment references
         if self.guides.show_center_guides {
+            // Check horizontal center line snapping (vertical guide)
+            // If position is close enough to center X, snap to it
             if self.should_snap_to_guide(position, center_x, false) {
                 position.x = center_x;
             }
+            // Check vertical center line snapping (horizontal guide)
+            // If position is close enough to center Y, snap to it
             if self.should_snap_to_guide(position, center_y, true) {
                 position.y = center_y;
             }
         }
 
-        // Snap to margin guides
+        // Snap to margin guides - these help maintain consistent spacing from edges
         if self.guides.show_margins {
+            // Left margin guide - snap to left edge + margin
             if self.should_snap_to_guide(position, canvas_rect.left() + margin.x, false) {
                 position.x = canvas_rect.left() + margin.x;
             }
+            // Right margin guide - snap to right edge - margin
             if self.should_snap_to_guide(position, canvas_rect.right() - margin.x, false) {
                 position.x = canvas_rect.right() - margin.x;
             }
+            // Top margin guide - snap to top edge + margin
             if self.should_snap_to_guide(position, canvas_rect.top() + margin.y, true) {
                 position.y = canvas_rect.top() + margin.y;
             }
+            // Bottom margin guide - snap to bottom edge - margin
             if self.should_snap_to_guide(position, canvas_rect.bottom() - margin.y, true) {
                 position.y = canvas_rect.bottom() - margin.y;
             }
         }
 
+        // Return the potentially snapped position
         position
     }
 }

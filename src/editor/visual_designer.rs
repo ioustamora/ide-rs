@@ -717,60 +717,91 @@ impl VisualDesigner {
     }
     
     /// Handle active drag operation state
+    /// 
+    /// This method implements the core drag-and-drop algorithm for component manipulation.
+    /// It handles three types of drag operations: moving components, resizing components,
+    /// and creating selection rectangles. The algorithm maintains smooth real-time feedback
+    /// while applying constraints like grid snapping.
     fn handle_active_drag_state(&mut self, pointer_pos: Option<egui::Pos2>, pointer_released: bool) -> bool {
         if let Some(current_pos) = pointer_pos {
             if let Some(ref drag_op) = self.selection.dragging {
+                // Calculate the delta from where the drag started to current mouse position
+                // This offset will be applied to all selected components to maintain relative positions
                 let drag_offset = current_pos - drag_op.start_pos;
                 let drag_type = drag_op.drag_type;
                 let component_indices = drag_op.component_indices.clone();
                 let original_positions = drag_op.original_positions.clone();
                 
-                // Update drag offset
+                // Update the drag offset in the operation state for visual feedback
+                // This is used by other systems (like visual guides) to show drag shadows
                 if let Some(ref mut drag_op) = self.selection.dragging {
                     drag_op.drag_offset = drag_offset;
                 }
                 
                 match drag_type {
                     DragOperationType::Move => {
+                        // Handle component movement - apply the drag offset to all selected components
+                        // while maintaining their relative positions to each other
                         for (i, &component_idx) in component_indices.iter().enumerate() {
                             if let Some(original_pos) = original_positions.get(i) {
+                                // Calculate the new position by adding the drag offset to the original position
+                                // This ensures smooth dragging regardless of how far the mouse has moved
                                 let new_pos = *original_pos + drag_offset;
                                 
-                                // Apply grid snapping
+                                // Apply grid snapping if enabled - this provides the "magnetic" feeling
+                                // where components automatically align to grid intersections
                                 let final_pos = if self.grid.snap_enabled {
+                                    // Snap to the nearest grid intersection for precise alignment
                                     self.snap_to_grid(new_pos)
                                 } else {
+                                    // Use exact mouse position for freeform positioning
                                     new_pos
                                 };
                                 
+                                // Update the component's position in the layout system
+                                // This immediately reflects in the visual display
                                 self.layout.positions.insert(component_idx, final_pos);
                             }
                         }
                     }
                     DragOperationType::Resize { handle } => {
+                        // Handle component resizing - only one component can be resized at a time
+                        // The resize algorithm adjusts both position and size based on which handle is dragged
                         if let Some(&component_idx) = component_indices.first() {
                             if let (Some(original_pos), Some(current_size)) = (
                                 original_positions.first(),
                                 self.layout.sizes.get(&component_idx).copied()
                             ) {
+                                // Calculate new position and size based on the resize handle being dragged
+                                // Different handles affect position and size differently (e.g., top-left vs bottom-right)
                                 let (new_pos, new_size) = self.calculate_resize(*original_pos, current_size, drag_offset, handle);
+                                
+                                // Apply the calculated changes to the component
+                                // Position may change when dragging certain handles (like top-left)
                                 self.layout.positions.insert(component_idx, new_pos);
                                 self.layout.sizes.insert(component_idx, new_size);
                             }
                         }
                     }
                     DragOperationType::SelectionRect => {
+                        // Handle selection rectangle creation - allows selecting multiple components by dragging
+                        // The algorithm creates a rectangle from the start position to current mouse position
                         let start_pos = if let Some(ref drag_op) = self.selection.dragging {
                             drag_op.start_pos
                         } else {
+                            // Fallback if drag operation state is inconsistent
                             return pointer_released;
                         };
                         
-                        let min_x = start_pos.x.min(current_pos.x);
-                        let min_y = start_pos.y.min(current_pos.y);
-                        let max_x = start_pos.x.max(current_pos.x);
-                        let max_y = start_pos.y.max(current_pos.y);
+                        // Calculate the selection rectangle bounds by finding min/max coordinates
+                        // This handles dragging in any direction (up, down, left, right)
+                        let min_x = start_pos.x.min(current_pos.x);  // Leftmost edge
+                        let min_y = start_pos.y.min(current_pos.y);  // Topmost edge
+                        let max_x = start_pos.x.max(current_pos.x);  // Rightmost edge
+                        let max_y = start_pos.y.max(current_pos.y);  // Bottommost edge
                         
+                        // Create the selection rectangle that will be rendered as visual feedback
+                        // and used to determine which components are selected when drag ends
                         self.selection.selection_rect = Some(egui::Rect::from_min_max(
                             egui::pos2(min_x, min_y),
                             egui::pos2(max_x, max_y)
@@ -780,6 +811,7 @@ impl VisualDesigner {
             }
         }
         
+        // Return whether the drag operation should end (true when mouse is released)
         pointer_released
     }
     
@@ -862,46 +894,69 @@ impl VisualDesigner {
     }
     
     /// Calculate new position and size during resize
+    /// 
+    /// This is a critical algorithm that handles 8-directional resizing of components.
+    /// Each resize handle behaves differently - some affect only size, others affect both
+    /// position and size. The algorithm ensures components never shrink below minimum size
+    /// and maintains proper visual feedback during resize operations.
     fn calculate_resize(&self, original_pos: egui::Pos2, original_size: egui::Vec2, offset: egui::Vec2, handle: ResizeHandle) -> (egui::Pos2, egui::Vec2) {
-        let min_size = egui::vec2(20.0, 20.0); // Minimum component size
+        // Enforce minimum component size to prevent components from disappearing
+        // This is essential for usability - users should never be able to resize components to zero
+        let min_size = egui::vec2(20.0, 20.0);
         
         match handle {
             ResizeHandle::TopLeft => {
-                let new_pos = original_pos + egui::vec2(offset.x, offset.y);
-                let new_size = original_size - egui::vec2(offset.x, offset.y);
-                (new_pos, new_size.at_least(min_size))
+                // Top-left handle: moving mouse right/down shrinks component, left/up grows it
+                // Both position and size change because we're dragging the origin point
+                let new_pos = original_pos + egui::vec2(offset.x, offset.y);  // Move origin with mouse
+                let new_size = original_size - egui::vec2(offset.x, offset.y); // Subtract offset from size
+                (new_pos, new_size.at_least(min_size))  // Enforce minimum size constraints
             }
             ResizeHandle::TopRight => {
-                let new_pos = original_pos + egui::vec2(0.0, offset.y);
-                let new_size = original_size + egui::vec2(offset.x, -offset.y);
+                // Top-right handle: mouse movement affects width positively, height negatively
+                // Only Y position changes, width grows/shrinks with X offset
+                let new_pos = original_pos + egui::vec2(0.0, offset.y);        // Only Y position changes
+                let new_size = original_size + egui::vec2(offset.x, -offset.y); // Width grows, height shrinks with upward drag
                 (new_pos, new_size.at_least(min_size))
             }
             ResizeHandle::BottomLeft => {
-                let new_pos = original_pos + egui::vec2(offset.x, 0.0);
-                let new_size = original_size + egui::vec2(-offset.x, offset.y);
+                // Bottom-left handle: mouse movement affects height positively, width negatively
+                // Only X position changes, height grows/shrinks with Y offset
+                let new_pos = original_pos + egui::vec2(offset.x, 0.0);        // Only X position changes
+                let new_size = original_size + egui::vec2(-offset.x, offset.y); // Width shrinks, height grows with downward drag
                 (new_pos, new_size.at_least(min_size))
             }
             ResizeHandle::BottomRight => {
-                let new_size = original_size + offset;
-                (original_pos, new_size.at_least(min_size))
+                // Bottom-right handle: simplest case, both width and height grow with mouse movement
+                // Position never changes, size increases in both directions
+                let new_size = original_size + offset;  // Direct offset addition to size
+                (original_pos, new_size.at_least(min_size))  // Position unchanged
             }
             ResizeHandle::TopCenter => {
-                let new_pos = original_pos + egui::vec2(0.0, offset.y);
-                let new_size = original_size + egui::vec2(0.0, -offset.y);
+                // Top-center handle: only affects height, moving up grows component, down shrinks it
+                // Y position changes to maintain bottom edge position
+                let new_pos = original_pos + egui::vec2(0.0, offset.y);        // Move top edge with mouse
+                let new_size = original_size + egui::vec2(0.0, -offset.y);     // Height changes inversely to Y offset
                 (new_pos, new_size.at_least(min_size))
             }
             ResizeHandle::BottomCenter => {
-                let new_size = original_size + egui::vec2(0.0, offset.y);
-                (original_pos, new_size.at_least(min_size))
+                // Bottom-center handle: only affects height, moving down grows component
+                // Position never changes, only height increases/decreases
+                let new_size = original_size + egui::vec2(0.0, offset.y);      // Only height changes
+                (original_pos, new_size.at_least(min_size))  // Position unchanged
             }
             ResizeHandle::LeftCenter => {
-                let new_pos = original_pos + egui::vec2(offset.x, 0.0);
-                let new_size = original_size + egui::vec2(-offset.x, 0.0);
+                // Left-center handle: only affects width, moving left grows component, right shrinks it
+                // X position changes to maintain right edge position
+                let new_pos = original_pos + egui::vec2(offset.x, 0.0);        // Move left edge with mouse
+                let new_size = original_size + egui::vec2(-offset.x, 0.0);     // Width changes inversely to X offset
                 (new_pos, new_size.at_least(min_size))
             }
             ResizeHandle::RightCenter => {
-                let new_size = original_size + egui::vec2(offset.x, 0.0);
-                (original_pos, new_size.at_least(min_size))
+                // Right-center handle: only affects width, moving right grows component
+                // Position never changes, only width increases/decreases
+                let new_size = original_size + egui::vec2(offset.x, 0.0);      // Only width changes
+                (original_pos, new_size.at_least(min_size))  // Position unchanged
             }
         }
     }
@@ -1123,17 +1178,30 @@ impl VisualDesigner {
     }
 
     /// Snap position to grid if enabled
+    /// 
+    /// This algorithm implements the "magnetic" grid snapping behavior that's essential
+    /// for precise component alignment. It rounds positions to the nearest grid intersection,
+    /// providing the satisfying "snap" feeling that users expect from professional design tools.
     pub fn snap_to_grid(&self, pos: egui::Pos2) -> egui::Pos2 {
+        // Early exit if grid snapping is disabled or grid size is invalid
+        // This optimization avoids unnecessary calculations when snapping isn't needed
         if !self.grid.snap_enabled || self.grid.size <= 0.0 {
-            return pos;
+            return pos;  // Return original position unchanged
         }
         
-        let grid_size = self.grid.size.max(1.0); // Ensure minimum grid size
+        // Clamp grid size to minimum value to prevent division by zero or infinite loops
+        // Even with invalid settings, we want the system to remain stable
+        let grid_size = self.grid.size.max(1.0);
         
-        // Ensure snapped position is not negative
+        // Grid snapping algorithm: round to nearest grid intersection
+        // 1. Divide position by grid size to get fractional grid units
+        // 2. Round to nearest integer to find closest grid line
+        // 3. Multiply back by grid size to get pixel position
+        // 4. Clamp to prevent negative coordinates (keep components in visible area)
         let snapped_x = ((pos.x / grid_size).round() * grid_size).max(0.0);
         let snapped_y = ((pos.y / grid_size).round() * grid_size).max(0.0);
         
+        // Return the snapped position as a new point
         egui::pos2(snapped_x, snapped_y)
     }
 

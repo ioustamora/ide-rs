@@ -165,46 +165,76 @@ impl AiAgent {
     }
 
     /// Build a contextual prompt with project information
+    /// 
+    /// This algorithm constructs a sophisticated, context-aware prompt that maximizes the AI's
+    /// effectiveness by providing comprehensive project state, error context, and conversation
+    /// history. The prompt engineering follows best practices for getting high-quality responses
+    /// from language models while maintaining conversation continuity and relevance.
     fn build_contextual_prompt(&self, user_prompt: &str, task_type: &AiTaskType) -> String {
         let mut prompt = String::new();
 
-        // Add specialized system prompt
+        // System Role and Task-Specific Instructions
+        // Each task type gets a specialized system prompt to prime the AI with appropriate
+        // knowledge, perspective, and response style for that specific type of request
         if let Some(system_prompt) = self.specialized_prompts.get(task_type) {
             prompt.push_str(&format!("System: {}\n\n", system_prompt));
         }
 
-        // Add project context
+        // Project Metadata Section
+        // Provides essential project context that helps the AI understand the environment
+        // and constraints it's working within for more targeted suggestions
         prompt.push_str(&format!("Project: {}\n", self.context.project_name));
         prompt.push_str(&format!("Dependencies: {}\n", self.context.project_dependencies.join(", ")));
 
+        // Current File Context (if available)
+        // Gives the AI awareness of the specific file being worked on
+        // This enables more targeted suggestions and code generation
         if let Some(current_file) = &self.context.current_file {
             prompt.push_str(&format!("Current file: {}\n", current_file));
         }
 
+        // Selected Code Context (if available)
+        // When user has selected specific code, include it for precise context
+        // This allows the AI to provide suggestions specific to the selected region
         if let Some(selected_code) = &self.context.selected_code {
             prompt.push_str(&format!("Selected code:\n```rust\n{}\n```\n", selected_code));
         }
 
+        // Error Context Integration
+        // Recent errors provide crucial debugging context and help the AI understand
+        // what problems the user is encountering for more relevant assistance
         if !self.context.error_messages.is_empty() {
             prompt.push_str(&format!("Recent errors:\n{}\n", self.context.error_messages.join("\n")));
         }
 
+        // Component Context Section
+        // Provides awareness of available UI components and their relationships
+        // This helps the AI make more informed suggestions about component usage and interactions
         if !self.context.component_context.is_empty() {
             prompt.push_str(&format!("Available components: {}\n", self.context.component_context.join(", ")));
         }
 
-        // Add recent conversation context (last 3 exchanges)
+        // Conversation History for Continuity
+        // Recent conversation context helps maintain coherence across multiple interactions
+        // Limited to 3 recent exchanges to balance context richness with prompt length
         if !self.conversation_history.is_empty() {
             prompt.push_str("\nRecent conversation:\n");
+            // Process conversations in chronological order (oldest to newest of the selected 3)
+            // First reverse to get most recent 3, then reverse again for chronological order
             for conv in self.conversation_history.iter().rev().take(3).rev() {
+                // Truncate long inputs/responses to prevent prompt bloat while preserving key context
+                // 100 chars for user input, 200 chars for AI response provides good summary
                 prompt.push_str(&format!("User: {}\nAssistant: {}\n\n", 
-                    conv.user_input.chars().take(100).collect::<String>(),
-                    conv.ai_response.chars().take(200).collect::<String>()
+                    conv.user_input.chars().take(100).collect::<String>(),    // Truncated user input
+                    conv.ai_response.chars().take(200).collect::<String>()    // Truncated AI response
                 ));
             }
         }
 
+        // Current User Request
+        // Clearly delineated user prompt to distinguish it from contextual information
         prompt.push_str(&format!("\nUser request: {}\n", user_prompt));
+        // Final instruction to reinforce expectation for quality, actionable responses
         prompt.push_str("\nPlease provide a detailed, practical response:");
 
         prompt
@@ -274,10 +304,22 @@ impl AiAgent {
     }
 
     /// Add error message to context
+    /// 
+    /// This algorithm maintains a rolling window of recent error messages that provide
+    /// crucial debugging context to the AI. The bounded history prevents context bloat
+    /// while ensuring the AI has access to recent error patterns that might inform
+    /// better suggestions and solutions.
     pub fn add_error_context(&mut self, error: &str) {
+        // Add the new error message to the context history
+        // This gives the AI visibility into current problems and failure patterns
         self.context.error_messages.push(error.to_string());
-        // Keep only recent errors
+        
+        // Maintain a bounded history to prevent unbounded growth
+        // Keep only the 5 most recent errors to balance context richness with memory usage
+        // Older errors are likely less relevant to current debugging efforts
         if self.context.error_messages.len() > 5 {
+            // Remove the oldest error message (FIFO queue behavior)
+            // This ensures we always have the most recent and relevant error context
             self.context.error_messages.remove(0);
         }
     }

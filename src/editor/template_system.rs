@@ -891,43 +891,72 @@ impl TemplateSystem {
     }
 
     /// Get template with inherited properties resolved
+    /// 
+    /// This algorithm implements recursive template inheritance resolution, similar to class
+    /// inheritance in object-oriented programming. It walks up the inheritance chain,
+    /// merging properties from parent templates while allowing child templates to override
+    /// specific properties. This enables powerful template reuse and customization.
     pub fn get_resolved_template(&self, template_id: &str) -> Option<ComponentTemplate> {
+        // Get the base template - return None if template doesn't exist
         let template = self.templates.get(template_id)?;
+        // Start with a copy of the child template as our working template
         let mut resolved = template.clone();
 
-        // Resolve inheritance chain
+        // Resolve inheritance chain recursively
+        // This implements depth-first inheritance resolution
         if let Some(parent_id) = &template.parent_template {
+            // Recursively resolve the parent template (which may itself have parents)
+            // This creates a fully resolved inheritance chain from root to child
             if let Some(parent_resolved) = self.get_resolved_template(parent_id) {
+                // Merge the resolved parent with this child template
+                // Child properties override parent properties where allowed
                 resolved = self.merge_templates(&parent_resolved, &resolved);
             }
         }
 
+        // Return the fully resolved template with all inheritance applied
         Some(resolved)
     }
 
     /// Merge parent and child templates (inheritance resolution)
+    /// 
+    /// This is the core template inheritance algorithm that combines a parent template
+    /// with a child template, respecting property override rules and maintaining the
+    /// inheritance hierarchy. It implements the "child wins" strategy where child
+    /// templates can selectively override parent properties while inheriting others.
     fn merge_templates(&self, parent: &ComponentTemplate, child: &ComponentTemplate) -> ComponentTemplate {
+        // Start with the parent template as the base - this ensures we inherit all parent properties
         let mut merged = parent.clone();
 
-        // Override with child properties
-        merged.id = child.id.clone();
-        merged.name = child.name.clone();
-        merged.description = child.description.clone();
-        merged.version = child.version.clone();
-        merged.parent_template = child.parent_template.clone();
+        // Override core template metadata with child values
+        // These fields are always overridden by the child to maintain template identity
+        merged.id = child.id.clone();                         // Child template ID takes precedence
+        merged.name = child.name.clone();                     // Child template name
+        merged.description = child.description.clone();       // Child template description
+        merged.version = child.version.clone();               // Child template version
+        merged.parent_template = child.parent_template.clone(); // Maintain inheritance reference
 
-        // Merge properties (child overrides parent)
+        // Property merging with override rules
+        // This is the critical part where inheritance behavior is determined
         for (prop_name, child_prop) in &child.properties {
+            // Only allow override if the property is marked as overridable
+            // This provides fine-grained control over which properties can be customized
             if child_prop.overridable {
+                // Child property completely replaces parent property
+                // This allows child templates to customize specific aspects while inheriting others
                 merged.properties.insert(prop_name.clone(), child_prop.clone());
             }
+            // If property is not overridable, parent property is preserved automatically
+            // This enforces template constraints and ensures certain properties remain consistent
         }
 
-        // Merge other settings
-        merged.visual_settings = child.visual_settings.clone();
-        merged.behavior_settings = child.behavior_settings.clone();
-        merged.metadata = child.metadata.clone();
+        // Override appearance and behavior settings with child values
+        // These settings are considered part of the child template's identity
+        merged.visual_settings = child.visual_settings.clone();     // Child visual appearance
+        merged.behavior_settings = child.behavior_settings.clone(); // Child behavior rules
+        merged.metadata = child.metadata.clone();                   // Child metadata (author, dates, etc.)
 
+        // Return the merged template with combined parent/child characteristics
         merged
     }
 
@@ -1217,14 +1246,22 @@ impl InheritanceTree {
     }
 
     /// Calculate inheritance depth recursively
+    /// 
+    /// This algorithm calculates the maximum depth of the inheritance tree rooted at a given
+    /// template. It uses recursive traversal to find the deepest inheritance path, which is
+    /// useful for understanding template complexity and detecting potential circular references.
     fn calculate_depth(&self, template_id: &str, current_depth: usize) -> usize {
+        // Check if this template has any child templates
         if let Some(children) = self.relationships.get(template_id) {
+            // Recursively calculate depth for each child template
+            // Each child starts at current_depth + 1 (one level deeper)
             children
                 .iter()
                 .map(|child_id| self.calculate_depth(child_id, current_depth + 1))
-                .max()
-                .unwrap_or(current_depth)
+                .max()  // Take the maximum depth among all children
+                .unwrap_or(current_depth)  // If no children, use current depth
         } else {
+            // Leaf node - no children, so depth is current level
             current_depth
         }
     }
@@ -1237,12 +1274,22 @@ impl InheritanceTree {
     }
 
     /// Collect descendants recursively
+    /// 
+    /// This algorithm performs a depth-first traversal of the inheritance tree to collect
+    /// all descendant templates. It's used for operations like "find all templates that
+    /// inherit from X" or for cleanup when deleting a template that has children.
     fn collect_descendants(&self, template_id: &str, descendants: &mut Vec<String>) {
+        // Check if this template has any direct children
         if let Some(children) = self.relationships.get(template_id) {
+            // Process each direct child
             for child_id in children {
+                // Add the child to our descendants collection
                 descendants.push(child_id.clone());
+                // Recursively collect the child's descendants (grandchildren, etc.)
+                // This implements depth-first traversal to capture the entire subtree
                 self.collect_descendants(child_id, descendants);
             }
         }
+        // If no children exist, recursion naturally terminates
     }
 }
