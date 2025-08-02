@@ -18,6 +18,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dirs = "5.0"
 whoami = "1.4"
 syntect = "5.1"
+thiserror = "1.0"
 
 [dev-dependencies]
 tokio = { version = "1.37", features = ["macros", "rt", "net"] }

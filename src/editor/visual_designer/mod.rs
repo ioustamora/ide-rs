@@ -85,6 +85,7 @@ impl VisualDesigner {
     }
 
     /// Render the design canvas with the root form and all components
+    /// The Form is always rendered as the bottom-most layer (root component)
     pub fn render_design_canvas(
         &mut self,
         ui: &mut egui::Ui,
@@ -102,7 +103,7 @@ impl VisualDesigner {
             form_size
         );
         
-        // Render the root form background
+        // CRITICAL: Render the root form background FIRST to ensure it's always at the bottom
         root_form.render_background(ui, form_rect);
         
         // Check if form is selected (form is index -1 or a special value)

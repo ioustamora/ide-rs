@@ -333,6 +333,116 @@ impl PropertyInspector {
             },
         ]);
         
+        // Form properties (root container)
+        self.add_component_properties("Form", vec![
+            PropertyDefinition {
+                name: "title".to_string(),
+                label: "Title".to_string(),
+                description: "Form title or name".to_string(),
+                property_type: PropertyType::String { max_length: Some(100) },
+                group: "Appearance".to_string(),
+                advanced: false,
+                default_value: PropertyValue::String("Form".to_string()),
+                read_only: false,
+            },
+            PropertyDefinition {
+                name: "background_color".to_string(),
+                label: "Background Color".to_string(),
+                description: "Form background color".to_string(),
+                property_type: PropertyType::Enum { 
+                    options: vec!["white".to_string(), "black".to_string(), "red".to_string(), 
+                                "green".to_string(), "blue".to_string(), "gray".to_string(), "light_gray".to_string()]
+                },
+                group: "Appearance".to_string(),
+                advanced: false,
+                default_value: PropertyValue::Enum("white".to_string()),
+                read_only: false,
+            },
+            PropertyDefinition {
+                name: "border_color".to_string(),
+                label: "Border Color".to_string(),
+                description: "Form border color".to_string(),
+                property_type: PropertyType::Enum { 
+                    options: vec!["white".to_string(), "black".to_string(), "red".to_string(), 
+                                "green".to_string(), "blue".to_string(), "gray".to_string(), "light_gray".to_string()]
+                },
+                group: "Appearance".to_string(),
+                advanced: false,
+                default_value: PropertyValue::Enum("light_gray".to_string()),
+                read_only: false,
+            },
+            PropertyDefinition {
+                name: "border_width".to_string(),
+                label: "Border Width".to_string(),
+                description: "Width of the form border".to_string(),
+                property_type: PropertyType::Number { min: 0.0, max: 10.0, step: 0.5 },
+                group: "Appearance".to_string(),
+                advanced: false,
+                default_value: PropertyValue::Number(1.0),
+                read_only: false,
+            },
+            PropertyDefinition {
+                name: "show_border".to_string(),
+                label: "Show Border".to_string(),
+                description: "Whether to display the form border".to_string(),
+                property_type: PropertyType::Boolean,
+                group: "Appearance".to_string(),
+                advanced: false,
+                default_value: PropertyValue::Boolean(true),
+                read_only: false,
+            },
+            PropertyDefinition {
+                name: "corner_radius".to_string(),
+                label: "Corner Radius".to_string(),
+                description: "Roundness of form corners".to_string(),
+                property_type: PropertyType::Number { min: 0.0, max: 50.0, step: 1.0 },
+                group: "Appearance".to_string(),
+                advanced: false,
+                default_value: PropertyValue::Number(4.0),
+                read_only: false,
+            },
+            PropertyDefinition {
+                name: "width".to_string(),
+                label: "Width".to_string(),
+                description: "Form width in pixels".to_string(),
+                property_type: PropertyType::Number { min: 200.0, max: 2000.0, step: 10.0 },
+                group: "Layout".to_string(),
+                advanced: false,
+                default_value: PropertyValue::Number(400.0),
+                read_only: false,
+            },
+            PropertyDefinition {
+                name: "height".to_string(),
+                label: "Height".to_string(),
+                description: "Form height in pixels".to_string(),
+                property_type: PropertyType::Number { min: 150.0, max: 1500.0, step: 10.0 },
+                group: "Layout".to_string(),
+                advanced: false,
+                default_value: PropertyValue::Number(300.0),
+                read_only: false,
+            },
+            PropertyDefinition {
+                name: "padding".to_string(),
+                label: "Padding".to_string(),
+                description: "Internal spacing around form content".to_string(),
+                property_type: PropertyType::Number { min: 0.0, max: 100.0, step: 1.0 },
+                group: "Layout".to_string(),
+                advanced: false,
+                default_value: PropertyValue::Number(16.0),
+                read_only: false,
+            },
+            PropertyDefinition {
+                name: "visible".to_string(),
+                label: "Visible".to_string(),
+                description: "Whether the form is visible".to_string(),
+                property_type: PropertyType::Boolean,
+                group: "Behavior".to_string(),
+                advanced: false,
+                default_value: PropertyValue::Boolean(true),
+                read_only: false,
+            },
+        ]);
+        
         // Initialize expanded groups
         self.expanded_groups.insert("Appearance".to_string(), true);
         self.expanded_groups.insert("Layout".to_string(), true);
