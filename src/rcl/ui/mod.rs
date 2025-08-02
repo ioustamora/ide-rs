@@ -89,6 +89,24 @@
 /// providing the foundation for the RCL component system.
 pub mod component;
 
+/// Property system for standardized component properties
+/// 
+/// Provides a comprehensive property system with type safety, validation,
+/// and metadata for advanced IDE integration and customization.
+pub mod properties;
+
+/// Enhanced component system with standardized properties
+/// 
+/// Enhanced component trait that provides standardized properties, theming,
+/// layout management, and improved IDE integration capabilities.
+pub mod enhanced_component;
+
+/// Theme system for consistent styling across components
+/// 
+/// Provides comprehensive theming capabilities with light/dark themes,
+/// customizable color palettes, typography, and component-specific overrides.
+pub mod theme;
+
 /// Basic UI components
 /// 
 /// Fundamental interactive elements like buttons, labels, text inputs, and
@@ -101,5 +119,8 @@ pub mod basic;
 /// panels that provide rich functionality for sophisticated applications.
 pub mod advanced;
 
-// Re-export the core component trait for convenience
+// Re-export the core types for convenience
 pub use component::Component;
+pub use properties::{PropertyInfo, PropertyValue, PropertyRegistry, PropertyCategory};
+pub use enhanced_component::{EnhancedComponent, StandardProperties};
+pub use theme::{Theme, ThemeManager, ColorPalette, Typography, Spacing};

@@ -53,6 +53,7 @@
 // Re-export all basic UI components for convenient access
 pub mod label;
 pub mod button;
+pub mod enhanced_button;
 pub mod textbox;
 pub mod checkbox;
 pub mod slider;
@@ -62,6 +63,7 @@ pub mod form;
 
 // Re-export component types for easier importing
 pub use button::Button;
+pub use enhanced_button::EnhancedButton;
 pub use checkbox::Checkbox;
 pub use dropdown::Dropdown;
 pub use form::Form;
