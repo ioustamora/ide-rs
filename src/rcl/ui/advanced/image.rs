@@ -26,4 +26,40 @@ impl Component for Image {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "path" => Some(self.path.clone()),
+            "editable" => Some(self.editable.to_string()),
+            "has_texture" => Some(self.texture.is_some().to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "path" => {
+                self.path = value.to_string();
+                // TODO: Load texture from new path
+                true
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "path".to_string(),
+            "editable".to_string(),
+            "has_texture".to_string(),
+        ]
+    }
 }

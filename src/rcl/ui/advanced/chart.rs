@@ -185,6 +185,164 @@ impl Component for Chart {
             }
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "chart_type" => Some(format!("{:?}", self.config.chart_type)),
+            "title" => Some(self.config.title.clone()),
+            "x_label" => Some(self.config.x_label.clone()),
+            "y_label" => Some(self.config.y_label.clone()),
+            "show_grid" => Some(self.config.show_grid.to_string()),
+            "show_legend" => Some(self.config.show_legend.to_string()),
+            "width" => Some(self.config.size.x.to_string()),
+            "height" => Some(self.config.size.y.to_string()),
+            "animation_enabled" => Some(self.animation.enabled.to_string()),
+            "animation_duration" => Some(self.animation.duration.to_string()),
+            "y_range_min" => Some(self.data.y_range.0.to_string()),
+            "y_range_max" => Some(self.data.y_range.1.to_string()),
+            "editable" => Some(self.editable.to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "chart_type" => {
+                match value {
+                    "Line" => { self.config.chart_type = ChartType::Line; true }
+                    "Bar" => { self.config.chart_type = ChartType::Bar; true }
+                    "Pie" => { self.config.chart_type = ChartType::Pie; true }
+                    "Scatter" => { self.config.chart_type = ChartType::Scatter; true }
+                    "Area" => { self.config.chart_type = ChartType::Area; true }
+                    "Histogram" => { self.config.chart_type = ChartType::Histogram; true }
+                    _ => false,
+                }
+            }
+            "title" => {
+                self.config.title = value.to_string();
+                true
+            }
+            "x_label" => {
+                self.config.x_label = value.to_string();
+                true
+            }
+            "y_label" => {
+                self.config.y_label = value.to_string();
+                true
+            }
+            "show_grid" => {
+                if let Ok(show_grid) = value.parse::<bool>() {
+                    self.config.show_grid = show_grid;
+                    true
+                } else {
+                    false
+                }
+            }
+            "show_legend" => {
+                if let Ok(show_legend) = value.parse::<bool>() {
+                    self.config.show_legend = show_legend;
+                    true
+                } else {
+                    false
+                }
+            }
+            "width" => {
+                if let Ok(width) = value.parse::<f32>() {
+                    if width >= 200.0 && width <= 800.0 {
+                        self.config.size.x = width;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "height" => {
+                if let Ok(height) = value.parse::<f32>() {
+                    if height >= 150.0 && height <= 600.0 {
+                        self.config.size.y = height;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "animation_enabled" => {
+                if let Ok(enabled) = value.parse::<bool>() {
+                    self.animation.enabled = enabled;
+                    true
+                } else {
+                    false
+                }
+            }
+            "animation_duration" => {
+                if let Ok(duration) = value.parse::<f32>() {
+                    if duration > 0.0 && duration <= 10.0 {
+                        self.animation.duration = duration;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "y_range_min" => {
+                if let Ok(min) = value.parse::<f32>() {
+                    if min < self.data.y_range.1 {
+                        self.data.y_range.0 = min;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "y_range_max" => {
+                if let Ok(max) = value.parse::<f32>() {
+                    if max > self.data.y_range.0 {
+                        self.data.y_range.1 = max;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "chart_type".to_string(),
+            "title".to_string(),
+            "x_label".to_string(),
+            "y_label".to_string(),
+            "show_grid".to_string(),
+            "show_legend".to_string(),
+            "width".to_string(),
+            "height".to_string(),
+            "animation_enabled".to_string(),
+            "animation_duration".to_string(),
+            "y_range_min".to_string(),
+            "y_range_max".to_string(),
+            "editable".to_string(),
+        ]
+    }
 }
 
 impl Chart {

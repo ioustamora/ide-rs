@@ -14,8 +14,9 @@ pub mod theme_system;
 pub mod code_generation;
 
 // Re-export main types for convenience
-pub use design_tokens::{DesignTokenSystem, TokenCategory, DesignToken};
-pub use component_library::{ComponentLibrary, ComponentTemplate, LibraryCategory};
-pub use framework_export::{FrameworkExporter, ExportTarget, ExportOptions};
-pub use theme_system::{ThemeSystem, Theme, ThemeVariant};
-pub use code_generation::{CodeGenerator, CodeStyle, ExportFormat};
+pub use design_tokens::{DesignTokenSystem, TokenValue, ColorToken};
+pub use component_library::{ComponentLibrary, ComponentTemplate, LayoutType};
+pub use framework_export::{FrameworkExportManager, ExportTarget, ExportSettings};
+pub use theme_system::{ThemeSystem, Theme, ThemeType};
+pub use code_generation::{CodeGenerator, CodeStyle, GenerationError};
+pub use crate::shared::serialization::ExportFormat;

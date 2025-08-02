@@ -233,3 +233,15 @@ pub mod advanced_alignment;
 /// Provides project templates, code generation patterns, and
 /// scaffolding tools for rapid application development.
 pub mod template_system_simple;
+
+/// Smart editing modular components
+/// 
+/// Modular architecture for intelligent editing features including
+/// alignment guides, magnetism, spacing guides, and learning systems.
+pub mod smart_editing_modules;
+
+/// Modern IDE integration modular components
+/// 
+/// Modular architecture for IDE integration including design tokens,
+/// component library, framework export, theme system, and code generation.
+pub mod modern_ide_integration_modules;

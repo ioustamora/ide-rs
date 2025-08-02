@@ -215,4 +215,34 @@ impl Component for TextBox {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "value" => Some(self.value.clone()),
+            "editable" => Some(self.editable.to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "value" => {
+                self.value = value.to_string();
+                true
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec!["value".to_string(), "editable".to_string()]
+    }
 }

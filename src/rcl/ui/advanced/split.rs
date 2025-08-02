@@ -29,4 +29,52 @@ impl Component for Split {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "orientation" => Some(self.orientation.clone()),
+            "ratio" => Some(self.ratio.to_string()),
+            "editable" => Some(self.editable.to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "orientation" => {
+                let orientation = value.to_string();
+                if orientation == "Horizontal" || orientation == "Vertical" {
+                    self.orientation = orientation;
+                    true
+                } else {
+                    false
+                }
+            }
+            "ratio" => {
+                if let Ok(ratio) = value.parse::<f32>() {
+                    if ratio >= 0.0 && ratio <= 1.0 {
+                        self.ratio = ratio;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec!["orientation".to_string(), "ratio".to_string(), "editable".to_string()]
+    }
 }

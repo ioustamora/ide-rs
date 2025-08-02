@@ -24,14 +24,14 @@ pub struct AlignmentGuide {
 }
 
 /// Guide direction enumeration
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Copy)]
 pub enum GuideDirection {
     Horizontal,
     Vertical,
 }
 
 /// Alignment type for different guide styles
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Copy)]
 pub enum AlignmentType {
     /// Component edge alignment
     Edge,
@@ -369,7 +369,7 @@ impl AlignmentGuideManager {
     fn draw_dashed_line(&self, painter: &Painter, start: Pos2, end: Pos2, stroke: Stroke) {
         let direction = (end - start).normalized();
         let length = (end - start).length();
-        let dash_length = 8.0;
+        let dash_length: f32 = 8.0;
         let gap_length = 4.0;
         let cycle_length = dash_length + gap_length;
         

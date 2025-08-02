@@ -172,6 +172,103 @@ impl Component for Notification {
             }
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "message" => Some(self.message.clone()),
+            "kind" => Some(format!("{:?}", self.kind)),
+            "editable" => Some(self.editable.to_string()),
+            "timeout_seconds" => self.timeout.map(|t| t.as_secs().to_string()),
+            "dismissible" => Some(self.dismissible.to_string()),
+            "show_icon" => Some(self.show_icon.to_string()),
+            "is_expired" => Some(self.is_expired().to_string()),
+            "remaining_seconds" => self.remaining_time().map(|t| t.as_secs().to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "message" => {
+                self.message = value.to_string();
+                true
+            }
+            "kind" => {
+                match value {
+                    "Info" => {
+                        self.kind = NotificationKind::Info;
+                        true
+                    }
+                    "Success" => {
+                        self.kind = NotificationKind::Success;
+                        true
+                    }
+                    "Warning" => {
+                        self.kind = NotificationKind::Warning;
+                        true
+                    }
+                    "Error" => {
+                        self.kind = NotificationKind::Error;
+                        true
+                    }
+                    _ => false,
+                }
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            "timeout_seconds" => {
+                if value.is_empty() || value == "none" {
+                    self.timeout = None;
+                    true
+                } else if let Ok(seconds) = value.parse::<u64>() {
+                    if seconds >= 1 && seconds <= 300 { // Max 5 minutes
+                        self.timeout = Some(Duration::from_secs(seconds));
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "dismissible" => {
+                if let Ok(dismissible) = value.parse::<bool>() {
+                    self.dismissible = dismissible;
+                    true
+                } else {
+                    false
+                }
+            }
+            "show_icon" => {
+                if let Ok(show_icon) = value.parse::<bool>() {
+                    self.show_icon = show_icon;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "message".to_string(),
+            "kind".to_string(),
+            "editable".to_string(),
+            "timeout_seconds".to_string(),
+            "dismissible".to_string(),
+            "show_icon".to_string(),
+            "is_expired".to_string(),
+            "remaining_seconds".to_string(),
+        ]
+    }
 }
 
 impl Notification {

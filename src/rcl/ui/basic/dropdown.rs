@@ -350,4 +350,74 @@ impl Component for Dropdown {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "label" => Some(self.label.clone()),
+            "selected" => Some(self.selected.to_string()),
+            "selected_text" => Some(self.selected_text().to_string()),
+            "options" => Some(self.options.join(",")), // Join options with comma for string representation
+            "editable" => Some(self.editable.to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "label" => {
+                self.label = value.to_string();
+                true
+            }
+            "selected" => {
+                if let Ok(index) = value.parse::<usize>() {
+                    if index < self.options.len() {
+                        self.selected = index;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "selected_text" => {
+                // Allow setting selection by text value
+                self.set_selected_by_text(value)
+            }
+            "options" => {
+                // Parse comma-separated options
+                let new_options: Vec<String> = value
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                
+                if !new_options.is_empty() {
+                    self.set_options(new_options);
+                    true
+                } else {
+                    false
+                }
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "label".to_string(),
+            "selected".to_string(),
+            "selected_text".to_string(),
+            "options".to_string(),
+            "editable".to_string()
+        ]
+    }
 }

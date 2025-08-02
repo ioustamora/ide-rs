@@ -12,7 +12,7 @@ pub struct Modal {
 
 impl Component for Modal {
     fn name(&self) -> &str {
-        &self.title
+        "Modal"
     }
     fn render(&mut self, ui: &mut Ui) {
         if self.open {
@@ -30,5 +30,54 @@ impl Component for Modal {
                     }
                 });
         }
+    }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "title" => Some(self.title.clone()),
+            "content" => Some(self.content.clone()),
+            "open" => Some(self.open.to_string()),
+            "editable" => Some(self.editable.to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "title" => {
+                self.title = value.to_string();
+                true
+            }
+            "content" => {
+                self.content = value.to_string();
+                true
+            }
+            "open" => {
+                if let Ok(open) = value.parse::<bool>() {
+                    self.open = open;
+                    true
+                } else {
+                    false
+                }
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "title".to_string(),
+            "content".to_string(),
+            "open".to_string(),
+            "editable".to_string(),
+        ]
     }
 }

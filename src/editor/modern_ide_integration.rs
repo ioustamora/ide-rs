@@ -4,10 +4,9 @@
 //! New code should use the modular structure in the `modern_ide_integration` submodule.
 
 // Re-export the new modular structure for backward compatibility
-pub use self::modern_ide_integration_modules::*;
+pub use crate::editor::modern_ide_integration_modules::*;
 
-// Include the new modular structure  
-mod modern_ide_integration_modules;
+// The modular structure is already declared in editor/mod.rs
 
 use egui::*;
 
@@ -48,6 +47,11 @@ impl ModernIdeIntegration {
     /// Apply current theme to egui context
     pub fn apply_theme(&self, ctx: &Context) {
         self.theme_system.apply_to_egui(ctx);
+    }
+    
+    /// Render the integration panel UI
+    pub fn render_integration_panel(&mut self, ui: &mut Ui) {
+        self.render_ui(ui);
     }
     
     /// Render the modern IDE integration UI

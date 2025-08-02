@@ -38,4 +38,50 @@ impl Component for Tree {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "root_label" => Some(self.root.label.clone()),
+            "editable" => Some(self.editable.to_string()),
+            "child_count" => Some(self.root.children.len().to_string()),
+            "total_nodes" => Some(self.count_total_nodes().to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "root_label" => {
+                self.root.label = value.to_string();
+                true
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "root_label".to_string(),
+            "editable".to_string(),
+            "child_count".to_string(),
+            "total_nodes".to_string(),
+        ]
+    }
+}
+
+impl Tree {
+    fn count_total_nodes(&self) -> usize {
+        fn count_node(node: &TreeNode) -> usize {
+            1 + node.children.iter().map(count_node).sum::<usize>()
+        }
+        count_node(&self.root)
+    }
 }

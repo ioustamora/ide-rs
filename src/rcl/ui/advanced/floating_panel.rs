@@ -117,4 +117,129 @@ impl Component for FloatingPanel {
             }
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "title" => Some(self.title.clone()),
+            "content" => Some(self.content.clone()),
+            "open" => Some(self.open.to_string()),
+            "editable" => Some(self.editable.to_string()),
+            "resizable" => Some(self.resizable.to_string()),
+            "collapsible" => Some(self.collapsible.to_string()),
+            "position_x" => self.position.map(|pos| pos.x.to_string()),
+            "position_y" => self.position.map(|pos| pos.y.to_string()),
+            "width" => self.size.map(|size| size.x.to_string()),
+            "height" => self.size.map(|size| size.y.to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "title" => {
+                self.title = value.to_string();
+                true
+            }
+            "content" => {
+                self.content = value.to_string();
+                true
+            }
+            "open" => {
+                if let Ok(open) = value.parse::<bool>() {
+                    self.open = open;
+                    true
+                } else {
+                    false
+                }
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            "resizable" => {
+                if let Ok(resizable) = value.parse::<bool>() {
+                    self.resizable = resizable;
+                    true
+                } else {
+                    false
+                }
+            }
+            "collapsible" => {
+                if let Ok(collapsible) = value.parse::<bool>() {
+                    self.collapsible = collapsible;
+                    true
+                } else {
+                    false
+                }
+            }
+            "position_x" => {
+                if let Ok(x) = value.parse::<f32>() {
+                    if let Some(pos) = &mut self.position {
+                        pos.x = x;
+                    } else {
+                        self.position = Some(Pos2::new(x, 0.0));
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            "position_y" => {
+                if let Ok(y) = value.parse::<f32>() {
+                    if let Some(pos) = &mut self.position {
+                        pos.y = y;
+                    } else {
+                        self.position = Some(Pos2::new(0.0, y));
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            "width" => {
+                if let Ok(w) = value.parse::<f32>() {
+                    if let Some(size) = &mut self.size {
+                        size.x = w;
+                    } else {
+                        self.size = Some(Vec2::new(w, 200.0));
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            "height" => {
+                if let Ok(h) = value.parse::<f32>() {
+                    if let Some(size) = &mut self.size {
+                        size.y = h;
+                    } else {
+                        self.size = Some(Vec2::new(300.0, h));
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "title".to_string(),
+            "content".to_string(),
+            "open".to_string(),
+            "editable".to_string(),
+            "resizable".to_string(),
+            "collapsible".to_string(),
+            "position_x".to_string(),
+            "position_y".to_string(),
+            "width".to_string(),
+            "height".to_string(),
+        ]
+    }
 }

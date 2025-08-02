@@ -25,4 +25,47 @@ impl Component for CodeEditor {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "code" => Some(self.code.clone()),
+            "language" => Some(self.language.clone()),
+            "editable" => Some(self.editable.to_string()),
+            "line_count" => Some(self.code.lines().count().to_string()),
+            "character_count" => Some(self.code.len().to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "code" => {
+                self.code = value.to_string();
+                true
+            }
+            "language" => {
+                self.language = value.to_string();
+                true
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "code".to_string(),
+            "language".to_string(),
+            "editable".to_string(),
+            "line_count".to_string(),
+            "character_count".to_string(),
+        ]
+    }
 }

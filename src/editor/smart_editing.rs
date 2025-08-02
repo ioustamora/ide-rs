@@ -4,7 +4,6 @@
 //! New code should use the modular structure in the `smart_editing` submodule.
 
 // Re-export the new modular structure for backward compatibility
-pub use self::smart_editing_modules::*;
+pub use crate::editor::smart_editing_modules::*;
 
-// Include the new modular structure
-mod smart_editing_modules;
+// The modular structure is already declared in editor/mod.rs

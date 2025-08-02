@@ -3,6 +3,7 @@ pub mod rcl;
 pub mod editor;
 pub mod ai_agent;
 pub mod ide_app;
+pub mod shared;
 
 // Re-export main modules for easy access
 pub use ide_app::IdeApp;

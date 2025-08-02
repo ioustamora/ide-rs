@@ -23,4 +23,53 @@ impl Component for FilePicker {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "path" => Some(self.path.clone()),
+            "editable" => Some(self.editable.to_string()),
+            "file_name" => {
+                if let Some(file_name) = std::path::Path::new(&self.path).file_name() {
+                    file_name.to_str().map(|s| s.to_string())
+                } else {
+                    None
+                }
+            }
+            "file_extension" => {
+                if let Some(extension) = std::path::Path::new(&self.path).extension() {
+                    extension.to_str().map(|s| s.to_string())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "path" => {
+                self.path = value.to_string();
+                true
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "path".to_string(),
+            "editable".to_string(),
+            "file_name".to_string(),
+            "file_extension".to_string(),
+        ]
+    }
 }

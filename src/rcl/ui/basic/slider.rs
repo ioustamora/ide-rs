@@ -275,4 +275,64 @@ impl Component for Slider {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "value" => Some(self.value.to_string()),
+            "min" => Some(self.min.to_string()),
+            "max" => Some(self.max.to_string()),
+            "editable" => Some(self.editable.to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "value" => {
+                if let Ok(val) = value.parse::<f32>() {
+                    self.set_value(val); // Uses the existing method that clamps to range
+                    true
+                } else {
+                    false
+                }
+            }
+            "min" => {
+                if let Ok(min) = value.parse::<f32>() {
+                    if min <= self.max {
+                        self.set_range(min, self.max); // Uses existing method
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "max" => {
+                if let Ok(max) = value.parse::<f32>() {
+                    if max >= self.min {
+                        self.set_range(self.min, max); // Uses existing method
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec!["value".to_string(), "min".to_string(), "max".to_string(), "editable".to_string()]
+    }
 }

@@ -41,4 +41,48 @@ impl Component for Table {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "headers" => Some(self.headers.join(",")),
+            "editable" => Some(self.editable.to_string()),
+            "column_count" => Some(self.headers.len().to_string()),
+            "row_count" => Some(self.rows.len().to_string()),
+            "total_cells" => Some((self.headers.len() + self.rows.len() * self.headers.len()).to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "headers" => {
+                self.headers = value.split(',').map(|s| s.trim().to_string()).collect();
+                // Adjust existing rows to match new header count
+                let header_count = self.headers.len();
+                for row in &mut self.rows {
+                    row.resize(header_count, String::new());
+                }
+                true
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "headers".to_string(),
+            "editable".to_string(),
+            "column_count".to_string(),
+            "row_count".to_string(),
+            "total_cells".to_string(),
+        ]
+    }
 }

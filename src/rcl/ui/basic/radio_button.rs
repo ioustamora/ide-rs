@@ -236,4 +236,43 @@ impl Component for RadioButton {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "label" => Some(self.label.clone()),
+            "selected" => Some(self.selected.to_string()),
+            "editable" => Some(self.editable.to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "label" => {
+                self.label = value.to_string();
+                true
+            }
+            "selected" => {
+                if let Ok(selected) = value.parse::<bool>() {
+                    self.selected = selected;
+                    true
+                } else {
+                    false
+                }
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec!["label".to_string(), "selected".to_string(), "editable".to_string()]
+    }
 }

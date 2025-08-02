@@ -157,4 +157,108 @@ impl Component for LayoutManager {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "layout_type" => Some(format!("{:?}", self.layout_type)),
+            "spacing" => Some(self.spacing.to_string()),
+            "padding_x" => Some(self.padding.x.to_string()),
+            "padding_y" => Some(self.padding.y.to_string()),
+            "grid_columns" => Some(self.grid_columns.to_string()),
+            "editable" => Some(self.editable.to_string()),
+            "children_count" => Some(self.children.len().to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "layout_type" => {
+                match value {
+                    "Horizontal" => {
+                        self.layout_type = LayoutType::Horizontal;
+                        true
+                    }
+                    "Vertical" => {
+                        self.layout_type = LayoutType::Vertical;
+                        true
+                    }
+                    "Grid" => {
+                        self.layout_type = LayoutType::Grid;
+                        true
+                    }
+                    _ => false,
+                }
+            }
+            "spacing" => {
+                if let Ok(spacing) = value.parse::<f32>() {
+                    if spacing >= 0.0 && spacing <= 20.0 {
+                        self.spacing = spacing;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "padding_x" => {
+                if let Ok(padding_x) = value.parse::<f32>() {
+                    if padding_x >= 0.0 && padding_x <= 50.0 {
+                        self.padding.x = padding_x;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "padding_y" => {
+                if let Ok(padding_y) = value.parse::<f32>() {
+                    if padding_y >= 0.0 && padding_y <= 50.0 {
+                        self.padding.y = padding_y;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "grid_columns" => {
+                if let Ok(columns) = value.parse::<usize>() {
+                    if columns >= 1 && columns <= 6 {
+                        self.grid_columns = columns;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "layout_type".to_string(),
+            "spacing".to_string(),
+            "padding_x".to_string(),
+            "padding_y".to_string(),
+            "grid_columns".to_string(),
+            "editable".to_string(),
+            "children_count".to_string(),
+        ]
+    }
 }

@@ -127,6 +127,140 @@ impl Component for RichTextEditor {
             self.editable = !self.editable;
         }
     }
+    
+    fn get_property(&self, name: &str) -> Option<String> {
+        match name {
+            "content" => Some(self.content.clone()),
+            "editable" => Some(self.editable.to_string()),
+            "font_size" => Some(self.font_size.to_string()),
+            "text_color" => Some(format!("#{:02X}{:02X}{:02X}", self.text_color.r(), self.text_color.g(), self.text_color.b())),
+            "bold" => Some(self.bold.to_string()),
+            "italic" => Some(self.italic.to_string()),
+            "search_query" => Some(self.search_query.clone()),
+            "replace_text" => Some(self.replace_text.clone()),
+            "show_toolbar" => Some(self.show_toolbar.to_string()),
+            "show_line_numbers" => Some(self.show_line_numbers.to_string()),
+            "word_wrap" => Some(self.word_wrap.to_string()),
+            "word_count" => Some(self.count_words().to_string()),
+            "character_count" => Some(self.content.len().to_string()),
+            "line_count" => Some(self.content.lines().count().to_string()),
+            _ => None,
+        }
+    }
+    
+    fn set_property(&mut self, name: &str, value: &str) -> bool {
+        match name {
+            "content" => {
+                self.content = value.to_string();
+                true
+            }
+            "editable" => {
+                if let Ok(editable) = value.parse::<bool>() {
+                    self.editable = editable;
+                    true
+                } else {
+                    false
+                }
+            }
+            "font_size" => {
+                if let Ok(size) = value.parse::<f32>() {
+                    if size >= 8.0 && size <= 24.0 {
+                        self.font_size = size;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "text_color" => {
+                // Parse hex color format #RRGGBB
+                if value.len() == 7 && value.starts_with('#') {
+                    if let (Ok(r), Ok(g), Ok(b)) = (
+                        u8::from_str_radix(&value[1..3], 16),
+                        u8::from_str_radix(&value[3..5], 16),
+                        u8::from_str_radix(&value[5..7], 16),
+                    ) {
+                        self.text_color = Color32::from_rgb(r, g, b);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            "bold" => {
+                if let Ok(bold) = value.parse::<bool>() {
+                    self.bold = bold;
+                    true
+                } else {
+                    false
+                }
+            }
+            "italic" => {
+                if let Ok(italic) = value.parse::<bool>() {
+                    self.italic = italic;
+                    true
+                } else {
+                    false
+                }
+            }
+            "search_query" => {
+                self.search_query = value.to_string();
+                true
+            }
+            "replace_text" => {
+                self.replace_text = value.to_string();
+                true
+            }
+            "show_toolbar" => {
+                if let Ok(show_toolbar) = value.parse::<bool>() {
+                    self.show_toolbar = show_toolbar;
+                    true
+                } else {
+                    false
+                }
+            }
+            "show_line_numbers" => {
+                if let Ok(show_line_numbers) = value.parse::<bool>() {
+                    self.show_line_numbers = show_line_numbers;
+                    true
+                } else {
+                    false
+                }
+            }
+            "word_wrap" => {
+                if let Ok(word_wrap) = value.parse::<bool>() {
+                    self.word_wrap = word_wrap;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    
+    fn get_property_names(&self) -> Vec<String> {
+        vec![
+            "content".to_string(),
+            "editable".to_string(),
+            "font_size".to_string(),
+            "text_color".to_string(),
+            "bold".to_string(),
+            "italic".to_string(),
+            "search_query".to_string(),
+            "replace_text".to_string(),
+            "show_toolbar".to_string(),
+            "show_line_numbers".to_string(),
+            "word_wrap".to_string(),
+            "word_count".to_string(),
+            "character_count".to_string(),
+            "line_count".to_string(),
+        ]
+    }
 }
 
 impl RichTextEditor {
