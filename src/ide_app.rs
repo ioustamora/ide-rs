@@ -383,11 +383,15 @@ impl eframe::App for IdeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Top menu bar with improved organization
         egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {
+            // Menu bar
             ui.horizontal(|ui| {
                 self.menu.ui(ui);
+            });
+            // Toolbar
+            self.menu.toolbar.ui(ui, &mut crate::editor::actions, &mut self.menu.output_panel);
+            // Panel toggles and mode switches
+            ui.horizontal(|ui| {
                 ui.separator();
-                
-                // Panel toggle buttons with tooltips
                 if ui.button("🧰").on_hover_text("Toggle Component Palette").clicked() {
                     self.show_component_palette = !self.show_component_palette;
                 }
@@ -409,20 +413,14 @@ impl eframe::App for IdeApp {
                 if ui.button("🚀").on_hover_text("Toggle Modern IDE Features").clicked() {
                     self.show_modern_ide_panel = !self.show_modern_ide_panel;
                 }
-                
                 ui.separator();
-                
-                // Design mode toggle
                 if ui.selectable_label(self.design_mode, "🎨 Design").on_hover_text("Visual Designer Mode").clicked() {
                     self.design_mode = true;
                 }
                 if ui.selectable_label(!self.design_mode, "💻 Code").on_hover_text("Code Editor Mode").clicked() {
                     self.design_mode = false;
                 }
-                
                 ui.separator();
-                
-                // Grid and alignment tools (only in design mode)
                 if self.design_mode {
                     if ui.button("📐").on_hover_text("Toggle Grid").clicked() {
                         self.visual_designer.grid.visible = !self.visual_designer.grid.visible;
@@ -433,10 +431,7 @@ impl eframe::App for IdeApp {
                     if ui.button("🔗").on_hover_text("Snap to Grid").clicked() {
                         self.visual_designer.grid.snap_enabled = !self.visual_designer.grid.snap_enabled;
                     }
-                    
                     ui.separator();
-                    
-                    // Multi-device preview toggle
                     if ui.selectable_label(self.multi_device_preview.enabled, "📱").on_hover_text("Multi-Device Preview").clicked() {
                         self.multi_device_preview.toggle_preview();
                     }
