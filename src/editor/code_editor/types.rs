@@ -136,6 +136,77 @@ impl CodeEditor {
                 });
         });
     }
+
+    /// Undo the last operation
+    pub fn undo(&mut self) {
+        if self.history.current_index > 0 {
+            self.history.current_index -= 1;
+            // Apply reverse operation - placeholder implementation
+        }
+    }
+
+    /// Redo the last undone operation
+    pub fn redo(&mut self) {
+        if self.history.current_index < self.history.operations.len() {
+            // Apply operation - placeholder implementation
+            self.history.current_index += 1;
+        }
+    }
+
+    /// Cut selected text to clipboard
+    pub fn cut(&mut self) {
+        if let Some(_selection) = &self.selection {
+            // Copy to clipboard first
+            self.copy();
+            // Then delete selected text - placeholder implementation
+            // In a real implementation, this would remove the selected text
+        }
+    }
+
+    /// Copy selected text to clipboard
+    pub fn copy(&mut self) {
+        if let Some(_selection) = &self.selection {
+            // Placeholder implementation - would copy selected text to clipboard
+            // In a real implementation, this would use a clipboard crate
+        }
+    }
+
+    /// Paste text from clipboard
+    pub fn paste(&mut self) {
+        // Placeholder implementation - would paste from clipboard
+        // In a real implementation, this would get text from clipboard and insert it
+    }
+
+    /// Select all text in the editor
+    pub fn select_all(&mut self) {
+        let lines: Vec<&str> = self.code.lines().collect();
+        if !lines.is_empty() {
+            let last_line = lines.len() - 1;
+            let last_col = lines[last_line].len();
+            self.selection = Some(TextSelection {
+                start: (0, 0),
+                end: (last_line, last_col),
+            });
+        }
+    }
+
+    /// Render the code editor (basic implementation)
+    pub fn render(&mut self, ui: &mut eframe::egui::Ui) {
+        ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                ui.label(format!("Language: {}", self.language));
+                ui.separator();
+                ui.label(format!("Lines: {}", self.code.lines().count()));
+            });
+            ui.separator();
+            
+            eframe::egui::ScrollArea::vertical()
+                .max_height(400.0)
+                .show(ui, |ui| {
+                    ui.text_edit_multiline(&mut self.code);
+                });
+        });
+    }
 }
 
 pub struct CodeFoldingState {

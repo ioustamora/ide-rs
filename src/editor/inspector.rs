@@ -628,4 +628,9 @@ impl PropertyInspector {
         self.history_index += 1;
         true
     }
+
+    /// Render component properties (wrapper for UI method)
+    pub fn render_component_properties(&mut self, ui: &mut Ui, component: &mut Box<dyn Component>) {
+        self.ui(ui, Some((0, component.as_ref())));
+    }
 }

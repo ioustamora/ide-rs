@@ -511,6 +511,42 @@ impl SmartAiAssistant {
             self.conversation_history.drain(0..20);
         }
     }
+
+    /// Render AI assistant panel
+    pub fn render_ai_panel(&mut self, ui: &mut egui::Ui) {
+        ui.vertical(|ui| {
+            ui.label("🤖 Smart AI Assistant");
+            ui.separator();
+            
+            // Show conversation history
+            egui::ScrollArea::vertical()
+                .max_height(300.0)
+                .show(ui, |ui| {
+                    for message in &self.conversation_history {
+                        ui.horizontal(|ui| {
+                            ui.label(if message.role == "user" { "👤" } else { "🤖" });
+                            ui.label(&message.content);
+                        });
+                        ui.separator();
+                    }
+                });
+            
+            // Input area for new requests
+            ui.horizontal(|ui| {
+                ui.label("Ask AI:");
+                // In a real implementation, this would connect to a text input field
+                if ui.button("Generate Code").clicked() {
+                    // Placeholder for AI interaction
+                }
+                if ui.button("Analyze Code").clicked() {
+                    // Placeholder for code analysis
+                }
+                if ui.button("Fix Errors").clicked() {
+                    // Placeholder for error fixing
+                }
+            });
+        });
+    }
 }
 
 impl CodeContext {

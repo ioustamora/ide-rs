@@ -762,4 +762,26 @@ impl LiveFeedbackSystem {
         self.preview_values.clear();
         self.clear_overlays();
     }
+
+    /// Update selection for live feedback (placeholder implementation)
+    pub fn update_selection(&mut self, selected_idx: usize, components: &[Box<dyn Component>]) {
+        // Clear existing overlays
+        self.clear_overlays();
+        
+        // Add feedback for the selected component if it exists
+        if selected_idx < components.len() {
+            let component = &components[selected_idx];
+            // Create a simple feedback overlay to indicate selection
+            self.feedback_overlays.push(FeedbackOverlay {
+                position: Pos2::new(10.0, 10.0), // Placeholder position
+                size: Vec2::new(100.0, 30.0),
+                overlay_type: OverlayType::PropertyTooltip {
+                    property: "Selected".to_string(),
+                    value: component.name().to_string(),
+                },
+                duration: 2.0,
+                fade: 1.0,
+            });
+        }
+    }
 }

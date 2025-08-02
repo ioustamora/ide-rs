@@ -84,31 +84,76 @@ impl VisualDesigner {
         self.history.redo(&mut self.layout)
     }
 
-    /// Render the design canvas with all components
+    /// Render the design canvas with the root form and all components
     pub fn render_design_canvas(
         &mut self,
         ui: &mut egui::Ui,
+        root_form: &mut crate::rcl::ui::basic::form::Form,
         components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>,
         canvas_size: egui::Vec2,
     ) {
+        // Get the available rect for the canvas
+        let canvas_rect = ui.available_rect_before_wrap();
+        
+        // Calculate the form rect based on form size and center it in the canvas
+        let form_size = root_form.size();
+        let form_rect = egui::Rect::from_center_size(
+            canvas_rect.center(),
+            form_size
+        );
+        
+        // Render the root form background
+        root_form.render_background(ui, form_rect);
+        
+        // Check if form is selected (form is index -1 or a special value)
+        let form_selected = self.selection.selected.contains(&usize::MAX); // Use MAX as form indicator
+        if form_selected {
+            // Draw selection highlight for the form
+            ui.painter().rect_stroke(
+                form_rect,
+                root_form.corner_radius(),
+                egui::Stroke::new(2.0, egui::Color32::BLUE)
+            );
+            // Draw resize handles for the form
+            self.draw_resize_handles(ui, form_rect);
+        }
+
+        // If no components exist on the form, show a helpful message
+        if components.is_empty() {
+            self.render_empty_form_message(ui, form_rect);
+        }
+
         // Draw grid if enabled
         if self.grid.visible {
-            self.draw_grid(ui, canvas_size);
+            self.draw_grid_in_rect(ui, canvas_rect);
         }
 
         // Draw rulers if enabled
         if self.guides.rulers_visible {
-            let canvas_rect = egui::Rect::from_min_size(ui.cursor().left_top(), canvas_size);
             self.guides.draw_rulers(ui, canvas_rect);
         }
 
-        // Render components
+        // Handle form interaction (clicking on empty form area)
+        let form_response = ui.interact(form_rect, egui::Id::new("root_form"), egui::Sense::click());
+        if form_response.clicked() {
+            // Select the form
+            if !ui.input(|i| i.modifiers.ctrl) {
+                self.selection.selected.clear();
+            }
+            self.selection.selected.insert(usize::MAX); // Use MAX as form indicator
+            self.selection.primary = Some(usize::MAX);
+        }
+
+        // Render components on top of the form
         for (idx, component) in components.iter_mut().enumerate() {
             let pos = self.layout.get_or_init_position(idx);
             let size = self.layout.get_or_init_size(idx, component.name());
             
-            // Create a rect for this component
-            let component_rect = egui::Rect::from_min_size(pos, size);
+            // Create a rect for this component relative to the form
+            let component_rect = egui::Rect::from_min_size(
+                form_rect.min + pos.to_vec2(), 
+                size
+            );
             
             // Check if component is selected
             let is_selected = self.selection.selected.contains(&idx);
@@ -120,6 +165,9 @@ impl VisualDesigner {
                     2.0,
                     egui::Stroke::new(2.0, egui::Color32::BLUE)
                 );
+                
+                // Draw resize handles for selected components
+                self.draw_resize_handles(ui, component_rect);
             }
             
             // Render the component in its allocated space
@@ -155,6 +203,38 @@ impl VisualDesigner {
         self.guides.draw_guides(ui, canvas_rect);
     }
 
+    /// Move a component by a delta vector
+    pub fn move_component(&mut self, component_idx: usize, delta: egui::Vec2) {
+        if let Some(pos) = self.layout.positions.get_mut(&component_idx) {
+            *pos += delta;
+        }
+    }
+
+    /// Resize a component to a new size
+    pub fn resize_component(&mut self, component_idx: usize, new_size: egui::Vec2) {
+        self.layout.sizes.insert(component_idx, new_size);
+    }
+
+    /// Move all selected components by a delta vector
+    pub fn move_selected_components(&mut self, delta: egui::Vec2) {
+        for &component_idx in &self.selection.selected {
+            if let Some(pos) = self.layout.positions.get_mut(&component_idx) {
+                *pos += delta;
+            }
+        }
+    }
+
+    /// Set the position of a component
+    pub fn set_component_position(&mut self, component_idx: usize, position: egui::Pos2) {
+        self.layout.positions.insert(component_idx, position);
+    }
+
+    /// Get the position of a component
+    pub fn get_component_position(&mut self, component_idx: usize) -> egui::Pos2 {
+        self.layout.positions.get(&component_idx).copied()
+            .unwrap_or(egui::Pos2::ZERO)
+    }
+
     /// Draw grid on the canvas
     fn draw_grid(&self, ui: &mut egui::Ui, canvas_size: egui::Vec2) {
         let painter = ui.painter();
@@ -179,6 +259,128 @@ impl VisualDesigner {
                 egui::Stroke::new(1.0, self.grid.color)
             );
             y += grid_size;
+        }
+    }
+
+    /// Draw grid within a specific rectangle
+    fn draw_grid_in_rect(&self, ui: &mut egui::Ui, rect: egui::Rect) {
+        let painter = ui.painter();
+        let grid_size = self.grid.size;
+        
+        // Draw vertical lines
+        let mut x = rect.min.x + (grid_size - (rect.min.x % grid_size));
+        while x <= rect.max.x {
+            painter.line_segment(
+                [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
+                egui::Stroke::new(1.0, self.grid.color)
+            );
+            x += grid_size;
+        }
+        
+        // Draw horizontal lines
+        let mut y = rect.min.y + (grid_size - (rect.min.y % grid_size));
+        while y <= rect.max.y {
+            painter.line_segment(
+                [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
+                egui::Stroke::new(1.0, self.grid.color)
+            );
+            y += grid_size;
+        }
+    }
+
+    /// Render message for empty form
+    fn render_empty_form_message(&self, ui: &mut egui::Ui, canvas_rect: egui::Rect) {
+        let center = canvas_rect.center();
+        
+        // Draw welcome message
+        ui.painter().text(
+            center,
+            egui::Align2::CENTER_CENTER,
+            "Drop components here to start designing",
+            egui::FontId::proportional(16.0),
+            egui::Color32::from_gray(128)
+        );
+        
+        // Draw a subtle dashed border to indicate drop area
+        let inner_rect = canvas_rect.shrink(20.0);
+        self.draw_dashed_border(ui, inner_rect);
+    }
+
+    /// Draw dashed border for drop zones
+    fn draw_dashed_border(&self, ui: &mut egui::Ui, rect: egui::Rect) {
+        let painter = ui.painter();
+        let dash_length = 8.0;
+        let gap_length = 4.0;
+        let stroke = egui::Stroke::new(2.0, egui::Color32::from_gray(180));
+        
+        // Top edge
+        let mut x = rect.min.x;
+        while x < rect.max.x {
+            let end_x = (x + dash_length).min(rect.max.x);
+            painter.line_segment(
+                [egui::pos2(x, rect.min.y), egui::pos2(end_x, rect.min.y)],
+                stroke
+            );
+            x += dash_length + gap_length;
+        }
+        
+        // Bottom edge
+        x = rect.min.x;
+        while x < rect.max.x {
+            let end_x = (x + dash_length).min(rect.max.x);
+            painter.line_segment(
+                [egui::pos2(x, rect.max.y), egui::pos2(end_x, rect.max.y)],
+                stroke
+            );
+            x += dash_length + gap_length;
+        }
+        
+        // Left edge
+        let mut y = rect.min.y;
+        while y < rect.max.y {
+            let end_y = (y + dash_length).min(rect.max.y);
+            painter.line_segment(
+                [egui::pos2(rect.min.x, y), egui::pos2(rect.min.x, end_y)],
+                stroke
+            );
+            y += dash_length + gap_length;
+        }
+        
+        // Right edge
+        y = rect.min.y;
+        while y < rect.max.y {
+            let end_y = (y + dash_length).min(rect.max.y);
+            painter.line_segment(
+                [egui::pos2(rect.max.x, y), egui::pos2(rect.max.x, end_y)],
+                stroke
+            );
+            y += dash_length + gap_length;
+        }
+    }
+
+    /// Draw resize handles for selected components
+    fn draw_resize_handles(&self, ui: &mut egui::Ui, rect: egui::Rect) {
+        let painter = ui.painter();
+        let handle_size = 6.0;
+        let handle_color = egui::Color32::BLUE;
+        
+        let handles = [
+            // Corner handles
+            egui::pos2(rect.min.x, rect.min.y), // Top-left
+            egui::pos2(rect.max.x, rect.min.y), // Top-right
+            egui::pos2(rect.min.x, rect.max.y), // Bottom-left
+            egui::pos2(rect.max.x, rect.max.y), // Bottom-right
+            // Edge handles
+            egui::pos2(rect.center().x, rect.min.y), // Top
+            egui::pos2(rect.center().x, rect.max.y), // Bottom
+            egui::pos2(rect.min.x, rect.center().y), // Left
+            egui::pos2(rect.max.x, rect.center().y), // Right
+        ];
+        
+        for handle_pos in handles {
+            let handle_rect = egui::Rect::from_center_size(handle_pos, egui::Vec2::splat(handle_size));
+            painter.rect_filled(handle_rect, 0.0, handle_color);
+            painter.rect_stroke(handle_rect, 0.0, egui::Stroke::new(1.0, egui::Color32::WHITE));
         }
     }
 }

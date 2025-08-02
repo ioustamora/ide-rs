@@ -156,5 +156,20 @@ impl ComponentSelection {
         None
     }
 
+    /// Get an iterator over selected component indices
+    pub fn selected_components(&self) -> impl Iterator<Item = usize> + '_ {
+        self.selected.iter().copied()
+    }
+
+    /// Select a component (shorthand for select_single_component)
+    pub fn select(&mut self, component_idx: usize) {
+        self.select_single_component(component_idx);
+    }
+
+    /// Toggle selection of a component (shorthand for toggle_component_selection)
+    pub fn toggle_selection(&mut self, component_idx: usize) {
+        self.toggle_component_selection(component_idx);
+    }
+
     // Additional selection/interaction methods can be added here.
 }

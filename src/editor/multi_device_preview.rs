@@ -544,6 +544,48 @@ impl MultiDevicePreview {
     pub fn add_custom_device(&mut self, profile: DeviceProfile) {
         self.device_profiles.push(profile);
     }
+
+    /// Render preview frame with callback for content
+    pub fn render_preview_frame<F>(&mut self, ui: &mut egui::Ui, content_callback: F)
+    where
+        F: FnOnce(&mut egui::Ui),
+    {
+        if !self.enabled {
+            content_callback(ui);
+            return;
+        }
+
+        // Create a frame for the preview
+        egui::Frame::none()
+            .fill(egui::Color32::from_gray(50))
+            .inner_margin(4.0)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("📱 Device Preview");
+                    ui.separator();
+                    
+                    // Device selector
+                    if let Some(device) = self.device_profiles.first() {
+                        ui.label(&device.name);
+                    }
+                });
+                ui.separator();
+                
+                // Content area with device constraints
+                let available_size = ui.available_size();
+                let device_size = if let Some(device) = self.device_profiles.first() {
+                    device.resolution.min(available_size)
+                } else {
+                    available_size
+                };
+                
+                ui.allocate_ui_with_layout(
+                    device_size,
+                    egui::Layout::top_down(egui::Align::Center),
+                    content_callback,
+                );
+            });
+    }
 }
 
 impl DeviceProfile {

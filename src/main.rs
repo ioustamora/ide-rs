@@ -18,6 +18,6 @@ fn main() {
     eframe::run_native(
         "Rust RAD IDE",
         options,
-        Box::new(|_cc| Box::new(ide_app::IdeApp::default())),
+        Box::new(|cc| Box::new(ide_app::IdeApp::new(cc))),
     ).unwrap();
 }

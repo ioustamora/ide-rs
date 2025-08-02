@@ -232,4 +232,4 @@ pub mod advanced_alignment;
 /// 
 /// Provides project templates, code generation patterns, and
 /// scaffolding tools for rapid application development.
-pub mod template_system;
+pub mod template_system_simple;

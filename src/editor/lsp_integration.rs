@@ -775,6 +775,43 @@ impl LspClient {
     pub fn get_diagnostics(&self, uri: &str) -> Vec<&Diagnostic> {
         self.diagnostics.get(uri).map_or(Vec::new(), |diags| diags.iter().collect())
     }
+
+    /// Check if the LSP client is connected to a language server
+    pub fn is_connected(&self) -> bool {
+        self.server_process.is_some() && self.server_capabilities.is_some()
+    }
+
+    /// Check if there are any diagnostics available
+    pub fn has_diagnostics(&self) -> bool {
+        !self.diagnostics.is_empty()
+    }
+
+    /// Render diagnostics in the UI
+    pub fn render_diagnostics(&self, ui: &mut egui::Ui) {
+        ui.heading("Diagnostics");
+        ui.separator();
+        
+        for (uri, diagnostics) in &self.diagnostics {
+            ui.label(format!("File: {}", uri));
+            for diagnostic in diagnostics {
+                ui.horizontal(|ui| {
+                    match diagnostic.severity {
+                        Some(DiagnosticSeverity::Error) => ui.label("❌"),
+                        Some(DiagnosticSeverity::Warning) => ui.label("⚠️"),
+                        Some(DiagnosticSeverity::Information) => ui.label("ℹ️"),
+                        Some(DiagnosticSeverity::Hint) => ui.label("💡"),
+                        None => ui.label("•"),
+                    };
+                    ui.label(&diagnostic.message);
+                });
+            }
+            ui.separator();
+        }
+        
+        if self.diagnostics.is_empty() {
+            ui.label("No diagnostics available");
+        }
+    }
 }
 
 /// Text document content change event
