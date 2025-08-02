@@ -252,15 +252,61 @@ impl UiManager {
         ui.separator();
         
         if let Some(selected_idx) = app_state.selected_component {
-            if selected_idx < app_state.components.len() {
+            if selected_idx == usize::MAX {
+                // Form is selected - show form properties
+                Self::render_form_properties(app_state, ui);
+            } else if selected_idx < app_state.components.len() {
+                // Use the basic property inspector
                 app_state.property_inspector.render_component_properties(ui, &mut app_state.components[selected_idx]);
             } else {
                 ui.label("Invalid component selection");
             }
         } else {
             ui.label("No component selected");
-            ui.label("Select a component to edit its properties");
+            ui.label("Click on the form background or a component to edit its properties");
         }
+    }
+    
+    /// Render form properties when form is selected
+    fn render_form_properties(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
+        ui.label("Form Properties");
+        ui.separator();
+        
+        // Form basic properties
+        ui.horizontal(|ui| {
+            ui.label("Title:");
+            ui.text_edit_singleline(&mut app_state.root_form.title);
+        });
+        
+        ui.horizontal(|ui| {
+            ui.label("Width:");
+            ui.add(egui::DragValue::new(&mut app_state.root_form.size.x).speed(1.0).clamp_range(100.0..=2000.0));
+        });
+        
+        ui.horizontal(|ui| {
+            ui.label("Height:");
+            ui.add(egui::DragValue::new(&mut app_state.root_form.size.y).speed(1.0).clamp_range(100.0..=1500.0));
+        });
+        
+        ui.horizontal(|ui| {
+            ui.label("Background Color:");
+            ui.color_edit_button_srgba(&mut app_state.root_form.background_color);
+        });
+        
+        ui.checkbox(&mut app_state.root_form.visible, "Visible");
+        ui.checkbox(&mut app_state.root_form.show_border, "Show Border");
+        
+        ui.separator();
+        ui.label("Form Layout");
+        ui.horizontal(|ui| {
+            ui.label("Padding:");
+            ui.add(egui::DragValue::new(&mut app_state.root_form.padding).speed(0.1).clamp_range(0.0..=50.0));
+        });
+        
+        ui.horizontal(|ui| {
+            ui.label("Corner Radius:");
+            ui.add(egui::DragValue::new(&mut app_state.root_form.corner_radius).speed(0.1).clamp_range(0.0..=25.0));
+        });
     }
     
     /// Render the modern IDE features panel

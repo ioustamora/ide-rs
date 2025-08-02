@@ -234,11 +234,15 @@ impl ContentManager {
                         app_state.selected_component = Some(component_idx);
                         app_state.visual_designer.clear_selection();
                         app_state.visual_designer.selection.select(component_idx);
+                        
+                        // Basic property inspector doesn't need explicit selection updates
                     }
                 } else {
-                    // Clicked on empty space - clear selection
-                    app_state.selected_component = None;
+                    // Clicked on empty space (form background) - select the form
+                    app_state.selected_component = Some(usize::MAX); // Use MAX to represent form selection
                     app_state.visual_designer.clear_selection();
+                    
+                    // Clear property inspector selection when form is selected (no method needed for basic inspector)
                 }
             }
         }

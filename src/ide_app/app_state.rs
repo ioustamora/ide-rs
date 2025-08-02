@@ -183,12 +183,12 @@ pub struct IdeAppState {
     // SPECIALIZED IDE FEATURES - Advanced IDE capabilities and tooling
     // ========================================================================================
     
-    /// Advanced property inspector with undo/redo and validation.
+    /// Property inspector for component configuration.
     /// 
-    /// Enhanced property editing system supporting:
-    /// - Type-safe property editing with validation
-    /// - Undo/redo for property changes
-    /// - Bulk property operations across selections
+    /// Property editing system supporting:
+    /// - Type-safe property editing
+    /// - Component property validation
+    /// - Real-time property updates
     pub property_inspector: PropertyInspector,
     
     /// Live visual feedback system for real-time design assistance.

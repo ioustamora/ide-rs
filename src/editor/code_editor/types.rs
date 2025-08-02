@@ -190,21 +190,175 @@ impl CodeEditor {
         }
     }
 
-    /// Render the code editor (basic implementation)
+    /// Render the code editor with advanced features
     pub fn render(&mut self, ui: &mut eframe::egui::Ui) {
         ui.vertical(|ui| {
-            ui.horizontal(|ui| {
-                ui.label(format!("Language: {}", self.language));
-                ui.separator();
-                ui.label(format!("Lines: {}", self.code.lines().count()));
-            });
+            // Toolbar
+            self.render_toolbar(ui);
             ui.separator();
             
-            eframe::egui::ScrollArea::vertical()
-                .max_height(400.0)
-                .show(ui, |ui| {
-                    ui.text_edit_multiline(&mut self.code);
-                });
+            // Main editor area with line numbers and syntax highlighting
+            ui.horizontal(|ui| {
+                // Line numbers column
+                if self.settings.show_line_numbers {
+                    self.render_line_numbers(ui);
+                }
+                
+                // Code editor with syntax highlighting
+                eframe::egui::ScrollArea::both()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        if self.language == "rust" {
+                            self.render_with_syntax_highlighting(ui);
+                        } else {
+                            // Fallback to simple editor
+                            ui.text_edit_multiline(&mut self.code);
+                        }
+                    });
+            });
+            
+            // Status bar
+            self.render_status_bar(ui);
+        });
+    }
+    
+    /// Render editor toolbar
+    fn render_toolbar(&mut self, ui: &mut eframe::egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(format!("Language: {}", self.language));
+            ui.separator();
+            
+            if ui.button("🔍").on_hover_text("Find/Replace").clicked() {
+                self.find_replace.show_panel = !self.find_replace.show_panel;
+            }
+            
+            if ui.button("⟲").on_hover_text("Undo").clicked() {
+                self.undo();
+            }
+            
+            if ui.button("⟳").on_hover_text("Redo").clicked() {
+                self.redo();
+            }
+            
+            ui.separator();
+            
+            // Settings toggles
+            ui.checkbox(&mut self.settings.show_line_numbers, "Line Numbers");
+            ui.checkbox(&mut self.settings.auto_complete, "Auto Complete");
+        });
+        
+        // Find/Replace panel
+        if self.find_replace.show_panel {
+            ui.horizontal(|ui| {
+                ui.label("Find:");
+                ui.text_edit_singleline(&mut self.find_replace.find_text);
+                ui.label("Replace:");
+                ui.text_edit_singleline(&mut self.find_replace.replace_text);
+                
+                if ui.button("Find Next").clicked() {
+                    // TODO: Implement find functionality
+                }
+                if ui.button("Replace").clicked() {
+                    // TODO: Implement replace functionality
+                }
+                ui.checkbox(&mut self.find_replace.case_sensitive, "Case Sensitive");
+            });
+        }
+    }
+    
+    /// Render line numbers
+    fn render_line_numbers(&self, ui: &mut eframe::egui::Ui) {
+        let line_count = self.code.lines().count();
+        let line_height = ui.text_style_height(&eframe::egui::TextStyle::Monospace);
+        
+        ui.allocate_ui_with_layout(
+            eframe::egui::Vec2::new(40.0, line_height * line_count as f32),
+            eframe::egui::Layout::top_down(eframe::egui::Align::RIGHT),
+            |ui| {
+                ui.style_mut().visuals.extreme_bg_color = eframe::egui::Color32::from_gray(245);
+                
+                for line_num in 1..=line_count {
+                    ui.label(format!("{:3}", line_num));
+                }
+            },
+        );
+        ui.separator();
+    }
+    
+    /// Render code with basic syntax highlighting for Rust
+    fn render_with_syntax_highlighting(&mut self, ui: &mut eframe::egui::Ui) {
+        let mut job = eframe::egui::text::LayoutJob::default();
+        
+        for line in self.code.lines() {
+            self.highlight_rust_line(line, &mut job);
+            job.append("\n", 0.0, eframe::egui::TextFormat::default());
+        }
+        
+        // Create a text edit that preserves formatting
+        ui.add(eframe::egui::TextEdit::multiline(&mut self.code)
+            .font(eframe::egui::TextStyle::Monospace)
+            .desired_width(f32::INFINITY)
+            .desired_rows(20));
+    }
+    
+    /// Simple Rust syntax highlighting
+    fn highlight_rust_line(&self, line: &str, job: &mut eframe::egui::text::LayoutJob) {
+        let keywords = ["fn", "let", "mut", "if", "else", "for", "while", "loop", "match", "struct", "enum", "impl", "pub", "use", "mod"];
+        let types = ["String", "i32", "i64", "f32", "f64", "bool", "char", "Vec", "Option", "Result"];
+        
+        let words: Vec<&str> = line.split_whitespace().collect();
+        let mut pos = 0;
+        
+        for word in words {
+            // Find the actual position in the line
+            while pos < line.len() && !line[pos..].starts_with(word) {
+                job.append(&line[pos..pos+1], 0.0, eframe::egui::TextFormat::default());
+                pos += 1;
+            }
+            
+            let format = if keywords.contains(&word) {
+                eframe::egui::TextFormat {
+                    color: eframe::egui::Color32::from_rgb(0, 0, 255), // Blue for keywords
+                    ..Default::default()
+                }
+            } else if types.contains(&word) {
+                eframe::egui::TextFormat {
+                    color: eframe::egui::Color32::from_rgb(43, 145, 175), // Teal for types
+                    ..Default::default()
+                }
+            } else if word.starts_with("//") {
+                eframe::egui::TextFormat {
+                    color: eframe::egui::Color32::from_rgb(0, 128, 0), // Green for comments
+                    ..Default::default()
+                }
+            } else if word.starts_with('"') && word.ends_with('"') {
+                eframe::egui::TextFormat {
+                    color: eframe::egui::Color32::from_rgb(163, 21, 21), // Red for strings
+                    ..Default::default()
+                }
+            } else {
+                eframe::egui::TextFormat::default()
+            };
+            
+            job.append(word, 0.0, format);
+            pos += word.len();
+        }
+        
+        // Add remaining characters
+        if pos < line.len() {
+            job.append(&line[pos..], 0.0, eframe::egui::TextFormat::default());
+        }
+    }
+    
+    /// Render status bar
+    fn render_status_bar(&self, ui: &mut eframe::egui::Ui) {
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label(format!("Lines: {}", self.code.lines().count()));
+            ui.separator();
+            ui.label(format!("Characters: {}", self.code.len()));
+            ui.separator();
+            ui.label(format!("Cursor: {}:{}", self.cursor_pos.0, self.cursor_pos.1));
         });
     }
 }

@@ -96,6 +96,13 @@ pub mod palette;
 /// through a context-sensitive interface.
 pub mod inspector;
 
+/// Enhanced property inspector with modern UX features
+/// 
+/// Advanced property editing system with multi-selection, design system integration,
+/// AI suggestions, animation system, and contextual panels.
+// TODO: Fix type mismatches before enabling
+// pub mod enhanced_property_inspector;
+
 /// Centralized state management for editor operations
 /// 
 /// Manages selection, drag-and-drop state, and coordination between
