@@ -4,11 +4,10 @@
 //! allowing consistent styling across all components and easy theme switching.
 
 use egui::Color32;
-use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 /// A complete theme for RCL components
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Theme {
     /// Theme metadata
     pub name: String,
@@ -30,7 +29,7 @@ pub struct Theme {
 }
 
 /// Color palette for the theme
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ColorPalette {
     /// Primary brand colors
     pub primary: Color32,
@@ -66,7 +65,7 @@ pub struct ColorPalette {
 }
 
 /// Typography settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Typography {
     /// Font families
     pub font_family_primary: String,
@@ -93,7 +92,7 @@ pub struct Typography {
 }
 
 /// Spacing and sizing values
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Spacing {
     /// Base spacing unit
     pub base_unit: f32,
@@ -130,7 +129,7 @@ pub struct Spacing {
 }
 
 /// Component-specific theme overrides
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ComponentTheme {
     /// Override colors
     pub colors: Option<HashMap<String, Color32>>,
@@ -506,23 +505,16 @@ impl ThemeManager {
         self.themes.keys().cloned().collect()
     }
     
-    /// Load theme from JSON string
-    pub fn load_theme_from_json(&mut self, json: &str) -> Result<(), String> {
-        let theme: Theme = serde_json::from_str(json)
-            .map_err(|e| format!("Failed to parse theme JSON: {}", e))?;
-        
-        self.add_theme(theme);
-        Ok(())
+    /// Load theme from JSON string (placeholder - requires custom serialization)
+    pub fn load_theme_from_json(&mut self, _json: &str) -> Result<(), String> {
+        // TODO: Implement custom JSON parsing for themes without serde
+        Err("Theme JSON loading not yet implemented".to_string())
     }
     
-    /// Save theme to JSON string
-    pub fn save_theme_to_json(&self, name: &str) -> Result<String, String> {
-        if let Some(theme) = self.get_theme(name) {
-            serde_json::to_string_pretty(theme)
-                .map_err(|e| format!("Failed to serialize theme: {}", e))
-        } else {
-            Err(format!("Theme '{}' not found", name))
-        }
+    /// Save theme to JSON string (placeholder - requires custom serialization)
+    pub fn save_theme_to_json(&self, _name: &str) -> Result<String, String> {
+        // TODO: Implement custom JSON serialization for themes without serde
+        Err("Theme JSON saving not yet implemented".to_string())
     }
 }
 

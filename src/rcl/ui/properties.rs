@@ -101,7 +101,7 @@ pub struct PropertyInfo {
 }
 
 /// Property value that can hold different types
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PropertyValue {
     Text(String),
     Integer(i64),

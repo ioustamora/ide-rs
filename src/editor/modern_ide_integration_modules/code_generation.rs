@@ -599,7 +599,7 @@ const props = defineProps([
     
     /// Format code using the specified formatter
     fn format_code(&self, code: &str, language: &str) -> Result<String, GenerationError> {
-        if let Some(formatter) = self.formatters.get(language) {
+        if let Some(_formatter) = self.formatters.get(language) {
             // Apply formatting rules (simplified implementation)
             let mut formatted = code.to_string();
             

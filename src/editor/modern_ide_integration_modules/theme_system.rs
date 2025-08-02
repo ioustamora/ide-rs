@@ -5,10 +5,9 @@
 
 use egui::*;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// Theme management system
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ThemeSystem {
     /// Available themes
     pub themes: HashMap<String, Theme>,
@@ -21,7 +20,7 @@ pub struct ThemeSystem {
 }
 
 /// Theme definition
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Theme {
     /// Theme name
     pub name: String,
@@ -44,7 +43,7 @@ pub struct Theme {
 }
 
 /// Theme customization settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ThemeCustomization {
     /// Custom color overrides
     pub color_overrides: HashMap<String, Color32>,
@@ -59,7 +58,7 @@ pub struct ThemeCustomization {
 }
 
 /// Auto theme switching settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct AutoThemeSwitching {
     /// Whether auto switching is enabled
     pub enabled: bool,
@@ -74,7 +73,7 @@ pub struct AutoThemeSwitching {
 }
 
 /// Theme type enumeration
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub enum ThemeType {
     Light,
     Dark,
@@ -83,7 +82,7 @@ pub enum ThemeType {
 }
 
 /// Color palette for themes
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ColorPalette {
     /// Primary colors
     pub primary: ColorScale,
@@ -104,7 +103,7 @@ pub struct ColorPalette {
 }
 
 /// Color scale (50, 100, 200, ..., 900)
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ColorScale {
     pub c50: Color32,
     pub c100: Color32,
@@ -119,7 +118,7 @@ pub struct ColorScale {
 }
 
 /// Semantic color definitions
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct SemanticColors {
     /// Success color
     pub success: Color32,
@@ -132,7 +131,7 @@ pub struct SemanticColors {
 }
 
 /// Background color definitions
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct BackgroundColors {
     /// Primary background
     pub primary: Color32,
@@ -145,7 +144,7 @@ pub struct BackgroundColors {
 }
 
 /// Text color definitions
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct TextColors {
     /// Primary text
     pub primary: Color32,
@@ -160,7 +159,7 @@ pub struct TextColors {
 }
 
 /// Border color definitions
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct BorderColors {
     /// Default border
     pub default: Color32,
@@ -173,7 +172,7 @@ pub struct BorderColors {
 }
 
 /// Typography theme settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct TypographyTheme {
     /// Font families
     pub font_families: HashMap<String, String>,
@@ -188,7 +187,7 @@ pub struct TypographyTheme {
 }
 
 /// Spacing theme settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct SpacingTheme {
     /// Base spacing unit
     pub base_unit: f32,
@@ -197,7 +196,7 @@ pub struct SpacingTheme {
 }
 
 /// Border radius theme settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct BorderRadiusTheme {
     /// None (0px)
     pub none: f32,
@@ -214,14 +213,14 @@ pub struct BorderRadiusTheme {
 }
 
 /// Shadow theme settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ShadowTheme {
     /// Shadow definitions by elevation
     pub elevations: HashMap<String, ShadowDefinition>,
 }
 
 /// Shadow definition
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ShadowDefinition {
     /// Shadow offset X
     pub offset_x: f32,
@@ -236,7 +235,7 @@ pub struct ShadowDefinition {
 }
 
 /// Animation theme settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct AnimationTheme {
     /// Animation durations
     pub durations: HashMap<String, u32>,
@@ -245,7 +244,7 @@ pub struct AnimationTheme {
 }
 
 /// Font weight enumeration
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub enum FontWeight {
     Thin,
     ExtraLight,
@@ -371,15 +370,15 @@ impl ThemeSystem {
                 _ => {}
             }
             
-            // Apply text colors
-            visuals.text_color = theme.colors.text.primary;
+            // Apply text colors (text color is now in fg_stroke.color in egui 0.27)
+            visuals.widgets.noninteractive.fg_stroke.color = theme.colors.text.primary;
             
             // Apply custom overrides
             for (name, color) in &self.customization.color_overrides {
                 match name.as_str() {
                     "window_fill" => visuals.window_fill = *color,
                     "panel_fill" => visuals.panel_fill = *color,
-                    "text_color" => visuals.text_color = *color,
+                    "text_color" => visuals.widgets.noninteractive.fg_stroke.color = *color,
                     _ => {}
                 }
             }

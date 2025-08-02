@@ -390,7 +390,7 @@ impl AlignmentGuideManager {
     
     /// Draw dotted line
     fn draw_dotted_line(&self, painter: &Painter, start: Pos2, end: Pos2, stroke: Stroke) {
-        let direction = (end - start).normalized();
+        let _direction = (end - start).normalized();
         let length = (end - start).length();
         let dot_spacing = 4.0;
         let dot_count = (length / dot_spacing) as usize;

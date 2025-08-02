@@ -5,7 +5,6 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
-use serde::{Serialize, Deserialize};
 
 /// Performance profiler for monitoring system performance
 pub struct PerformanceProfiler {
@@ -35,7 +34,7 @@ pub struct ProfilingSession {
 }
 
 /// Performance measurement
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Measurement {
     /// Measurement name
     pub name: String,
@@ -48,7 +47,7 @@ pub struct Measurement {
 }
 
 /// Rendering performance metrics
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct RenderMetrics {
     /// Frame render time
     pub frame_time: Duration,
@@ -71,7 +70,7 @@ pub struct RenderMetrics {
 }
 
 /// Performance thresholds for warnings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct PerformanceThresholds {
     /// Maximum acceptable frame time (ms)
     pub max_frame_time: Duration,
@@ -98,7 +97,7 @@ pub struct MemoryTracker {
 }
 
 /// Memory usage snapshot
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct MemorySnapshot {
     /// Total memory usage (bytes)
     pub total_usage: usize,
@@ -119,7 +118,7 @@ pub struct PerformanceAnalyzer {
 }
 
 /// Performance analysis result
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct AnalysisResult {
     /// Analysis type
     pub analysis_type: AnalysisType,
@@ -134,7 +133,7 @@ pub struct AnalysisResult {
 }
 
 /// Type of performance analysis
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AnalysisType {
     FrameTimeSpike,
     MemoryLeak,
@@ -146,7 +145,7 @@ pub enum AnalysisType {
 }
 
 /// Performance issue severity
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum PerformanceSeverity {
     Critical,
     High,
@@ -156,7 +155,7 @@ pub enum PerformanceSeverity {
 }
 
 /// Optimization suggestion
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct OptimizationSuggestion {
     /// Suggestion title
     pub title: String,
@@ -173,7 +172,7 @@ pub struct OptimizationSuggestion {
 }
 
 /// Optimization implementation difficulty
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OptimizationDifficulty {
     Easy,
     Medium,
@@ -182,7 +181,7 @@ pub enum OptimizationDifficulty {
 }
 
 /// Optimization category
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OptimizationCategory {
     Rendering,
     Memory,
@@ -626,7 +625,7 @@ impl RenderTimer {
     
     /// Start timing a render phase
     pub fn start_phase(&mut self, phase: String) {
-        if let Some(current) = &self.current_phase {
+        if let Some(_current) = &self.current_phase {
             self.end_current_phase();
         }
         

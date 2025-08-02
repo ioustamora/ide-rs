@@ -5,10 +5,10 @@
 
 use egui::*;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use chrono::Timelike;
 
 /// Guide activation history for learning
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct GuideActivation {
     /// Timestamp of activation
     pub timestamp: chrono::DateTime<chrono::Utc>,
@@ -21,7 +21,7 @@ pub struct GuideActivation {
 }
 
 /// Type of guide that was activated
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum GuideType {
     AlignmentGuide,
     SpacingGuide,
@@ -30,7 +30,7 @@ pub enum GuideType {
 }
 
 /// User action in response to guide
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum UserAction {
     /// User followed the guide suggestion
     Accepted,
@@ -43,7 +43,7 @@ pub enum UserAction {
 }
 
 /// Context information for guide activation
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ActivationContext {
     /// Number of components on canvas
     pub component_count: usize,
@@ -70,7 +70,7 @@ pub struct SmartEditingLearningSystem {
 }
 
 /// Learned user preferences
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct LearnedPreferences {
     /// Preferred guide types by frequency of use
     pub preferred_guide_types: HashMap<GuideType, f32>,
@@ -83,7 +83,7 @@ pub struct LearnedPreferences {
 }
 
 /// Context-specific preferences
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ContextualPreference {
     /// Component count range this applies to
     pub component_count_range: (usize, usize),
@@ -626,40 +626,16 @@ impl SmartEditingLearningSystem {
         recommendations
     }
     
-    /// Export learning data for analysis or backup
-    pub fn export_learning_data(&self) -> serde_json::Result<String> {
-        #[derive(Serialize)]
-        struct LearningData<'a> {
-            activation_history: &'a [GuideActivation],
-            preferences: &'a LearnedPreferences,
-            patterns: &'a BehaviorPatterns,
-        }
-        
-        let data = LearningData {
-            activation_history: &self.activation_history,
-            preferences: &self.preferences,
-            patterns: &self.patterns,
-        };
-        
-        serde_json::to_string_pretty(&data)
+    /// Export learning data for analysis or backup (placeholder)
+    pub fn export_learning_data(&self) -> Result<String, String> {
+        // TODO: Implement custom JSON export without serde
+        Err("Learning data export not yet implemented".to_string())
     }
     
-    /// Import learning data from backup
-    pub fn import_learning_data(&mut self, json: &str) -> serde_json::Result<()> {
-        #[derive(Deserialize)]
-        struct LearningData {
-            activation_history: Vec<GuideActivation>,
-            preferences: LearnedPreferences,
-        }
-        
-        let data: LearningData = serde_json::from_str(json)?;
-        self.activation_history = data.activation_history;
-        self.preferences = data.preferences;
-        
-        // Regenerate patterns from imported data
-        self.analyze_behavior_patterns();
-        
-        Ok(())
+    /// Import learning data from backup (placeholder)
+    pub fn import_learning_data(&mut self, _json: &str) -> Result<(), String> {
+        // TODO: Implement custom JSON import without serde
+        Err("Learning data import not yet implemented".to_string())
     }
     
     /// Get learning statistics

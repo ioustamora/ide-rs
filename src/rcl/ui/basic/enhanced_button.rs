@@ -4,10 +4,10 @@
 //! standardized property system. It serves as a reference implementation for
 //! how to create components with the enhanced property system.
 
-use egui::{Ui, Response, Color32};
+use egui::{Ui, Color32};
 use crate::rcl::ui::{
     enhanced_component::{EnhancedComponent, StandardProperties},
-    properties::{PropertyInfo, PropertyValue, PropertyCategory, PropertyType, PropertyConstraints},
+    properties::{PropertyInfo, PropertyValue, PropertyCategory, PropertyType},
 };
 
 /// Enhanced Button component with standardized properties
@@ -390,9 +390,6 @@ impl EnhancedComponent for EnhancedButton {
         }
     }
     
-    fn name(&self) -> &str {
-        "EnhancedButton"
-    }
 }
 
 #[cfg(test)]

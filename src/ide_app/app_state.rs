@@ -235,7 +235,6 @@ pub struct IdeAppState {
 impl IdeAppState {
     /// Create a new IDE application state with default values
     pub fn new() -> Self {
-        use crate::rcl::ui::basic::*;
         
         Self {
             // Initialize with a default form as the root component

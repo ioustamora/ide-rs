@@ -5,7 +5,6 @@
 
 use crate::rcl::ui::component::Component;
 use egui::{self, Color32, Stroke};
-use serde::{Deserialize, Serialize};
 
 /// Form component that serves as the root container
 #[derive(Debug, Clone)]

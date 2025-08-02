@@ -19,4 +19,5 @@ pub use component_library::{ComponentLibrary, ComponentTemplate, LayoutType};
 pub use framework_export::{FrameworkExportManager, ExportTarget, ExportSettings};
 pub use theme_system::{ThemeSystem, Theme, ThemeType};
 pub use code_generation::{CodeGenerator, CodeStyle, GenerationError};
-pub use crate::shared::serialization::ExportFormat;
+// Note: ExportFormat import disabled due to path resolution issue
+// pub use super::super::shared::serialization::ExportFormat;

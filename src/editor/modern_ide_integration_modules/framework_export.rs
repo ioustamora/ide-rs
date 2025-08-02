@@ -5,11 +5,10 @@
 
 use egui::*;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use crate::editor::inspector::PropertyValue;
 
 /// Framework export manager
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct FrameworkExportManager {
     /// Available export targets
     pub targets: Vec<ExportTarget>,
@@ -20,7 +19,7 @@ pub struct FrameworkExportManager {
 }
 
 /// Export target definition
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ExportTarget {
     /// Target framework name
     pub name: String,
@@ -39,7 +38,7 @@ pub struct ExportTarget {
 }
 
 /// Export settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ExportSettings {
     /// Output directory
     pub output_directory: String,
@@ -58,7 +57,7 @@ pub struct ExportSettings {
 }
 
 /// Code formatting options
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct FormattingOptions {
     /// Indentation type
     pub indent_type: IndentType,
@@ -75,7 +74,7 @@ pub struct FormattingOptions {
 }
 
 /// Template engine for code generation
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct TemplateEngine {
     /// Template registry
     pub templates: HashMap<String, CodeTemplate>,
@@ -84,7 +83,7 @@ pub struct TemplateEngine {
 }
 
 /// Code template definition
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CodeTemplate {
     /// Template name
     pub name: String,
@@ -97,7 +96,7 @@ pub struct CodeTemplate {
 }
 
 /// Code generator settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct GeneratorSettings {
     /// Component prefix
     pub component_prefix: String,
@@ -110,21 +109,21 @@ pub struct GeneratorSettings {
 }
 
 /// Indentation type
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub enum IndentType {
     Spaces,
     Tabs,
 }
 
 /// Quote style
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub enum QuoteStyle {
     Single,
     Double,
 }
 
 /// Naming convention
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NamingConvention {
     PascalCase,
     CamelCase,
@@ -462,7 +461,7 @@ export default {{component_name}};"#.to_string(),
 }
 
 /// Component data for export
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ComponentData {
     /// Component type name
     pub component_type: String,

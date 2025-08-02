@@ -5,10 +5,9 @@
 
 use egui::*;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// Color palette management system
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ColorPalette {
     /// Palette name
     pub name: String,

@@ -5,11 +5,10 @@
 
 use egui::*;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use crate::editor::inspector::PropertyValue;
 
 /// Component library manager for reusable components
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ComponentLibrary {
     /// User-defined component templates
     pub templates: HashMap<String, ComponentTemplate>,
@@ -24,7 +23,7 @@ pub struct ComponentLibrary {
 }
 
 /// Component template definition
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ComponentTemplate {
     /// Template name
     pub name: String,
@@ -47,7 +46,7 @@ pub struct ComponentTemplate {
 }
 
 /// User-defined component
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct UserComponent {
     /// Component name
     pub name: String,
@@ -66,7 +65,7 @@ pub struct UserComponent {
 }
 
 /// Library metadata and organization
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct LibraryMetadata {
     /// Library name
     pub name: String,
@@ -85,7 +84,7 @@ pub struct LibraryMetadata {
 }
 
 /// Component layout definition
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ComponentLayout {
     /// Layout type (stack, grid, absolute, etc.)
     pub layout_type: LayoutType,
@@ -96,22 +95,22 @@ pub struct ComponentLayout {
 }
 
 /// Component data for serialization
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ComponentData {
     /// Component type name
     pub component_type: String,
     /// Component properties
     pub properties: HashMap<String, PropertyValue>,
-    /// Component position
-    pub position: Option<Pos2>,
-    /// Component size
-    pub size: Option<Vec2>,
+    /// Component position (as tuple to avoid egui serialization)
+    pub position: Option<(f32, f32)>,
+    /// Component size (as tuple to avoid egui serialization)
+    pub size: Option<(f32, f32)>,
     /// Child components (for containers)
     pub children: Vec<ComponentData>,
 }
 
 /// Layout type enumeration
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub enum LayoutType {
     /// Absolute positioning
     Absolute,
@@ -126,7 +125,7 @@ pub enum LayoutType {
 }
 
 /// Flex direction enumeration
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub enum FlexDirection {
     Row,
     Column,
@@ -209,16 +208,14 @@ impl ComponentLibrary {
             .collect()
     }
     
-    /// Export library as JSON
-    pub fn export_json(&self) -> serde_json::Result<String> {
-        serde_json::to_string_pretty(self)
+    /// Export library as JSON (placeholder)
+    pub fn export_json(&self) -> Result<String, String> {
+        Err("JSON export not implemented".to_string())
     }
     
-    /// Import library from JSON
-    pub fn import_json(&mut self, json: &str) -> serde_json::Result<()> {
-        let imported: ComponentLibrary = serde_json::from_str(json)?;
-        *self = imported;
-        Ok(())
+    /// Import library from JSON (placeholder)
+    pub fn import_json(&mut self, _json: &str) -> Result<(), String> {
+        Err("JSON import not implemented".to_string())
     }
     
     /// Render component library UI
@@ -262,11 +259,11 @@ impl ComponentLibrary {
                 .num_columns(3)
                 .spacing([10.0, 10.0])
                 .show(ui, |ui| {
-                    for (name, template) in &self.templates {
+                    for (count, (name, template)) in self.templates.iter().enumerate() {
                         self.render_template_card(ui, name, template);
                         
-                        // Start new row every 3 items
-                        if ui.next_location().x == 0.0 {
+                        // Start new row every 3 items (simplified for egui 0.27)
+                        if (count + 1) % 3 == 0 {
                             ui.end_row();
                         }
                     }

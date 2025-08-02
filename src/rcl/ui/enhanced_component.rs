@@ -12,8 +12,7 @@
 //! - **IDE Integration**: Rich property metadata for advanced property inspectors
 
 use egui::{Ui, Color32, Vec2, Pos2, Rect};
-use std::collections::HashMap;
-use super::properties::{PropertyInfo, PropertyValue, PropertyRegistry, PropertyCategory, standard_properties};
+use super::properties::{PropertyInfo, PropertyValue, PropertyRegistry, standard_properties};
 use super::component::Component;
 
 /// Standard properties that all components should have
@@ -415,18 +414,26 @@ pub trait EnhancedComponent: Component {
     
     /// Enhanced render method that applies standard styling
     fn render_enhanced(&mut self, ui: &mut Ui) {
-        let props = self.standard_properties();
+        // Extract values to avoid borrowing issues
+        let visible = self.standard_properties().visible;
+        let enabled = self.standard_properties().enabled;
+        let x = self.standard_properties().x;
+        let y = self.standard_properties().y;
+        let width = self.standard_properties().width;
+        let height = self.standard_properties().height;
+        let opacity = self.standard_properties().opacity;
+        let tooltip = self.standard_properties().tooltip.clone();
         
         // Don't render if not visible
-        if !props.visible {
+        if !visible {
             return;
         }
         
         // Apply position and size constraints
         let available_rect = ui.available_rect_before_wrap();
         let desired_rect = Rect::from_min_size(
-            Pos2::new(props.x, props.y),
-            Vec2::new(props.width, props.height)
+            Pos2::new(x, y),
+            Vec2::new(width, height)
         );
         
         // Ensure the component is within bounds
@@ -439,23 +446,26 @@ pub trait EnhancedComponent: Component {
             // Apply styling (background, border, etc.)
             self.apply_standard_styling(&mut child_ui);
             
-            // Apply opacity
-            if props.opacity < 1.0 {
-                child_ui.multiply_opacity(props.opacity);
+            // Apply opacity (egui 0.27 uses set_opacity instead of multiply_opacity)
+            if opacity < 1.0 {
+                child_ui.set_opacity(opacity);
             }
             
             // Render the component content
-            if props.enabled {
+            if enabled {
                 self.render_content(&mut child_ui);
             } else {
-                // Render disabled state
-                child_ui.disable();
-                self.render_content(&mut child_ui);
+                // Render disabled state (egui 0.27 uses add_enabled_ui instead of disable)
+                child_ui.add_enabled_ui(false, |ui| {
+                    self.render_content(ui);
+                });
             }
             
-            // Handle tooltip
-            if !props.tooltip.is_empty() && child_ui.rect_contains_pointer(final_rect) {
-                child_ui.on_hover_text(&props.tooltip);
+            // Handle tooltip (tooltip is handled via response in egui 0.27)
+            if !tooltip.is_empty() && child_ui.rect_contains_pointer(final_rect) {
+                // Create an invisible widget to handle the tooltip
+                let response = child_ui.allocate_response(final_rect.size(), egui::Sense::hover());
+                response.on_hover_text(&tooltip);
             }
         }
     }

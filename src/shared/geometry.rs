@@ -5,17 +5,16 @@
 
 use egui::*;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// 2D bounding box with utility methods
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Bounds {
     pub min: Pos2,
     pub max: Pos2,
 }
 
 /// 2D transformation matrix
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Transform2D {
     pub translation: Vec2,
     pub rotation: f32,
@@ -23,7 +22,10 @@ pub struct Transform2D {
 }
 
 /// Spatial index for efficient collision detection and spatial queries
-pub struct SpatialIndex<T> {
+pub struct SpatialIndex<T> 
+where 
+    T: Clone,
+{
     /// Grid cells for spatial partitioning
     cells: HashMap<(i32, i32), Vec<SpatialItem<T>>>,
     /// Cell size for partitioning
@@ -32,7 +34,10 @@ pub struct SpatialIndex<T> {
 
 /// Item in the spatial index
 #[derive(Clone, Debug)]
-pub struct SpatialItem<T> {
+pub struct SpatialItem<T> 
+where 
+    T: Clone,
+{
     pub bounds: Bounds,
     pub data: T,
 }
@@ -67,7 +72,8 @@ impl Bounds {
     
     /// Get center point
     pub fn center(&self) -> Pos2 {
-        (self.min.to_vec2() + self.max.to_vec2()) / 2.0
+        let center_vec = (self.min.to_vec2() + self.max.to_vec2()) / 2.0;
+        Pos2::new(center_vec.x, center_vec.y)
     }
     
     /// Get size
@@ -275,7 +281,10 @@ impl Transform2D {
     }
 }
 
-impl<T> SpatialIndex<T> {
+impl<T> SpatialIndex<T> 
+where 
+    T: Clone,
+{
     /// Create new spatial index
     pub fn new(cell_size: f32) -> Self {
         Self {

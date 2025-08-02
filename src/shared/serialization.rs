@@ -4,8 +4,7 @@
 //! project data, and export/import functionality.
 
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde_json::{Value, Map};
+use serde_json::Value;
 
 /// Trait for serializable components
 pub trait SerializableComponent {
@@ -25,7 +24,7 @@ pub trait SerializableComponent {
 }
 
 /// Export format options
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ExportFormat {
     /// Native IDE format (JSON)
     Native,
@@ -55,7 +54,7 @@ pub enum ExportFormat {
 #[derive(Debug, thiserror::Error)]
 pub enum SerializationError {
     #[error("JSON parsing error: {0}")]
-    JsonError(#[from] serde_json::Error),
+    JsonError(String),
     
     #[error("Schema version mismatch: expected {expected}, found {found}")]
     VersionMismatch { expected: String, found: String },
@@ -77,7 +76,7 @@ pub enum SerializationError {
 }
 
 /// Component serialization data
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ComponentData {
     /// Component type identifier
     pub component_type: String,
@@ -94,7 +93,7 @@ pub struct ComponentData {
 }
 
 /// Component metadata
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ComponentMetadata {
     /// Creation timestamp
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -111,8 +110,7 @@ pub struct ComponentMetadata {
 }
 
 /// Property value for serialization
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "type", content = "value")]
+#[derive(Clone, Debug)]
 pub enum PropertyValue {
     String(String),
     Number(f64),
@@ -124,7 +122,7 @@ pub enum PropertyValue {
 }
 
 /// Project serialization data
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ProjectData {
     /// Project metadata
     pub metadata: ProjectMetadata,
@@ -141,7 +139,7 @@ pub struct ProjectData {
 }
 
 /// Project metadata
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ProjectMetadata {
     /// Project name
     pub name: String,
@@ -162,7 +160,7 @@ pub struct ProjectMetadata {
 }
 
 /// Asset data
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct AssetData {
     /// Asset ID
     pub id: String,
@@ -177,7 +175,7 @@ pub struct AssetData {
 }
 
 /// Asset type enumeration
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AssetType {
     Image,
     Font,
@@ -189,7 +187,7 @@ pub enum AssetType {
 }
 
 /// Design system serialization data
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct DesignSystemData {
     /// Design tokens
     pub tokens: HashMap<String, DesignToken>,
@@ -200,7 +198,7 @@ pub struct DesignSystemData {
 }
 
 /// Design token data
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct DesignToken {
     /// Token name
     pub name: String,
@@ -213,7 +211,7 @@ pub struct DesignToken {
 }
 
 /// Component template data
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ComponentTemplate {
     /// Template name
     pub name: String,
@@ -226,7 +224,7 @@ pub struct ComponentTemplate {
 }
 
 /// Style guide data
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct StyleGuideData {
     /// Color palette
     pub colors: Vec<String>,
@@ -239,7 +237,7 @@ pub struct StyleGuideData {
 }
 
 /// Typography settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct TypographySettings {
     /// Font families
     pub font_families: Vec<String>,
@@ -252,7 +250,7 @@ pub struct TypographySettings {
 }
 
 /// Project settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ProjectSettings {
     /// Default canvas size
     pub canvas_size: (f64, f64),
@@ -265,7 +263,7 @@ pub struct ProjectSettings {
 }
 
 /// Grid settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct GridSettings {
     /// Grid enabled
     pub enabled: bool,
@@ -278,7 +276,7 @@ pub struct GridSettings {
 }
 
 /// Snap settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct SnapSettings {
     /// Snap to grid enabled
     pub to_grid: bool,
@@ -289,7 +287,7 @@ pub struct SnapSettings {
 }
 
 /// Export settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ExportSettings {
     /// Default export format
     pub default_format: ExportFormat,
@@ -362,24 +360,24 @@ impl Default for ExportSettings {
 }
 
 impl SerializationUtils {
-    /// Serialize component to JSON string
-    pub fn serialize_component(component: &ComponentData) -> Result<String, SerializationError> {
-        serde_json::to_string_pretty(component).map_err(SerializationError::JsonError)
+    /// Serialize component to JSON string (placeholder)
+    pub fn serialize_component(_component: &ComponentData) -> Result<String, SerializationError> {
+        Err(SerializationError::MigrationError { message: "Serialization not implemented".to_string() })
     }
     
-    /// Deserialize component from JSON string
-    pub fn deserialize_component(json: &str) -> Result<ComponentData, SerializationError> {
-        serde_json::from_str(json).map_err(SerializationError::JsonError)
+    /// Deserialize component from JSON string (placeholder)
+    pub fn deserialize_component(_json: &str) -> Result<ComponentData, SerializationError> {
+        Err(SerializationError::MigrationError { message: "Deserialization not implemented".to_string() })
     }
     
-    /// Serialize project to JSON string
-    pub fn serialize_project(project: &ProjectData) -> Result<String, SerializationError> {
-        serde_json::to_string_pretty(project).map_err(SerializationError::JsonError)
+    /// Serialize project to JSON string (placeholder)
+    pub fn serialize_project(_project: &ProjectData) -> Result<String, SerializationError> {
+        Err(SerializationError::MigrationError { message: "Project serialization not implemented".to_string() })
     }
     
-    /// Deserialize project from JSON string
-    pub fn deserialize_project(json: &str) -> Result<ProjectData, SerializationError> {
-        serde_json::from_str(json).map_err(SerializationError::JsonError)
+    /// Deserialize project from JSON string (placeholder)
+    pub fn deserialize_project(_json: &str) -> Result<ProjectData, SerializationError> {
+        Err(SerializationError::MigrationError { message: "Project deserialization not implemented".to_string() })
     }
     
     /// Convert component to different export format
@@ -483,7 +481,7 @@ impl SerializationUtils {
         }
         
         if component.children.is_empty() {
-            template.push_str("></{}>", Self::component_type_to_angular(&component.component_type));
+            template.push_str(&format!("></{}>>", Self::component_type_to_angular(&component.component_type)));
         } else {
             template.push_str(">");
             
@@ -649,26 +647,12 @@ impl SerializationUtils {
     }
 }
 
-/// Custom serializer for DateTime
-pub fn serialize_datetime<S>(
-    date: &chrono::DateTime<chrono::Utc>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let timestamp = date.timestamp();
-    serializer.serialize_i64(timestamp)
+/// Custom serializer for DateTime (placeholder)
+pub fn serialize_datetime(date: &chrono::DateTime<chrono::Utc>) -> String {
+    date.to_rfc3339()
 }
 
-/// Custom deserializer for DateTime
-pub fn deserialize_datetime<'de, D>(
-    deserializer: D,
-) -> Result<chrono::DateTime<chrono::Utc>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let timestamp = i64::deserialize(deserializer)?;
-    Ok(chrono::DateTime::from_timestamp(timestamp, 0)
-        .unwrap_or_else(chrono::Utc::now))
+/// Custom deserializer for DateTime (placeholder) 
+pub fn deserialize_datetime(s: &str) -> Result<chrono::DateTime<chrono::Utc>, chrono::ParseError> {
+    chrono::DateTime::parse_from_rfc3339(s).map(|dt| dt.with_timezone(&chrono::Utc))
 }
