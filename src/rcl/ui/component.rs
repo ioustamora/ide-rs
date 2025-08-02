@@ -132,4 +132,44 @@ pub trait Component {
     /// }
     /// ```
     fn render(&mut self, ui: &mut Ui);
+    
+    /// Gets the value of a named property as a string.
+    /// 
+    /// This method enables the IDE's property inspector to read component properties
+    /// for display and editing. Components should return the current value of the
+    /// requested property as a string representation.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The name of the property to retrieve
+    /// 
+    /// # Returns
+    /// 
+    /// `Some(String)` containing the property value, or `None` if the property doesn't exist
+    fn get_property(&self, name: &str) -> Option<String>;
+    
+    /// Sets the value of a named property from a string.
+    /// 
+    /// This method enables the IDE's property inspector to modify component properties.
+    /// Components should parse the string value and update their internal state accordingly.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The name of the property to set
+    /// * `value` - The new value as a string
+    /// 
+    /// # Returns
+    /// 
+    /// `true` if the property was successfully set, `false` otherwise
+    fn set_property(&mut self, name: &str, value: &str) -> bool;
+    
+    /// Returns a list of all available property names.
+    /// 
+    /// This method enables the IDE to discover what properties are available
+    /// for editing in the property inspector.
+    /// 
+    /// # Returns
+    /// 
+    /// A vector of property names that can be used with `get_property` and `set_property`
+    fn get_property_names(&self) -> Vec<String>;
 }

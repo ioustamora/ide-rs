@@ -1,20 +1,13 @@
-//! Modern IDE Integration - Now Modularized
+//! Modern IDE Integration - Legacy Compatibility Layer
 //!
-//! This module has been restructured into a modular architecture.
-//! The functionality is now split across multiple focused modules.
+//! This module provides backward compatibility for the old monolithic structure.
+//! New code should use the modular structure in the `modern_ide_integration` submodule.
 
-pub mod design_tokens;
-pub mod component_library;
-pub mod framework_export;
-pub mod theme_system;
-pub mod code_generation;
+// Re-export the new modular structure for backward compatibility
+pub use self::modern_ide_integration_modules::*;
 
-// Re-export main types for convenience
-pub use design_tokens::{DesignTokenSystem, ColorToken, TypographyToken, SpacingToken, ShadowToken};
-pub use component_library::{ComponentLibrary, ComponentTemplate, UserComponent, LibraryMetadata};
-pub use framework_export::{FrameworkExportManager, ExportTarget, ExportSettings, GeneratedFile};
-pub use theme_system::{ThemeSystem, Theme, ColorPalette, ThemeType};
-pub use code_generation::{CodeGenerator, CodeTemplate, GeneratedCode, GenerationContext};
+// Include the new modular structure  
+mod modern_ide_integration_modules;
 
 use egui::*;
 

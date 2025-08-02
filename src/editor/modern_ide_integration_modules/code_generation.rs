@@ -198,14 +198,14 @@ pub struct PrettierConfig {
 }
 
 /// Indentation type
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum IndentationType {
     Spaces,
     Tabs,
 }
 
 /// Quote style
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum QuoteStyle {
     Single,
     Double,
