@@ -66,4 +66,4 @@ pub use dropdown::Dropdown;
 pub use label::Label;
 pub use radio_button::RadioButton;
 pub use slider::Slider;
-pub use textbox::Textbox;
+pub use textbox::TextBox;

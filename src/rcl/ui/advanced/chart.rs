@@ -438,7 +438,7 @@ impl Chart {
         let bar_width = rect.width() / (self.data.series.first().map_or(1, |s| s.points.len()) as f32 * 1.2);
         
         for (series_idx, series) in self.data.series.iter().enumerate() {
-            for (point_idx, (x, y)) in series.points.iter().enumerate() {
+            for (_point_idx, (x, y)) in series.points.iter().enumerate() {
                 let screen_pos = self.data_to_screen(*x, 0.0, rect);
                 let bar_height = (*y / self.data.y_range.1) * rect.height() * self.animation.progress;
                 

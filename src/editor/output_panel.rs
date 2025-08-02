@@ -58,7 +58,8 @@ impl OutputPanel {
     pub fn show_errors(&self, ui: &mut Ui, error_output: &str) {
         let parsed = crate::editor::actions::parse_errors(error_output);
         ui.label("Errors:");
-        ui.text_edit_multiline(&mut parsed.clone());
+        let mut parsed_text = parsed.join("\n");
+        ui.text_edit_multiline(&mut parsed_text);
     }
 
     pub fn ui(&mut self, ui: &mut Ui) {

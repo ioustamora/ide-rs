@@ -120,4 +120,4 @@ pub use http_client::HttpClient;
 pub use network_monitor::NetworkMonitor;
 pub use tcp_client::TcpClient;
 pub use udp_client::UdpClient;
-pub use websocket::WebSocket;
+pub use websocket::WebSocketClient;

@@ -258,7 +258,7 @@ impl LiveFeedbackSystem {
     }
     
     /// Add property feedback overlay
-    fn add_property_feedback(&mut self, component_idx: usize, property: &str, value: String) {
+    fn add_property_feedback(&mut self, _component_idx: usize, property: &str, value: String) {
         let overlay = FeedbackOverlay {
             position: Pos2::new(0.0, 0.0), // Will be positioned based on component
             size: Vec2::new(150.0, 30.0),
@@ -273,7 +273,7 @@ impl LiveFeedbackSystem {
     }
     
     /// Add color feedback overlay
-    fn add_color_feedback(&mut self, component_idx: usize, color: Color32) {
+    fn add_color_feedback(&mut self, _component_idx: usize, color: Color32) {
         let overlay = FeedbackOverlay {
             position: Pos2::new(0.0, 0.0), // Will be positioned based on component
             size: Vec2::new(20.0, 20.0),
@@ -728,7 +728,7 @@ impl LiveFeedbackSystem {
         self.preview_values.insert(key, value.clone());
         
         // Add visual feedback
-        if let Some(pos) = position {
+        if let Some(_pos) = position {
             match &value {
                 PropertyValue::Color(color) => {
                     let egui_color = Color32::from_rgba_unmultiplied(color[0], color[1], color[2], color[3]);

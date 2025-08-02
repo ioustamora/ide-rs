@@ -1,9 +1,8 @@
-//! Accessibility validation and reporting
-//!
-//! Implements WCAG checks and accessibility reports.
+/// Accessibility validation and reporting
+///
+/// Implements WCAG checks and accessibility reports.
 
-// TODO: Move accessibility logic here.
-
+#[derive(Default)]
 pub struct AccessibilityValidator {
     // ...fields...
 }

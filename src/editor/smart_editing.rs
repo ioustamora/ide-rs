@@ -398,7 +398,7 @@ impl SmartEditingSystem {
         }
         
         // Generate grid magnetism zones if grid snapping is enabled
-        if visual_designer.grid.snap_enabled {
+        {
             let grid_size = visual_designer.grid.size;
             let canvas_size = Vec2::new(800.0, 600.0); // TODO: Get actual canvas size from context
             
@@ -778,7 +778,7 @@ impl SmartEditingSystem {
         }
         
         // Canvas edge magnetism
-        self.add_canvas_edge_magnetism(visual_designer, dragging_size);
+        self.add_canvas_edge_magnetism(dragging_size);
         
         // Find the strongest magnetic attraction with enhanced scoring
         let mut best_snap: Option<Pos2> = None;
@@ -860,7 +860,7 @@ impl SmartEditingSystem {
     }
     
     /// Add canvas edge magnetism
-    fn add_canvas_edge_magnetism(&mut self, visual_designer: &VisualDesigner, dragging_size: Vec2) {
+    fn add_canvas_edge_magnetism(&mut self, dragging_size: Vec2) {
         let canvas_size = Vec2::new(800.0, 600.0); // TODO: Get actual canvas size
         let margin = 16.0; // Margin from canvas edges
         

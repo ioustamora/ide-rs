@@ -36,8 +36,7 @@
 //! and testing. A production implementation would integrate with system APIs
 //! and process management libraries.
 
-use std::collections::HashMap;
-use std::process::{Command, Child};
+use std::process::Command;
 use std::time::{SystemTime, Duration};
 
 /// Information about a running process

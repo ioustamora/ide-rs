@@ -30,9 +30,7 @@
 //! - Safe handling of symbolic links
 //! - Proper error handling for access denied scenarios
 
-use std::path::{Path, PathBuf};
-use std::fs;
-use std::io;
+use std::path::Path;
 
 /// A cross-platform file system interface for file and directory operations
 /// 

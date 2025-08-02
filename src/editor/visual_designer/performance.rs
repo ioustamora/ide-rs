@@ -1,12 +1,12 @@
-use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct MemoryUsage {
     pub components: usize,
     pub cache: usize,
     pub total: usize,
 }
 
+#[derive(Default)]
 pub struct PerformanceMetrics {
     pub frame_times: Vec<f32>,
     pub render_calls: usize,
@@ -16,20 +16,11 @@ pub struct PerformanceMetrics {
 
 impl PerformanceMetrics {
     pub fn new() -> Self {
-        Self {
-            frame_times: Vec::new(),
-            render_calls: 0,
-            cache_hit_ratio: 0.0,
-            memory_usage: MemoryUsage {
-                components: 0,
-                cache: 0,
-                total: 0,
-            },
-        }
+        Self::default()
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PerformanceReport {
     pub average_frame_time: f32,
     pub fps: f32,
@@ -37,11 +28,9 @@ pub struct PerformanceReport {
     pub cache_hit_ratio: f32,
     pub memory_usage: MemoryUsage,
 }
-//! Performance metrics and render cache
-//!
-//! Tracks performance and optimizes rendering.
-
-// TODO: Move performance and caching logic here.
+/// Performance metrics and render cache
+///
+/// Tracks performance and optimizes rendering.
 
 impl PerformanceMetrics {
     pub fn add_frame_time(&mut self, time: f32) {

@@ -388,7 +388,7 @@ impl eframe::App for IdeApp {
                 self.menu.ui(ui);
             });
             // Toolbar
-            self.menu.toolbar.ui(ui, &mut crate::editor::actions, &mut self.menu.output_panel);
+            self.menu.toolbar.ui(ui, crate::editor::actions::get_actions(), &mut self.menu.output_panel);
             // Panel toggles and mode switches
             ui.horizontal(|ui| {
                 ui.separator();
@@ -653,17 +653,17 @@ impl eframe::App for IdeApp {
                     ui.separator();
                     
                     // Advanced alignment toolbar
-                    self.visual_designer.advanced_alignment.render_toolbar(ui, self.visual_designer.selection.selected.len());
+                    self.visual_designer.layout.alignment.render_toolbar(ui, self.visual_designer.selection.selected.len());
                     
                     // Process alignment operations
-                    if let Some(operation) = self.visual_designer.advanced_alignment.get_recent_operations().last() {
+                    if let Some(operation) = self.visual_designer.layout.alignment.get_recent_operations().last() {
                         if !self.visual_designer.selection.selected.is_empty() {
                             let canvas_rect = egui::Rect::from_min_size(ui.cursor().min, ui.available_size());
                             self.apply_advanced_alignment_operation(operation.clone(), canvas_rect);
                         }
                         // Clear the operation after processing
-                        if !self.visual_designer.advanced_alignment.get_recent_operations().is_empty() {
-                            self.visual_designer.advanced_alignment.clear_recent_operations();
+                        if !self.visual_designer.layout.alignment.get_recent_operations().is_empty() {
+                            self.visual_designer.layout.alignment.clear_recent_operations();
                         }
                     }
                     
@@ -805,8 +805,8 @@ impl IdeApp {
     }
 
     /// Apply advanced alignment operation to selected components
-    fn apply_advanced_alignment_operation(&mut self, operation: crate::editor::advanced_alignment::AlignmentOperation, canvas_rect: egui::Rect) {
-        use crate::editor::advanced_alignment::ComponentBounds;
+    fn apply_advanced_alignment_operation(&mut self, operation: crate::editor::visual_designer::AlignmentOperation, canvas_rect: egui::Rect) {
+        use crate::editor::visual_designer::ComponentBounds;
         
         // Convert selected components to bounds
         let mut component_bounds: Vec<ComponentBounds> = Vec::new();
@@ -828,7 +828,7 @@ impl IdeApp {
 
         // Apply the alignment operation
         if !component_bounds.is_empty() {
-            if self.visual_designer.advanced_alignment.apply_operation(&operation, &mut component_bounds, canvas_rect) {
+            if self.visual_designer.layout.alignment.apply_operation(&operation, &mut component_bounds, canvas_rect) {
                 // Collect new positions before moving component_bounds
                 let new_positions: Vec<egui::Pos2> = component_bounds.iter().map(|b| b.position).collect();
                 
@@ -840,7 +840,7 @@ impl IdeApp {
                 
                 // Add to undo history
                 let design_operation = crate::editor::visual_designer::DesignOperation::Move {
-                    component_ids: self.visual_designer.selection.selected.clone(),
+                    component_ids: self.visual_designer.selection.selected.iter().copied().collect(),
                     old_positions: Vec::new(), // TODO: Store old positions for proper undo
                     new_positions,
                 };

@@ -1,10 +1,11 @@
-use egui;
-use std::collections::HashMap;
-
 /// Component selection and interaction logic
+
+use eframe::egui;
+use std::collections::HashSet;
+
 #[derive(Clone)]
 pub struct ComponentSelection {
-    pub selected: Vec<usize>,
+    pub selected: HashSet<usize>,
     pub primary: Option<usize>,
     pub selection_rect: Option<egui::Rect>,
     pub multi_select_mode: bool,
@@ -43,7 +44,7 @@ pub enum ResizeHandle {
 impl Default for ComponentSelection {
     fn default() -> Self {
         Self {
-            selected: Vec::new(),
+            selected: HashSet::new(),
             primary: None,
             selection_rect: None,
             multi_select_mode: false,
@@ -52,32 +53,21 @@ impl Default for ComponentSelection {
         }
     }
 }
-//! Component selection and interaction logic
-//!
-//! Handles multi-selection, drag, resize, and hit-testing.
-
-// TODO: Move selection-related structs and logic here.
-
-
-use egui;
-use crate::editor::visual_designer::{DragOperation, DragOperationType, ResizeHandle, DesignOperation, LayoutManager};
-use std::collections::HashMap;
-
 impl ComponentSelection {
     pub fn select_single_component(&mut self, component_idx: usize) {
         self.selected.clear();
-        self.selected.push(component_idx);
+        self.selected.insert(component_idx);
         self.primary = Some(component_idx);
     }
 
     pub fn toggle_component_selection(&mut self, component_idx: usize) {
-        if let Some(pos) = self.selected.iter().position(|&idx| idx == component_idx) {
-            self.selected.remove(pos);
+        if self.selected.contains(&component_idx) {
+            self.selected.remove(&component_idx);
             if Some(component_idx) == self.primary {
-                self.primary = self.selected.first().copied();
+                self.primary = self.selected.iter().next().copied();
             }
         } else {
-            self.selected.push(component_idx);
+            self.selected.insert(component_idx);
             if self.primary.is_none() {
                 self.primary = Some(component_idx);
             }
@@ -93,19 +83,19 @@ impl ComponentSelection {
         self.select_single_component(component_idx);
     }
 
-    pub fn select_components_in_rect(&mut self, selection_rect: egui::Rect, layout: &LayoutManager) {
+    pub fn select_components_in_rect(&mut self, selection_rect: egui::Rect, layout: &super::LayoutManager) {
         self.selected.clear();
         for (idx, pos) in &layout.positions {
             let size = layout.sizes.get(idx).cloned().unwrap_or(egui::vec2(100.0, 30.0));
             let component_rect = egui::Rect::from_min_size(*pos, size);
             if selection_rect.intersects(component_rect) {
-                self.selected.push(*idx);
+                self.selected.insert(*idx);
             }
         }
-        self.primary = self.selected.first().copied();
+        self.primary = self.selected.iter().next().copied();
     }
 
-    pub fn start_component_drag(&mut self, component_idx: usize, start_pos: egui::Pos2, layout: &LayoutManager) {
+    pub fn start_component_drag(&mut self, component_idx: usize, start_pos: egui::Pos2, layout: &super::LayoutManager) {
         if !self.selected.contains(&component_idx) {
             self.select_single_component(component_idx);
         }
@@ -114,7 +104,7 @@ impl ComponentSelection {
             .filter_map(|&idx| layout.positions.get(&idx).copied())
             .collect();
         self.dragging = Some(DragOperation {
-            component_indices: self.selected.clone(),
+            component_indices: self.selected.iter().copied().collect(),
             original_positions,
             drag_offset: egui::Vec2::ZERO,
             start_pos,
@@ -122,7 +112,7 @@ impl ComponentSelection {
         });
     }
 
-    pub fn start_resize_drag(&mut self, component_idx: usize, handle: ResizeHandle, start_pos: egui::Pos2, layout: &LayoutManager) {
+    pub fn start_resize_drag(&mut self, component_idx: usize, handle: ResizeHandle, start_pos: egui::Pos2, layout: &super::LayoutManager) {
         if let Some(original_pos) = layout.positions.get(&component_idx).copied() {
             self.dragging = Some(DragOperation {
                 component_indices: vec![component_idx],

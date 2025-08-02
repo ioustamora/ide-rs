@@ -12,21 +12,28 @@ pub struct DesignTimeProperties {
     /// Custom properties
     pub custom_props: HashMap<String, String>,
 }
-//! Centralized state management for Visual Designer
-//!
-//! Coordinates state between layout, selection, history, etc.
-
-// TODO: Move state management logic here.
+/// Centralized state management for Visual Designer
+///
+/// Coordinates state between layout, selection, history, etc.
 
 pub struct DesignerState {
-    // ...fields...
+    /// Layout management
+    pub layout: super::LayoutManager,
+    /// Component selection
+    pub selection: super::ComponentSelection,
+    /// Design history for undo/redo
+    pub history: super::DesignHistory,
+    /// Performance metrics
+    pub performance: super::PerformanceMetrics,
 }
 
 impl DesignerState {
     pub fn new() -> Self {
         Self {
-            // ...
+            layout: super::LayoutManager::default(),
+            selection: super::ComponentSelection::default(),
+            history: super::DesignHistory::default(),
+            performance: super::PerformanceMetrics::new(),
         }
     }
-    // ...state methods...
 }

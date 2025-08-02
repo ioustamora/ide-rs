@@ -404,7 +404,7 @@ impl HttpClient {
         method: HttpMethod,
         url: &str,
         body: Option<&str>,
-        headers: Option<HashMap<String, String>>,
+        _headers: Option<HashMap<String, String>>,
     ) -> Result<HttpResponse, Error> {
         // TODO: Implement detailed HTTP request with full response information
         // Production implementation would:

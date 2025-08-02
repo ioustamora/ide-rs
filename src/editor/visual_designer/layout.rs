@@ -1,11 +1,17 @@
 use egui;
 use std::collections::HashMap;
 
+/// Layout management for components
 #[derive(Default)]
 pub struct LayoutManager {
+    /// Component positions
     pub positions: HashMap<usize, egui::Pos2>,
+    /// Component sizes
     pub sizes: HashMap<usize, egui::Vec2>,
-    pub alignment: AlignmentManager,
+    /// Z-order (layering)
+    pub z_order: Vec<usize>,
+    /// Alignment helpers
+    pub alignment: AlignmentTools,
 }
 
 impl LayoutManager {
@@ -44,13 +50,117 @@ impl LayoutManager {
     }
 }
 
+/// Alignment and distribution tools
 #[derive(Default)]
-pub struct AlignmentManager {
-    pub last_operation: Option<crate::editor::visual_designer::AlignmentOperation>,
+pub struct AlignmentTools {
+    /// Last alignment operation
+    pub last_operation: Option<AlignmentOperation>,
+    /// Recent operations for processing
+    pub recent_operations: Vec<AlignmentOperation>,
 }
-use std::collections::HashMap;
 
+impl AlignmentTools {
+    pub fn render_toolbar(&mut self, ui: &mut egui::Ui, selected_count: usize) {
+        if selected_count > 1 {
+            ui.horizontal(|ui| {
+                ui.label("Align:");
+                if ui.button("←").on_hover_text("Align Left").clicked() {
+                    self.recent_operations.push(AlignmentOperation::AlignLeft);
+                }
+                if ui.button("→").on_hover_text("Align Right").clicked() {
+                    self.recent_operations.push(AlignmentOperation::AlignRight);
+                }
+                if ui.button("↑").on_hover_text("Align Top").clicked() {
+                    self.recent_operations.push(AlignmentOperation::AlignTop);
+                }
+                if ui.button("↓").on_hover_text("Align Bottom").clicked() {
+                    self.recent_operations.push(AlignmentOperation::AlignBottom);
+                }
+                if ui.button("⊢").on_hover_text("Center Horizontal").clicked() {
+                    self.recent_operations.push(AlignmentOperation::AlignCenterHorizontal);
+                }
+                if ui.button("⊥").on_hover_text("Center Vertical").clicked() {
+                    self.recent_operations.push(AlignmentOperation::AlignCenterVertical);
+                }
+            });
+        }
+    }
+
+    pub fn get_recent_operations(&self) -> &Vec<AlignmentOperation> {
+        &self.recent_operations
+    }
+
+    pub fn clear_recent_operations(&mut self) {
+        self.recent_operations.clear();
+    }
+
+    pub fn apply_operation(
+        &mut self,
+        operation: &AlignmentOperation,
+        component_bounds: &mut Vec<ComponentBounds>,
+        canvas_rect: egui::Rect,
+    ) -> bool {
+        if component_bounds.is_empty() {
+            return false;
+        }
+
+        match operation {
+            AlignmentOperation::AlignLeft => {
+                let min_x = component_bounds.iter().map(|b| b.position.x).fold(f32::INFINITY, f32::min);
+                for bounds in component_bounds {
+                    bounds.position.x = min_x;
+                }
+            }
+            AlignmentOperation::AlignRight => {
+                let max_x = component_bounds.iter()
+                    .map(|b| b.position.x + b.size.x)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                for bounds in component_bounds {
+                    bounds.position.x = max_x - bounds.size.x;
+                }
+            }
+            AlignmentOperation::AlignTop => {
+                let min_y = component_bounds.iter().map(|b| b.position.y).fold(f32::INFINITY, f32::min);
+                for bounds in component_bounds {
+                    bounds.position.y = min_y;
+                }
+            }
+            AlignmentOperation::AlignBottom => {
+                let max_y = component_bounds.iter()
+                    .map(|b| b.position.y + b.size.y)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                for bounds in component_bounds {
+                    bounds.position.y = max_y - bounds.size.y;
+                }
+            }
+            AlignmentOperation::AlignCenterHorizontal => {
+                let center_x = canvas_rect.center().x;
+                for bounds in component_bounds {
+                    bounds.position.x = center_x - bounds.size.x / 2.0;
+                }
+            }
+            AlignmentOperation::AlignCenterVertical => {
+                let center_y = canvas_rect.center().y;
+                for bounds in component_bounds {
+                    bounds.position.y = center_y - bounds.size.y / 2.0;
+                }
+            }
+            _ => return false, // Other operations not implemented yet
+        }
+        
+        self.last_operation = Some(*operation);
+        true
+    }
+}
 pub type ComponentId = usize;
+
+/// Component bounds for alignment operations
+#[derive(Clone, Debug)]
+pub struct ComponentBounds {
+    pub position: egui::Pos2,
+    pub size: egui::Vec2,
+    pub index: usize,
+}
 
 #[derive(Clone, Debug)]
 pub struct ConstraintSystem {
@@ -200,27 +310,6 @@ pub enum VerticalConstraint {
     TopMargin(f32),
     BottomMargin(f32),
 }
-use std::collections::HashMap;
-use egui;
-
-/// Layout management for components
-pub struct LayoutManager {
-    /// Component positions
-    pub positions: HashMap<usize, egui::Pos2>,
-    /// Component sizes
-    pub sizes: HashMap<usize, egui::Vec2>,
-    /// Z-order (layering)
-    pub z_order: Vec<usize>,
-    /// Alignment helpers
-    pub alignment: AlignmentTools,
-}
-
-/// Alignment and distribution tools
-pub struct AlignmentTools {
-    /// Last alignment operation
-    pub last_operation: Option<AlignmentOperation>,
-}
-
 /// Types of alignment operations
 #[derive(Clone, Copy)]
 pub enum AlignmentOperation {
@@ -235,41 +324,4 @@ pub enum AlignmentOperation {
     SameWidth,
     SameHeight,
     SameSize,
-}
-
-impl Default for LayoutManager {
-    fn default() -> Self {
-        Self {
-            positions: HashMap::new(),
-            sizes: HashMap::new(),
-            z_order: Vec::new(),
-            alignment: AlignmentTools::default(),
-        }
-    }
-}
-
-impl Default for AlignmentTools {
-    fn default() -> Self {
-        Self {
-            last_operation: None,
-        }
-    }
-}
-//! Layout logic for Visual Designer
-//!
-//! Handles grid, stack, wrap, and absolute positioning systems.
-
-// TODO: Move all layout-related structs, enums, and logic here.
-
-pub struct LayoutManager {
-    // ...fields...
-}
-
-impl LayoutManager {
-    pub fn new() -> Self {
-        Self {
-            // ...
-        }
-    }
-    // ...layout methods...
 }

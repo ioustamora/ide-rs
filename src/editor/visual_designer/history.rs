@@ -44,20 +44,12 @@ pub enum DesignOperation {
         new_value: String,
     },
 }
-//! Undo/redo and design history logic
-//!
-//! Maintains operation history and state snapshots.
-
-// TODO: Move all history-related structs and logic here.
-
-pub struct DesignHistory {
-    // ...fields...
-}
-
 impl DesignHistory {
     pub fn new() -> Self {
         Self {
-            // ...
+            operations: Vec::new(),
+            current_index: 0,
+            max_size: 100,
         }
     }
 
@@ -71,7 +63,7 @@ impl DesignHistory {
         }
     }
 
-    pub fn undo(&mut self, layout: &mut crate::editor::visual_designer::LayoutManager) -> bool {
+    pub fn undo(&mut self, layout: &mut super::LayoutManager) -> bool {
         if self.current_index == 0 {
             return false;
         }
@@ -91,7 +83,7 @@ impl DesignHistory {
         true
     }
 
-    pub fn redo(&mut self, layout: &mut crate::editor::visual_designer::LayoutManager) -> bool {
+    pub fn redo(&mut self, layout: &mut super::LayoutManager) -> bool {
         if self.current_index >= self.operations.len() {
             return false;
         }

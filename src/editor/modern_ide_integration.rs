@@ -10,7 +10,6 @@
 use egui::*;
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
-use crate::rcl::ui::component::Component;
 use crate::editor::inspector::PropertyValue;
 
 /// Modern IDE integration system

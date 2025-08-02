@@ -58,7 +58,6 @@ pub struct ComponentTransform {
 type ComponentId = usize;
 
 /// Information about a component placed on the canvas
-#[derive(Debug)]
 struct CanvasComponent {
     /// Unique identifier for this component instance
     id: ComponentId,
@@ -269,7 +268,7 @@ impl EditorCanvas {
             ui.separator();
             ui.label(format!("Components: {}", self.components.len()));
             if self.dirty {
-                ui.colored_label(Color32::ORANGE, "●"); // Unsaved changes indicator
+                ui.colored_label(Color32::from_rgb(255, 165, 0), "●"); // Unsaved changes indicator
             }
         });
         
@@ -285,7 +284,7 @@ impl EditorCanvas {
         let painter = ui.painter();
         painter.rect_filled(
             canvas_response.rect,
-            Rounding::none(),
+            Rounding::ZERO,
             self.config.background_color,
         );
         
@@ -302,14 +301,10 @@ impl EditorCanvas {
         // - Context menu support
         // - Zoom and pan functionality
         
-        // Render all components with proper layering
-        // Sort components by z-index for proper rendering order
-        let mut sorted_components: Vec<_> = self.components.iter_mut().enumerate().collect();
-        sorted_components.sort_by(|a, b| a.1.transform.z_index.cmp(&b.1.transform.z_index));
-        
-        for (index, canvas_component) in sorted_components {
+        // Collect component information for rendering
+        let mut component_info = Vec::new();
+        for (i, canvas_component) in self.components.iter().enumerate() {
             if canvas_component.visible {
-                // Set up component rendering area based on transform
                 let component_rect = Rect::from_min_size(
                     canvas_response.rect.min + Vec2::new(
                         canvas_component.transform.x,
@@ -321,32 +316,41 @@ impl EditorCanvas {
                     )
                 );
                 
-                // Create a UI context for the component
-                let mut component_ui = ui.child_ui(component_rect, Layout::top_down(Align::LEFT));
+                component_info.push((i, component_rect, canvas_component.selected, canvas_component.transform.z_index));
+            }
+        }
+        
+        // Sort by z-index
+        component_info.sort_by(|a, b| a.3.cmp(&b.3));
+        
+        // Render components
+        for (component_idx, component_rect, _selected, _) in &component_info {
+            let mut component_ui = ui.child_ui(*component_rect, Layout::top_down(Align::LEFT));
+            self.components[*component_idx].component.render(&mut component_ui);
+        }
+        
+        // Draw overlays using a new painter reference
+        let overlay_painter = ui.painter();
+        for (_, component_rect, selected, _) in component_info {
+            // Draw selection indicator if component is selected
+            if selected && self.config.show_selection {
+                overlay_painter.rect_stroke(
+                    component_rect,
+                    Rounding::same(2.0),
+                    Stroke::new(2.0, Color32::BLUE)
+                );
                 
-                // Render the component
-                canvas_component.component.render(&mut component_ui);
-                
-                // Draw selection indicator if component is selected
-                if canvas_component.selected && self.config.show_selection {
-                    painter.rect_stroke(
-                        component_rect,
-                        Rounding::same(2.0),
-                        Stroke::new(2.0, Color32::BLUE)
-                    );
-                    
-                    // Draw resize handles
-                    self.draw_resize_handles(&painter, component_rect);
-                }
-                
-                // Draw component bounds if enabled
-                if self.config.show_bounds {
-                    painter.rect_stroke(
-                        component_rect,
-                        Rounding::none(),
-                        Stroke::new(1.0, Color32::GRAY)
-                    );
-                }
+                // Draw resize handles
+                self.draw_resize_handles(&overlay_painter, component_rect);
+            }
+            
+            // Draw component bounds if enabled
+            if self.config.show_bounds {
+                overlay_painter.rect_stroke(
+                    component_rect,
+                    Rounding::ZERO,
+                    Stroke::new(1.0, Color32::GRAY)
+                );
             }
         }
         

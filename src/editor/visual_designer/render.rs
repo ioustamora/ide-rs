@@ -1,5 +1,26 @@
 use egui;
-use crate::editor::visual_designer::{GuideSystem, GridSettings, ResizeHandle, ComponentSelection};
+
+/// Grid display settings
+#[derive(Clone)]
+pub struct GridSettings {
+    pub size: f32,
+    pub color: egui::Color32,
+    pub major_lines: u32,
+    pub visible: bool,
+    pub snap_enabled: bool,
+}
+
+impl Default for GridSettings {
+    fn default() -> Self {
+        Self {
+            size: 20.0,
+            color: egui::Color32::from_rgba_unmultiplied(128, 128, 128, 64),
+            major_lines: 5,
+            visible: true,
+            snap_enabled: true,
+        }
+    }
+}
 
 /// Rendering logic for Visual Designer
 impl GuideSystem {
@@ -126,8 +147,8 @@ impl GridSettings {
     }
 }
 
-impl ComponentSelection {
-    pub fn draw_selection_indicators(&self, ui: &mut egui::Ui, layout: &crate::editor::visual_designer::LayoutManager) {
+impl super::ComponentSelection {
+    pub fn draw_selection_indicators(&self, ui: &mut egui::Ui, layout: &super::LayoutManager) {
         let painter = ui.painter();
         if let Some(selection_rect) = self.selection_rect {
             painter.rect_stroke(
@@ -197,8 +218,6 @@ impl ComponentSelection {
         }
     }
 }
-use egui;
-
 /// Visual guides and rulers system
 pub struct GuideSystem {
     /// Horizontal guides
@@ -223,16 +242,4 @@ impl Default for GuideSystem {
             guide_color: egui::Color32::from_rgb(0, 150, 255),
         }
     }
-}
-//! Rendering logic for Visual Designer
-//!
-//! Handles grid, guides, rulers, and component rendering.
-
-// TODO: Move all rendering-related logic here.
-
-pub struct RenderEngine;
-
-impl RenderEngine {
-    pub fn new() -> Self { Self }
-    // ...rendering methods...
 }
