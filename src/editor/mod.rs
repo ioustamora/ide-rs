@@ -258,3 +258,15 @@ pub mod smart_editing_modules;
 /// Modular architecture for IDE integration including design tokens,
 /// component library, framework export, theme system, and code generation.
 pub mod modern_ide_integration_modules;
+
+/// Multi-file management with tab system
+/// 
+/// VS Code-inspired file management with tabs, file type recognition,
+/// and automatic mode switching between code editor and visual designer.
+pub mod file_manager;
+
+/// Real-time synchronization between visual designer and code
+/// 
+/// Provides bidirectional synchronization ensuring changes are reflected
+/// immediately in both visual designer and generated code.
+pub mod realtime_sync;

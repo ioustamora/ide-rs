@@ -859,7 +859,7 @@ impl CodeEditor {
                                 text_galley.size(),
                             );
                             
-                            ui.painter().galley(text_rect.min, text_galley, eframe::egui::Color32::TRANSPARENT);
+                            ui.painter().galley(text_rect.min, text_galley.clone(), eframe::egui::Color32::TRANSPARENT);
                             pos += text_galley.size().x;
                         }
                         
@@ -1079,6 +1079,9 @@ impl CodeEditor {
                         ui.heading("🔧 Autocomplete");
                         ui.separator();
                         
+                        // Store completion action to avoid borrow checker issues
+                        let mut completion_action = None;
+                        
                         eframe::egui::ScrollArea::vertical()
                             .max_height(150.0)
                             .show(ui, |ui| {
@@ -1118,19 +1121,24 @@ impl CodeEditor {
                                     });
                                     
                                     if response.response.clicked() {
-                                        self.autocomplete.selected_index = i;
-                                        // Accept completion on click
-                                        let item = self.autocomplete.items[i].clone();
-                                        if let Some(insert_text) = &item.insert_text {
-                                            self.insert_text_at_cursor(insert_text);
-                                        } else {
-                                            self.insert_text_at_cursor(&item.label);
-                                        }
-                                        self.hide_autocomplete();
-                                        self.mark_dirty();
+                                        // Store the action to perform after the loop
+                                        completion_action = Some((i, item.clone()));
                                     }
                                 }
                             });
+                        
+                        // Execute completion action outside the borrow
+                        if let Some((index, item)) = completion_action {
+                            self.autocomplete.selected_index = index;
+                            // Accept completion on click
+                            if let Some(insert_text) = &item.insert_text {
+                                self.insert_text_at_cursor(insert_text);
+                            } else {
+                                self.insert_text_at_cursor(&item.label);
+                            }
+                            self.hide_autocomplete();
+                            self.mark_dirty();
+                        }
                         
                         ui.separator();
                         ui.small("Use ↑↓ to navigate, Enter to accept, Esc to cancel");

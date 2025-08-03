@@ -97,6 +97,9 @@ impl eframe::App for IdeApp {
         // Render main content area
         ContentManager::render_central_panel(&mut self.app_state, &mut self.drag_state, ctx);
         
+        // Update real-time sync between visual designer and code
+        self.app_state.update_realtime_sync();
+        
         // Process any pending events
         self.event_handlers.process_pending_events(&mut self.app_state);
     }

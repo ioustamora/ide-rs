@@ -17,6 +17,8 @@ use crate::editor::hierarchy_manager::HierarchyManager;
 use crate::editor::modern_ide_integration::ModernIdeIntegration;
 use crate::editor::multi_device_preview::MultiDevicePreview;
 use crate::editor::template_system_simple::ComponentTemplate;
+use crate::editor::file_manager::FileManager;
+use crate::editor::realtime_sync::RealtimeSync;
 
 /// # Main IDE Application State
 /// 
@@ -254,6 +256,26 @@ pub struct IdeAppState {
     /// - Component repositioning
     /// - Snap-to-grid animations
     pub movement_manager: super::animated_ui::MovementManager,
+    
+    // ========================================================================================
+    // FILE MANAGEMENT SYSTEM - Multi-file editing with VS Code-inspired interface
+    // ========================================================================================
+    
+    /// Multi-file management with tab system
+    /// 
+    /// VS Code-inspired file management providing:
+    /// - Multiple file tabs with easy switching
+    /// - File type recognition for mode selection
+    /// - Automatic switching between code and visual designer
+    pub file_manager: FileManager,
+    
+    /// Real-time synchronization between visual designer and code
+    /// 
+    /// Ensures changes are reflected immediately:
+    /// - Visual designer changes update generated code
+    /// - Component additions/modifications trigger code regeneration
+    /// - Bidirectional sync with debouncing for performance
+    pub realtime_sync: RealtimeSync,
 }
 
 impl IdeAppState {
@@ -295,6 +317,88 @@ impl IdeAppState {
             template_system: Vec::new(),
             animation_manager: super::animated_ui::AnimationManager::new(),
             movement_manager: super::animated_ui::MovementManager::new(),
+            file_manager: FileManager::new(),
+            realtime_sync: RealtimeSync::new(),
+        }
+    }
+
+    /// Add a component and trigger real-time sync
+    pub fn add_component_with_sync(&mut self, component: Box<dyn Component>) {
+        let component_index = self.components.len();
+        let component_type = component.name().to_string();
+        
+        // Add component to the collection
+        self.components.push(component);
+        
+        // Notify real-time sync of the addition
+        self.realtime_sync.notify_change(
+            crate::editor::realtime_sync::ComponentChangeEvent::ComponentAdded {
+                component_index,
+                component_type,
+            }
+        );
+    }
+    
+    /// Remove a component and trigger real-time sync
+    pub fn remove_component_with_sync(&mut self, component_index: usize) -> bool {
+        if component_index < self.components.len() {
+            self.components.remove(component_index);
+            
+            // Notify real-time sync of the removal
+            self.realtime_sync.notify_change(
+                crate::editor::realtime_sync::ComponentChangeEvent::ComponentRemoved {
+                    component_index,
+                }
+            );
+            
+            true
+        } else {
+            false
+        }
+    }
+    
+    /// Update component property and trigger real-time sync
+    pub fn update_component_property_with_sync(
+        &mut self, 
+        component_index: usize, 
+        property_name: String, 
+        new_value: String
+    ) -> bool {
+        if let Some(component) = self.components.get_mut(component_index) {
+            let old_value = component.get_property(&property_name)
+                .unwrap_or_else(|| "".to_string());
+            
+            if component.set_property(&property_name, &new_value) {
+                // Notify real-time sync of the change
+                self.realtime_sync.notify_change(
+                    crate::editor::realtime_sync::ComponentChangeEvent::ComponentModified {
+                        component_index,
+                        property_name,
+                        old_value,
+                        new_value,
+                    }
+                );
+                return true;
+            }
+        }
+        false
+    }
+    
+    /// Check and perform real-time sync if needed
+    pub fn update_realtime_sync(&mut self) {
+        // Check if visual designer has changed and sync to code
+        if let Some(active_tab) = self.file_manager.get_active_tab_mut() {
+            if let Some(code_editor) = &mut active_tab.code_editor {
+                if let Some(_sync_result) = self.realtime_sync.check_and_sync_designer(
+                    &self.visual_designer,
+                    &self.root_form,
+                    &self.components,
+                    code_editor,
+                ) {
+                    // Code was updated, mark tab as dirty
+                    active_tab.mark_dirty();
+                }
+            }
         }
     }
 

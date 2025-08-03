@@ -17,10 +17,65 @@ impl ContentManager {
     /// Render the main central content area
     pub fn render_central_panel(app_state: &mut IdeAppState, drag_state: &mut DragState, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            if app_state.design_mode {
-                Self::render_design_mode(app_state, drag_state, ui);
+            // Render file manager tab bar
+            Self::render_file_tabs(app_state, ui);
+            ui.separator();
+            
+            // Render content based on current mode and active file
+            if let Some(active_tab) = app_state.file_manager.get_active_tab() {
+                match &active_tab.file_type {
+                    crate::editor::file_manager::FileType::UIDesign => {
+                        Self::render_design_mode(app_state, drag_state, ui);
+                    }
+                    crate::editor::file_manager::FileType::Code(_) | 
+                    crate::editor::file_manager::FileType::Unknown => {
+                        Self::render_code_mode(app_state, ui);
+                    }
+                }
             } else {
-                Self::render_code_mode(app_state, ui);
+                // No files open, show welcome screen
+                Self::render_welcome_screen(app_state, ui);
+            }
+        });
+    }
+    
+    /// Render file manager tabs
+    fn render_file_tabs(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            // File tabs
+            app_state.file_manager.render_tab_bar(ui);
+            
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                // Real-time sync status
+                app_state.realtime_sync.render_sync_ui(ui);
+            });
+        });
+    }
+    
+    /// Render welcome screen when no files are open
+    fn render_welcome_screen(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
+        ui.vertical_centered(|ui| {
+            ui.add_space(50.0);
+            ui.heading("Welcome to RAD IDE");
+            ui.add_space(20.0);
+            
+            ui.label("Get started by:");
+            ui.add_space(10.0);
+            
+            if ui.button("📁 Open Project").clicked() {
+                // TODO: Implement project opening
+            }
+            
+            if ui.button("📄 New File").clicked() {
+                // TODO: Implement new file creation
+            }
+            
+            if ui.button("🎨 New UI Design").clicked() {
+                // Create a new UI design file
+                let _ = app_state.file_manager.open_file(
+                    std::path::PathBuf::from("Untitled.ui"), 
+                    String::new()
+                );
             }
         });
     }
