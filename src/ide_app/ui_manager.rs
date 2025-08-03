@@ -203,6 +203,9 @@ impl UiManager {
                      .push(component_type);
         }
         
+        // Collect component actions to avoid borrow checker issues
+        let mut component_actions = Vec::new();
+        
         // Render each category with smooth animations
         for (category, components) in categories {
             let category_id = egui::Id::new(format!("palette_category_{:?}", category));
@@ -221,15 +224,28 @@ impl UiManager {
                         
                         // Handle drag start from palette
                         if button.drag_started() {
-                            let drag_type = DragType::ComponentFromPalette(component_type);
-                            app_state.visual_designer.drag_state.start_drag(drag_type, button.rect.center());
+                            component_actions.push((component_type, "drag", button.rect.center()));
                         } else if button.clicked() {
                             // Add component directly on click
-                            Self::add_component_to_form(app_state, component_type, egui::Pos2::new(100.0, 100.0));
+                            component_actions.push((component_type, "click", egui::Pos2::new(100.0, 100.0)));
                         }
                     });
                 }
             });
+        }
+        
+        // Execute actions after borrowing is complete
+        for (component_type, action, position) in component_actions {
+            match action {
+                "drag" => {
+                    let drag_type = DragType::ComponentFromPalette(component_type);
+                    app_state.visual_designer.drag_state.start_drag(drag_type, position);
+                }
+                "click" => {
+                    Self::add_component_to_form(app_state, component_type, position);
+                }
+                _ => {}
+            }
         }
     }
     

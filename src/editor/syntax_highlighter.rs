@@ -1,10 +1,9 @@
 // Token-based syntax highlighting and theme support for CodeEditor
 // This module provides a wrapper around syntect for use in the code editor.
 
-use syntect::parsing::{SyntaxSet, SyntaxReference};
+use syntect::parsing::SyntaxSet;
 use syntect::highlighting::{ThemeSet, Theme, Style as SyntectStyle};
 use syntect::easy::HighlightLines;
-use syntect::util::LinesWithEndings;
 use egui::Color32;
 
 pub struct SyntaxHighlighter {

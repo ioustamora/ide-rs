@@ -434,7 +434,7 @@ impl VisualDesigner {
         form_rect: egui::Rect,
         components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>
     ) {
-        use crate::ide_app::drag_drop::{DragType, ComponentType};
+        
         
         // Update drag position if dragging
         if self.drag_state.is_dragging {
@@ -508,8 +508,8 @@ impl VisualDesigner {
         form_rect: egui::Rect,
         components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>
     ) {
-        use crate::ide_app::drag_drop::{DragType, ComponentType};
-        use crate::rcl::ui::component::Component;
+        use crate::ide_app::drag_drop::DragType;
+        
         
         match completion.drag_type {
             DragType::ComponentFromPalette(component_type) => {
