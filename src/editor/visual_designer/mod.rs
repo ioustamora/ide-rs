@@ -19,6 +19,7 @@ pub use layout::{
     StackDirection, StackAlignment, WrapDirection, WrapAlignment,
     GridAlignment, SizeConstraint, HorizontalConstraint, VerticalConstraint,
 };
+use crate::ide_app::animated_ui::MovementManager;
 pub use selection::{
     ComponentSelection, DragOperation, DragOperationType, ResizeHandle,
 };
@@ -58,11 +59,15 @@ pub struct VisualDesigner {
     pub accessibility: AccessibilityValidator,
     /// Drag and drop state
     pub drag_state: crate::ide_app::drag_drop::DragState,
+    /// Movement animation manager for smooth component transitions
+    pub movement_manager: MovementManager,
 }
 
 impl VisualDesigner {
     pub fn new() -> Self {
-        Self::default()
+        let mut designer = Self::default();
+        designer.movement_manager = MovementManager::new();
+        designer
     }
 
     /// Clear current selection
@@ -151,14 +156,21 @@ impl VisualDesigner {
             clicked_component = Some(usize::MAX);
         }
 
+        // Update movement animations
+        self.movement_manager.update_all(ui.ctx());
+        
         // Render components on top of the form
         for (idx, component) in components.iter_mut().enumerate() {
-            let pos = self.layout.get_or_init_position(idx);
+            let layout_pos = self.layout.get_or_init_position(idx);
             let size = self.layout.get_or_init_size(idx, component.name());
             
-            // Create a rect for this component relative to the form
+            // Get animated position from movement manager
+            let movement_anim = self.movement_manager.get_or_create(idx, layout_pos);
+            let animated_pos = movement_anim.current_pos;
+            
+            // Create a rect for this component relative to the form using animated position
             let component_rect = egui::Rect::from_min_size(
-                form_rect.min + pos.to_vec2(), 
+                form_rect.min + animated_pos.to_vec2(), 
                 size
             );
             
@@ -196,11 +208,16 @@ impl VisualDesigner {
             }
             
             if response.dragged() && is_selected {
-                // Move selected components
+                // Move selected components with smooth animation
                 let delta = response.drag_delta();
                 for &selected_idx in &self.selection.selected {
                     if let Some(pos) = self.layout.positions.get_mut(&selected_idx) {
+                        // Update layout position immediately for responsiveness
                         *pos += delta;
+                        
+                        // Animate to the new position
+                        let movement_anim = self.movement_manager.get_or_create(selected_idx, *pos);
+                        movement_anim.move_to(*pos);
                     }
                 }
             }
@@ -217,10 +234,14 @@ impl VisualDesigner {
         clicked_component
     }
 
-    /// Move a component by a delta vector
+    /// Move a component by a delta vector with smooth animation
     pub fn move_component(&mut self, component_idx: usize, delta: egui::Vec2) {
         if let Some(pos) = self.layout.positions.get_mut(&component_idx) {
             *pos += delta;
+            
+            // Animate to the new position
+            let movement_anim = self.movement_manager.get_or_create(component_idx, *pos);
+            movement_anim.move_to(*pos);
         }
     }
 
@@ -229,18 +250,26 @@ impl VisualDesigner {
         self.layout.sizes.insert(component_idx, new_size);
     }
 
-    /// Move all selected components by a delta vector
+    /// Move all selected components by a delta vector with smooth animation
     pub fn move_selected_components(&mut self, delta: egui::Vec2) {
         for &component_idx in &self.selection.selected {
             if let Some(pos) = self.layout.positions.get_mut(&component_idx) {
                 *pos += delta;
+                
+                // Animate to the new position
+                let movement_anim = self.movement_manager.get_or_create(component_idx, *pos);
+                movement_anim.move_to(*pos);
             }
         }
     }
 
-    /// Set the position of a component
+    /// Set the position of a component with smooth animation
     pub fn set_component_position(&mut self, component_idx: usize, position: egui::Pos2) {
         self.layout.positions.insert(component_idx, position);
+        
+        // Animate to the new position
+        let movement_anim = self.movement_manager.get_or_create(component_idx, position);
+        movement_anim.move_to(position);
     }
 
     /// Get the position of a component

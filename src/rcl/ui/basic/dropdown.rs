@@ -71,6 +71,17 @@ pub struct Dropdown {
     /// When `true`, the label can be edited via a text input field.
     /// When `false`, the component displays as an interactive dropdown.
     pub editable: bool,
+    
+    /// Whether the dropdown is currently expanded
+    /// 
+    /// Controls the animated state of the dropdown expansion.
+    pub expanded: bool,
+    
+    /// Animation progress for smooth transitions (0.0 = closed, 1.0 = open)
+    pub animation_progress: f32,
+    
+    /// Animation target state
+    pub target_expanded: bool,
 }
 
 impl Dropdown {
@@ -112,6 +123,9 @@ impl Dropdown {
             options,
             selected,
             editable: false,
+            expanded: false,
+            animation_progress: 0.0,
+            target_expanded: false,
         }
     }
     
@@ -277,6 +291,24 @@ impl Dropdown {
     pub fn option_count(&self) -> usize {
         self.options.len()
     }
+    
+    /// Update the dropdown animation state
+    fn update_animation(&mut self, ctx: &egui::Context) {
+        let target_progress = if self.target_expanded { 1.0 } else { 0.0 };
+        let animation_speed = 8.0; // Transition speed per second
+        
+        if (self.animation_progress - target_progress).abs() > 0.001 {
+            let delta_time = ctx.input(|i| i.stable_dt);
+            let direction = if target_progress > self.animation_progress { 1.0 } else { -1.0 };
+            self.animation_progress += direction * animation_speed * delta_time;
+            self.animation_progress = self.animation_progress.clamp(0.0, 1.0);
+            
+            // Request repaint for next frame
+            ctx.request_repaint();
+        } else {
+            self.animation_progress = target_progress;
+        }
+    }
 }
 
 impl Component for Dropdown {
@@ -321,21 +353,64 @@ impl Component for Dropdown {
             // TODO: Future enhancement could allow editing the options themselves
             // This would require a more complex UI for adding/removing/editing individual options
         } else {
-            // Selection mode - show interactive dropdown
-            // The ComboBox provides:
-            // - Collapsible interface showing current selection
-            // - Expandable list of selectable options
-            // - Automatic selection state management
-            // - Keyboard navigation support
+            // Selection mode - show animated dropdown
             if !self.options.is_empty() && self.selected < self.options.len() {
-                egui::ComboBox::from_label(&self.label)
-                    .selected_text(&self.options[self.selected])
-                    .show_ui(ui, |ui| {
-                        // Render all options as selectable items
-                        for (i, option) in self.options.iter().enumerate() {
-                            ui.selectable_value(&mut self.selected, i, option);
-                        }
+                // Update animation
+                self.update_animation(ui.ctx());
+                
+                // Create dropdown header with current selection
+                ui.horizontal(|ui| {
+                    ui.label(&self.label);
+                    ui.separator();
+                    
+                    let button_text = format!("{} {}", 
+                        &self.options[self.selected],
+                        if self.expanded { "▲" } else { "▼" }
+                    );
+                    
+                    if ui.button(button_text).clicked() {
+                        self.target_expanded = !self.target_expanded;
+                        self.expanded = self.target_expanded;
+                    }
+                });
+                
+                // Animated dropdown content
+                if self.animation_progress > 0.0 {
+                    let available_rect = ui.available_rect_before_wrap();
+                    let max_height = 150.0; // Maximum dropdown height
+                    let content_height = max_height * self.animation_progress;
+                    
+                    // Create animated content area
+                    let content_rect = egui::Rect::from_min_size(
+                        available_rect.min,
+                        egui::Vec2::new(available_rect.width().min(200.0), content_height)
+                    );
+                    
+                    ui.allocate_ui_at_rect(content_rect, |ui| {
+                        // Clip content to animated height
+                        ui.set_clip_rect(content_rect);
+                        
+                        egui::Frame::popup(ui.style())
+                            .inner_margin(egui::Margin::symmetric(8.0, 4.0))
+                            .show(ui, |ui| {
+                                egui::ScrollArea::vertical()
+                                    .max_height(content_height)
+                                    .show(ui, |ui| {
+                                        // Render all options as selectable items
+                                        for (i, option) in self.options.iter().enumerate() {
+                                            let is_selected = i == self.selected;
+                                            let response = ui.selectable_label(is_selected, option);
+                                            
+                                            if response.clicked() {
+                                                self.selected = i;
+                                                self.target_expanded = false;
+                                                self.expanded = false;
+                                            }
+                                        }
+                                    });
+                            });
                     });
+                }
             } else {
                 // Fallback for invalid state - should not normally occur
                 ui.label(format!("Invalid dropdown state: {} options, selected {}", 

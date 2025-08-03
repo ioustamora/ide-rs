@@ -115,6 +115,12 @@ pub mod state;
 /// for viewing and editing generated code.
 pub mod code_editor;
 
+/// Advanced syntax highlighting using syntect
+/// 
+/// Provides high-quality syntax highlighting for multiple programming
+/// languages with theme support and token-level highlighting.
+pub mod syntax_highlighter;
+
 /// Rust Analyzer integration for language services
 /// 
 /// Integrates with the Rust language server to provide intelligent

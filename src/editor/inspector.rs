@@ -553,27 +553,23 @@ impl PropertyInspector {
         }
     }
     
-    /// Render a single property group with animated collapse
-    fn render_property_group(&mut self, ui: &mut Ui, component_id: usize, group_name: &str, properties: &[PropertyDefinition], animation_manager: &mut crate::ide_app::animated_ui::AnimationManager) {
-        use crate::ide_app::animated_ui::AnimatedCollapsing;
-        
+    /// Render a single property group with collapsible header
+    fn render_property_group(&mut self, ui: &mut Ui, component_id: usize, group_name: &str, properties: &[PropertyDefinition]) {
         let group = PropertyGroup::from_name(group_name);
         let group_id = egui::Id::new(format!("prop_group_{}", group_name));
         
-        AnimatedCollapsing::new(
-            group_id,
-            format!("{} {}", group.icon(), group.name()),
-            animation_manager
-        )
-        .default_open(true)
-        .show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 4.0; // Consistent spacing between properties
-            
-            for property in properties {
-                self.render_property_editor(ui, component_id, property);
-                ui.add_space(2.0); // Small space between properties
-            }
-        });
+        // Use basic egui collapsing header instead of animated version
+        egui::CollapsingHeader::new(format!("{} {}", group.icon(), group.name()))
+            .id_source(group_id)
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 4.0; // Consistent spacing between properties
+                
+                for property in properties {
+                    self.render_property_editor(ui, component_id, property);
+                    ui.add_space(2.0); // Small space between properties
+                }
+            });
         
         ui.add_space(4.0); // Space between groups
     }

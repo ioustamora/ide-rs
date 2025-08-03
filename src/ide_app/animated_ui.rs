@@ -117,7 +117,7 @@ impl<'a> AnimatedCollapsing<'a> {
         self
     }
     
-    pub fn show<R>(
+    pub fn show<R: Clone>(
         self,
         ui: &mut Ui,
         add_contents: impl FnOnce(&mut Ui) -> R,
@@ -213,10 +213,12 @@ impl<'a> AnimatedCollapsing<'a> {
             None
         };
         
+        let body_returned = body_response.as_ref().map(|r| r.inner.clone());
+        
         CollapsingResponse {
             header_response,
             body_response,
-            body_returned: body_response.map(|r| r.inner),
+            body_returned,
             openness: progress,
         }
     }
@@ -293,6 +295,7 @@ impl MoveAnimation {
 }
 
 /// Manager for component movement animations
+#[derive(Default)]
 pub struct MovementManager {
     /// Map of movement animations by component ID
     movements: HashMap<usize, MoveAnimation>,

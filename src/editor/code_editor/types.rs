@@ -1,6 +1,7 @@
 //! Shared types for code editor
 
 use std::collections::HashMap;
+use crate::editor::lsp_integration::{CompletionItem, Diagnostic};
 
 #[derive(Clone, Debug)]
 pub struct TextSelection {
@@ -19,6 +20,34 @@ pub struct FindReplaceState {
     pub use_regex: bool,
 }
 
+/// Autocomplete popup state
+#[derive(Default)]
+pub struct AutocompleteState {
+    pub visible: bool,
+    pub items: Vec<CompletionItem>,
+    pub selected_index: usize,
+    pub trigger_position: (usize, usize),
+    pub filter_text: String,
+    pub popup_rect: Option<eframe::egui::Rect>,
+}
+
+/// Inline diagnostics display
+#[derive(Default)]
+pub struct InlineDiagnostics {
+    pub diagnostics: Vec<Diagnostic>,
+    pub show_error_popup: bool,
+    pub hover_diagnostic: Option<Diagnostic>,
+    pub error_positions: HashMap<usize, Vec<Diagnostic>>, // line -> diagnostics
+}
+
+/// Code folding regions
+#[derive(Default)]
+pub struct CodeFolding {
+    pub regions: Vec<FoldableRegion>,
+    pub folded_lines: std::collections::HashSet<usize>,
+}
+
+/// Enhanced editor settings with modern IDE features
 pub struct EditorSettings {
     pub font_size: f32,
     pub tab_size: usize,
@@ -29,6 +58,12 @@ pub struct EditorSettings {
     pub current_theme: EditorTheme,
     pub minimap_width: f32,
     pub word_wrap: bool,
+    pub auto_save: bool,
+    pub show_whitespace: bool,
+    pub highlight_current_line: bool,
+    pub auto_indent: bool,
+    pub bracket_matching: bool,
+    pub code_folding: bool,
 }
 
 impl Default for EditorSettings {
@@ -43,6 +78,12 @@ impl Default for EditorSettings {
             current_theme: EditorTheme::default(),
             minimap_width: 120.0,
             word_wrap: false,
+            auto_save: false,
+            show_whitespace: false,
+            highlight_current_line: true,
+            auto_indent: true,
+            bracket_matching: true,
+            code_folding: true,
         }
     }
 }
@@ -157,17 +198,37 @@ pub enum EditOperationType {
     Replace,
 }
 
-/// Main code editor struct
+/// Main code editor struct with modern IDE features
 #[derive(Default)]
 pub struct CodeEditor {
+    /// The code content
     pub code: String,
+    /// Programming language
     pub language: String,
+    /// Current cursor position (line, column)
     pub cursor_pos: (usize, usize),
+    /// Current text selection
     pub selection: Option<TextSelection>,
+    /// Editor settings and preferences
     pub settings: EditorSettings,
+    /// Edit history for undo/redo
     pub history: EditHistory,
+    /// Find and replace state
     pub find_replace: FindReplaceState,
+    /// Folded regions
     pub folded_regions: HashMap<usize, bool>,
+    /// Autocomplete popup state
+    pub autocomplete: AutocompleteState,
+    /// Inline diagnostics
+    pub diagnostics: InlineDiagnostics,
+    /// Code folding state
+    pub code_folding: CodeFolding,
+    /// Last known file modification time
+    pub last_modified: Option<std::time::SystemTime>,
+    /// Dirty flag for unsaved changes
+    pub is_dirty: bool,
+    /// Scroll position
+    pub scroll_offset: (f32, f32),
 }
 
 impl CodeEditor {
@@ -181,6 +242,12 @@ impl CodeEditor {
             history: EditHistory::default(),
             find_replace: FindReplaceState::default(),
             folded_regions: HashMap::new(),
+            autocomplete: AutocompleteState::default(),
+            diagnostics: InlineDiagnostics::default(),
+            code_folding: CodeFolding::default(),
+            last_modified: None,
+            is_dirty: false,
+            scroll_offset: (0.0, 0.0),
         }
     }
 
@@ -204,24 +271,125 @@ impl CodeEditor {
     pub fn render_enhanced(
         &mut self,
         ui: &mut eframe::egui::Ui,
-        _lsp_client: &mut crate::editor::lsp_integration::LspClient,
+        lsp_client: &mut crate::editor::lsp_integration::LspClient,
         _output_panel: &mut crate::editor::output_panel::OutputPanel,
     ) {
-        // Basic code editor rendering
         ui.vertical(|ui| {
+            // Enhanced toolbar with LSP status
             ui.horizontal(|ui| {
-                ui.label(format!("Language: {}", self.language));
+                ui.label(format!("📄 {} ({})", 
+                    if self.is_dirty { "● Modified" } else { "✓ Saved" },
+                    self.language
+                ));
                 ui.separator();
-                ui.label(format!("Lines: {}", self.code.lines().count()));
+                
+                // LSP connection status
+                let lsp_status = if lsp_client.is_connected() {
+                    ui.colored_label(eframe::egui::Color32::GREEN, "🟢 LSP Connected");
+                } else {
+                    ui.colored_label(eframe::egui::Color32::RED, "🔴 LSP Disconnected");
+                };
+                
+                ui.separator();
+                
+                // Code actions
+                if ui.button("🔧 Complete").on_hover_text("Trigger Autocomplete (Ctrl+Space)").clicked() {
+                    self.trigger_autocomplete(lsp_client);
+                }
+                
+                if ui.button("💡 Hover").on_hover_text("Show Hover Info").clicked() {
+                    self.request_hover_info(lsp_client);
+                }
+                
+                if ui.button("🎯 Format").on_hover_text("Format Code").clicked() {
+                    // TODO: Implement code formatting
+                    self.mark_dirty();
+                }
             });
             ui.separator();
             
-            eframe::egui::ScrollArea::vertical()
-                .max_height(400.0)
-                .show(ui, |ui| {
-                    ui.text_edit_multiline(&mut self.code);
+            // Main editor area with enhanced features
+            self.render(ui);
+            
+            // Show diagnostics panel if there are any
+            if !self.diagnostics.diagnostics.is_empty() {
+                ui.separator();
+                ui.collapsing("🔍 Diagnostics", |ui| {
+                    self.render_diagnostics_panel(ui);
                 });
+            }
         });
+    }
+
+    /// Trigger autocomplete request from LSP
+    fn trigger_autocomplete(&mut self, lsp_client: &mut crate::editor::lsp_integration::LspClient) {
+        let (line, character) = self.cursor_pos;
+        let uri = format!("file://current_file.{}", self.language);
+        
+        // For now, show a simple placeholder autocomplete
+        // In a real implementation, we would handle the LSP callback properly
+        if lsp_client.is_connected() {
+            let placeholder_completions = vec![
+                crate::editor::lsp_integration::CompletionItem {
+                    label: "println!".to_string(),
+                    kind: Some(crate::editor::lsp_integration::CompletionItemKind::Function),
+                    detail: Some("Print to stdout".to_string()),
+                    documentation: Some("Prints to the standard output".to_string()),
+                    sort_text: None,
+                    filter_text: None,
+                    insert_text: Some("println!(\"{}\", );".to_string()),
+                    insert_text_format: None,
+                },
+                crate::editor::lsp_integration::CompletionItem {
+                    label: "String".to_string(),
+                    kind: Some(crate::editor::lsp_integration::CompletionItemKind::Class),
+                    detail: Some("String type".to_string()),
+                    documentation: Some("UTF-8 encoded string".to_string()),
+                    sort_text: None,
+                    filter_text: None,
+                    insert_text: Some("String::new()".to_string()),
+                    insert_text_format: None,
+                },
+            ];
+            self.show_autocomplete(placeholder_completions);
+        }
+    }
+
+    /// Request hover information from LSP
+    fn request_hover_info(&mut self, lsp_client: &mut crate::editor::lsp_integration::LspClient) {
+        let (_line, _character) = self.cursor_pos;
+        
+        // For now, show a simple placeholder hover
+        if lsp_client.is_connected() {
+            self.diagnostics.show_error_popup = true;
+        }
+    }
+
+    /// Render diagnostics panel
+    fn render_diagnostics_panel(&mut self, ui: &mut eframe::egui::Ui) {
+        eframe::egui::ScrollArea::vertical()
+            .max_height(150.0)
+            .show(ui, |ui| {
+                for diagnostic in &self.diagnostics.diagnostics {
+                    ui.horizontal(|ui| {
+                        let (icon, color) = match diagnostic.severity {
+                            Some(crate::editor::lsp_integration::DiagnosticSeverity::Error) => ("❌", eframe::egui::Color32::RED),
+                            Some(crate::editor::lsp_integration::DiagnosticSeverity::Warning) => ("⚠️", eframe::egui::Color32::YELLOW),
+                            Some(crate::editor::lsp_integration::DiagnosticSeverity::Information) => ("ℹ️", eframe::egui::Color32::BLUE),
+                            Some(crate::editor::lsp_integration::DiagnosticSeverity::Hint) => ("💡", eframe::egui::Color32::GRAY),
+                            None => ("•", eframe::egui::Color32::WHITE),
+                        };
+                        
+                        ui.colored_label(color, icon);
+                        ui.label(&diagnostic.message);
+                        ui.label(format!("Line {}", diagnostic.range.start.line + 1));
+                        
+                        if ui.small_button("🎯").on_hover_text("Go to error").clicked() {
+                            self.cursor_pos = (diagnostic.range.start.line as usize, diagnostic.range.start.character as usize);
+                        }
+                    });
+                }
+            });
     }
 
     /// Undo the last operation
@@ -277,6 +445,159 @@ impl CodeEditor {
         }
     }
 
+    /// Show autocomplete popup at current cursor position
+    pub fn show_autocomplete(&mut self, completions: Vec<CompletionItem>) {
+        self.autocomplete.visible = true;
+        self.autocomplete.items = completions;
+        self.autocomplete.selected_index = 0;
+        self.autocomplete.trigger_position = self.cursor_pos;
+        self.autocomplete.filter_text.clear();
+    }
+
+    /// Hide autocomplete popup
+    pub fn hide_autocomplete(&mut self) {
+        self.autocomplete.visible = false;
+        self.autocomplete.items.clear();
+        self.autocomplete.selected_index = 0;
+    }
+
+    /// Move autocomplete selection up
+    pub fn autocomplete_previous(&mut self) {
+        if self.autocomplete.visible && !self.autocomplete.items.is_empty() {
+            if self.autocomplete.selected_index > 0 {
+                self.autocomplete.selected_index -= 1;
+            } else {
+                self.autocomplete.selected_index = self.autocomplete.items.len() - 1;
+            }
+        }
+    }
+
+    /// Move autocomplete selection down
+    pub fn autocomplete_next(&mut self) {
+        if self.autocomplete.visible && !self.autocomplete.items.is_empty() {
+            if self.autocomplete.selected_index < self.autocomplete.items.len() - 1 {
+                self.autocomplete.selected_index += 1;
+            } else {
+                self.autocomplete.selected_index = 0;
+            }
+        }
+    }
+
+    /// Accept current autocomplete selection
+    pub fn autocomplete_accept(&mut self) {
+        if self.autocomplete.visible && !self.autocomplete.items.is_empty() {
+            let selected_index = self.autocomplete.selected_index;
+            let item = self.autocomplete.items[selected_index].clone();
+            
+            // Insert the completion text
+            if let Some(insert_text) = &item.insert_text {
+                self.insert_text_at_cursor(insert_text);
+                self.mark_dirty();
+            } else {
+                self.insert_text_at_cursor(&item.label);
+                self.mark_dirty();
+            }
+            
+            self.hide_autocomplete();
+        }
+    }
+
+    /// Insert text at current cursor position
+    pub fn insert_text_at_cursor(&mut self, text: &str) {
+        let lines: Vec<&str> = self.code.lines().collect();
+        let (line, col) = self.cursor_pos;
+        
+        if line < lines.len() {
+            let current_line = lines[line];
+            let (before, after) = current_line.split_at(col.min(current_line.len()));
+            let new_line = format!("{}{}{}", before, text, after);
+            
+            let mut new_lines = lines.clone();
+            new_lines[line] = &new_line;
+            self.code = new_lines.join("\n");
+            
+            // Update cursor position
+            self.cursor_pos.1 += text.len();
+        }
+    }
+
+    /// Update diagnostics from LSP
+    pub fn update_diagnostics(&mut self, diagnostics: Vec<Diagnostic>) {
+        self.diagnostics.diagnostics = diagnostics.clone();
+        self.diagnostics.error_positions.clear();
+        
+        // Group diagnostics by line
+        for diagnostic in diagnostics {
+            let line = diagnostic.range.start.line as usize;
+            self.diagnostics.error_positions
+                .entry(line)
+                .or_insert_with(Vec::new)
+                .push(diagnostic);
+        }
+    }
+
+    /// Mark editor as dirty (has unsaved changes)
+    pub fn mark_dirty(&mut self) {
+        self.is_dirty = true;
+    }
+
+    /// Mark editor as clean (saved)
+    pub fn mark_clean(&mut self) {
+        self.is_dirty = false;
+        self.last_modified = Some(std::time::SystemTime::now());
+    }
+
+    /// Toggle code folding for a region
+    pub fn toggle_fold(&mut self, line: usize) {
+        if let Some(region) = self.code_folding.regions.iter_mut().find(|r| r.start_line == line) {
+            region.is_folded = !region.is_folded;
+            if region.is_folded {
+                self.code_folding.folded_lines.insert(line);
+            } else {
+                self.code_folding.folded_lines.remove(&line);
+            }
+        }
+    }
+
+    /// Get word at cursor position for autocomplete
+    pub fn get_word_at_cursor(&self) -> String {
+        let lines: Vec<&str> = self.code.lines().collect();
+        let (line, col) = self.cursor_pos;
+        
+        if line < lines.len() {
+            let current_line = lines[line];
+            let bytes = current_line.as_bytes();
+            
+            // Find word boundaries
+            let mut start = col;
+            let mut end = col;
+            
+            // Move backward to find start of word
+            while start > 0 && Self::is_word_char(bytes[start - 1]) {
+                start -= 1;
+            }
+            
+            // Move forward to find end of word
+            while end < bytes.len() && Self::is_word_char(bytes[end]) {
+                end += 1;
+            }
+            
+            if start < end {
+                return current_line[start..end].to_string();
+            }
+        }
+        
+        String::new()
+    }
+
+    /// Check if character is part of a word (alphanumeric or underscore)
+    fn is_word_char(c: u8) -> bool {
+        (c >= b'a' && c <= b'z') ||
+        (c >= b'A' && c <= b'Z') ||
+        (c >= b'0' && c <= b'9') ||
+        c == b'_'
+    }
+
     /// Render the code editor with advanced features
     pub fn render(&mut self, ui: &mut eframe::egui::Ui) {
         ui.vertical(|ui| {
@@ -316,16 +637,8 @@ impl CodeEditor {
                                 eframe::egui::ScrollArea::both()
                                     .auto_shrink([false, false])
                                     .show(ui, |ui| {
-                                        if self.language == "rust" {
-                                            self.render_rust_syntax_highlighted(ui);
-                                        } else {
-                                            // Apply theme to simple editor
-                                            let text_edit = eframe::egui::TextEdit::multiline(&mut self.code)
-                                                .font(eframe::egui::TextStyle::Monospace)
-                                                .text_color(self.settings.current_theme.text)
-                                                .desired_width(f32::INFINITY);
-                                            ui.add(text_edit);
-                                        }
+                                        // Use enhanced syntax highlighting for all languages
+                                        self.render_enhanced_syntax_highlighted(ui);
                                     });
                             }
                         );
@@ -341,6 +654,16 @@ impl CodeEditor {
             
             // Status bar
             self.render_status_bar(ui);
+            
+            // Render autocomplete popup overlay
+            if self.autocomplete.visible {
+                self.render_autocomplete_popup(ui);
+            }
+            
+            // Render diagnostics popup overlay
+            if self.settings.show_inline_diagnostics && self.diagnostics.show_error_popup {
+                self.render_diagnostics_popup(ui);
+            }
         });
     }
     
@@ -369,6 +692,15 @@ impl CodeEditor {
             ui.checkbox(&mut self.settings.show_minimap, "Minimap");
             ui.checkbox(&mut self.settings.auto_complete, "Auto Complete");
             ui.checkbox(&mut self.settings.word_wrap, "Word Wrap");
+            
+            ui.separator();
+            
+            // Modern editor features
+            ui.checkbox(&mut self.settings.show_whitespace, "Whitespace");
+            ui.checkbox(&mut self.settings.highlight_current_line, "Highlight Line");
+            ui.checkbox(&mut self.settings.auto_indent, "Auto Indent");
+            ui.checkbox(&mut self.settings.bracket_matching, "Bracket Match");
+            ui.checkbox(&mut self.settings.code_folding, "Code Folding");
             
             ui.separator();
             
@@ -475,24 +807,84 @@ impl CodeEditor {
         );
     }
     
-    /// Render code with syntax highlighting for Rust
-    fn render_rust_syntax_highlighted(&mut self, ui: &mut eframe::egui::Ui) {
-        // Create a text editor with theme colors
-        let text_edit = eframe::egui::TextEdit::multiline(&mut self.code)
-            .font(eframe::egui::TextStyle::Monospace)
-            .text_color(self.settings.current_theme.text)
-            .desired_width(f32::INFINITY)
-            .desired_rows(20);
-            
-        let response = ui.add(text_edit);
+    /// Render code with enhanced syntect-based syntax highlighting
+    fn render_enhanced_syntax_highlighted(&mut self, ui: &mut eframe::egui::Ui) {
+        use crate::editor::syntax_highlighter::SyntaxHighlighter;
         
-        // If code changed, we could update syntax highlighting here
-        if response.changed() {
-            // Code was modified - we could trigger re-parsing here
-        }
+        // Create syntax highlighter based on current theme
+        let theme_name = match self.settings.current_theme.name.as_str() {
+            "Dark" => "base16-ocean.dark",
+            "Light" => "InspiredGitHub", 
+            "Monokai" => "Monokai",
+            _ => "base16-ocean.dark",
+        };
         
-        // For now, use simpler highlighting approach since the overlay approach has borrowing issues
-        // In the future, we could implement proper syntax highlighting using syntect crate
+        let highlighter = SyntaxHighlighter::new(theme_name);
+        
+        eframe::egui::ScrollArea::both()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                let available_rect = ui.available_rect_before_wrap();
+                let font_id = eframe::egui::FontId::monospace(self.settings.font_size);
+                let line_height = ui.fonts(|fonts| fonts.row_height(&font_id));
+                
+                let lines: Vec<&str> = self.code.lines().collect();
+                let visible_lines = (available_rect.height() / line_height).ceil() as usize + 2;
+                let start_line = (self.scroll_offset.1 / line_height) as usize;
+                let end_line = (start_line + visible_lines).min(lines.len());
+                
+                for (line_index, line) in lines.iter().enumerate().skip(start_line).take(end_line - start_line) {
+                    let highlighted = highlighter.highlight_line(line, &self.language);
+                    
+                    ui.horizontal(|ui| {
+                        // Current line highlighting
+                        if self.settings.highlight_current_line && line_index == self.cursor_pos.0 {
+                            let line_rect = ui.available_rect_before_wrap();
+                            ui.painter().rect_filled(
+                                line_rect,
+                                0.0,
+                                self.settings.current_theme.current_line,
+                            );
+                        }
+                        
+                        // Render highlighted text
+                        let mut pos = 0.0;
+                        for (text, color) in highlighted {
+                            let text_galley = ui.fonts(|fonts| {
+                                fonts.layout_no_wrap(text, font_id.clone(), color)
+                            });
+                            
+                            let text_rect = eframe::egui::Rect::from_min_size(
+                                ui.next_widget_position() + eframe::egui::Vec2::new(pos, 0.0),
+                                text_galley.size(),
+                            );
+                            
+                            ui.painter().galley(text_rect.min, text_galley, eframe::egui::Color32::TRANSPARENT);
+                            pos += text_galley.size().x;
+                        }
+                        
+                        // Add diagnostic indicators
+                        if let Some(diagnostics) = self.diagnostics.error_positions.get(&line_index) {
+                            for diagnostic in diagnostics {
+                                let icon = match diagnostic.severity {
+                                    Some(crate::editor::lsp_integration::DiagnosticSeverity::Error) => "❌",
+                                    Some(crate::editor::lsp_integration::DiagnosticSeverity::Warning) => "⚠️",
+                                    _ => "💡",
+                                };
+                                
+                                let icon_pos = ui.next_widget_position() + eframe::egui::Vec2::new(pos + 10.0, 0.0);
+                                ui.painter().text(
+                                    icon_pos,
+                                    eframe::egui::Align2::LEFT_TOP,
+                                    icon,
+                                    eframe::egui::FontId::default(),
+                                    eframe::egui::Color32::RED,
+                                );
+                            }
+                        }
+                    });
+                }
+            });
     }
     
     /// Render syntax highlighting overlay
@@ -637,7 +1029,155 @@ impl CodeEditor {
             ui.label(format!("Characters: {}", self.code.len()));
             ui.separator();
             ui.label(format!("Cursor: {}:{}", self.cursor_pos.0, self.cursor_pos.1));
+            ui.separator();
+            
+            // Show dirty indicator
+            if self.is_dirty {
+                ui.colored_label(eframe::egui::Color32::YELLOW, "●");
+            } else {
+                ui.colored_label(eframe::egui::Color32::GREEN, "●");
+            }
+            
+            // Show diagnostics count
+            if !self.diagnostics.diagnostics.is_empty() {
+                let error_count = self.diagnostics.diagnostics.iter()
+                    .filter(|d| matches!(d.severity, Some(crate::editor::lsp_integration::DiagnosticSeverity::Error)))
+                    .count();
+                let warning_count = self.diagnostics.diagnostics.iter()
+                    .filter(|d| matches!(d.severity, Some(crate::editor::lsp_integration::DiagnosticSeverity::Warning)))
+                    .count();
+                    
+                if error_count > 0 {
+                    ui.colored_label(eframe::egui::Color32::RED, format!("❌ {}", error_count));
+                }
+                if warning_count > 0 {
+                    ui.colored_label(eframe::egui::Color32::YELLOW, format!("⚠️ {}", warning_count));
+                }
+            }
         });
+    }
+
+    /// Render autocomplete popup overlay
+    fn render_autocomplete_popup(&mut self, ui: &mut eframe::egui::Ui) {
+        if self.autocomplete.items.is_empty() {
+            return;
+        }
+
+        // Calculate popup position (simplified)
+        let popup_pos = ui.next_widget_position() + eframe::egui::Vec2::new(200.0, 100.0);
+        
+        eframe::egui::Area::new("autocomplete_popup".into())
+            .fixed_pos(popup_pos)
+            .order(eframe::egui::Order::Foreground)
+            .show(ui.ctx(), |ui| {
+                eframe::egui::Frame::popup(ui.style())
+                    .inner_margin(4.0)
+                    .show(ui, |ui| {
+                        ui.set_max_width(300.0);
+                        ui.set_max_height(200.0);
+                        
+                        ui.heading("🔧 Autocomplete");
+                        ui.separator();
+                        
+                        eframe::egui::ScrollArea::vertical()
+                            .max_height(150.0)
+                            .show(ui, |ui| {
+                                for (i, item) in self.autocomplete.items.iter().enumerate() {
+                                    let is_selected = i == self.autocomplete.selected_index;
+                                    
+                                    let color = if is_selected {
+                                        ui.visuals().selection.bg_fill
+                                    } else {
+                                        eframe::egui::Color32::TRANSPARENT
+                                    };
+                                    
+                                    let frame = eframe::egui::Frame::none()
+                                        .fill(color)
+                                        .inner_margin(2.0);
+                                        
+                                    let response = frame.show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            // Kind icon
+                                            let icon = match &item.kind {
+                                                Some(crate::editor::lsp_integration::CompletionItemKind::Function) => "🔧",
+                                                Some(crate::editor::lsp_integration::CompletionItemKind::Variable) => "📦",
+                                                Some(crate::editor::lsp_integration::CompletionItemKind::Class) => "🏗️",
+                                                Some(crate::editor::lsp_integration::CompletionItemKind::Method) => "⚙️",
+                                                Some(crate::editor::lsp_integration::CompletionItemKind::Keyword) => "🔑",
+                                                _ => "📄",
+                                            };
+                                            ui.label(icon);
+                                            
+                                            ui.vertical(|ui| {
+                                                ui.label(&item.label);
+                                                if let Some(detail) = &item.detail {
+                                                    ui.small(detail);
+                                                }
+                                            });
+                                        });
+                                    });
+                                    
+                                    if response.response.clicked() {
+                                        self.autocomplete.selected_index = i;
+                                        // Accept completion on click
+                                        let item = self.autocomplete.items[i].clone();
+                                        if let Some(insert_text) = &item.insert_text {
+                                            self.insert_text_at_cursor(insert_text);
+                                        } else {
+                                            self.insert_text_at_cursor(&item.label);
+                                        }
+                                        self.hide_autocomplete();
+                                        self.mark_dirty();
+                                    }
+                                }
+                            });
+                        
+                        ui.separator();
+                        ui.small("Use ↑↓ to navigate, Enter to accept, Esc to cancel");
+                    });
+            });
+    }
+
+    /// Render diagnostics popup overlay
+    fn render_diagnostics_popup(&mut self, ui: &mut eframe::egui::Ui) {
+        if let Some(diagnostic) = &self.diagnostics.hover_diagnostic.clone() {
+            let popup_pos = ui.next_widget_position() + eframe::egui::Vec2::new(250.0, 50.0);
+            
+            eframe::egui::Area::new("diagnostics_popup".into())
+                .fixed_pos(popup_pos)
+                .order(eframe::egui::Order::Foreground)
+                .show(ui.ctx(), |ui| {
+                    eframe::egui::Frame::popup(ui.style())
+                        .inner_margin(8.0)
+                        .show(ui, |ui| {
+                            ui.set_max_width(400.0);
+                            
+                            let (icon, color) = match diagnostic.severity {
+                                Some(crate::editor::lsp_integration::DiagnosticSeverity::Error) => ("❌", eframe::egui::Color32::RED),
+                                Some(crate::editor::lsp_integration::DiagnosticSeverity::Warning) => ("⚠️", eframe::egui::Color32::YELLOW),
+                                Some(crate::editor::lsp_integration::DiagnosticSeverity::Information) => ("ℹ️", eframe::egui::Color32::BLUE),
+                                Some(crate::editor::lsp_integration::DiagnosticSeverity::Hint) => ("💡", eframe::egui::Color32::GRAY),
+                                None => ("•", eframe::egui::Color32::WHITE),
+                            };
+                            
+                            ui.horizontal(|ui| {
+                                ui.colored_label(color, icon);
+                                ui.colored_label(color, "Diagnostic");
+                            });
+                            ui.separator();
+                            
+                            ui.label(&diagnostic.message);
+                            
+                            if let Some(source) = &diagnostic.source {
+                                ui.small(format!("Source: {}", source));
+                            }
+                            
+                            if let Some(code) = &diagnostic.code {
+                                ui.small(format!("Code: {}", code));
+                            }
+                        });
+                });
+        }
     }
 }
 
