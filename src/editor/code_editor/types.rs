@@ -286,12 +286,16 @@ impl CodeEditor {
             
             // Main editor area with line numbers, code, and minimap
             ui.horizontal(|ui| {
-                // Apply theme background
+                // Apply theme background and styling
                 let frame = eframe::egui::Frame::none()
                     .fill(self.settings.current_theme.background)
-                    .inner_margin(eframe::egui::Margin::same(0.0));
+                    .stroke(eframe::egui::Stroke::new(1.0, self.settings.current_theme.line_number))
+                    .inner_margin(eframe::egui::Margin::same(4.0));
                 
                 frame.show(ui, |ui| {
+                    // Override UI style with theme colors
+                    ui.style_mut().visuals.extreme_bg_color = self.settings.current_theme.background;
+                    ui.style_mut().visuals.override_text_color = Some(self.settings.current_theme.text);
                     ui.horizontal(|ui| {
                         // Line numbers column
                         if self.settings.show_line_numbers {
@@ -313,10 +317,14 @@ impl CodeEditor {
                                     .auto_shrink([false, false])
                                     .show(ui, |ui| {
                                         if self.language == "rust" {
-                                            self.render_with_syntax_highlighting(ui);
+                                            self.render_rust_syntax_highlighted(ui);
                                         } else {
-                                            // Fallback to simple editor
-                                            ui.text_edit_multiline(&mut self.code);
+                                            // Apply theme to simple editor
+                                            let text_edit = eframe::egui::TextEdit::multiline(&mut self.code)
+                                                .font(eframe::egui::TextStyle::Monospace)
+                                                .text_color(self.settings.current_theme.text)
+                                                .desired_width(f32::INFINITY);
+                                            ui.add(text_edit);
                                         }
                                     });
                             }
@@ -442,7 +450,7 @@ impl CodeEditor {
                     eframe::egui::ScrollArea::vertical()
                         .max_height(available_height - 40.0)
                         .show(ui, |ui| {
-                            for (i, line) in lines.iter().enumerate().take(lines_to_show) {
+                            for (_i, line) in lines.iter().enumerate().take(lines_to_show) {
                                 let preview = if line.len() > 20 {
                                     format!("{}...", &line[..17])
                                 } else {
@@ -467,23 +475,94 @@ impl CodeEditor {
         );
     }
     
-    /// Render code with basic syntax highlighting for Rust
-    fn render_with_syntax_highlighting(&mut self, ui: &mut eframe::egui::Ui) {
-        let mut job = eframe::egui::text::LayoutJob::default();
+    /// Render code with syntax highlighting for Rust
+    fn render_rust_syntax_highlighted(&mut self, ui: &mut eframe::egui::Ui) {
+        // Create a text editor with theme colors
+        let text_edit = eframe::egui::TextEdit::multiline(&mut self.code)
+            .font(eframe::egui::TextStyle::Monospace)
+            .text_color(self.settings.current_theme.text)
+            .desired_width(f32::INFINITY)
+            .desired_rows(20);
+            
+        let response = ui.add(text_edit);
         
-        for line in self.code.lines() {
-            self.highlight_rust_line(line, &mut job);
-            job.append("\n", 0.0, eframe::egui::TextFormat::default());
+        // If code changed, we could update syntax highlighting here
+        if response.changed() {
+            // Code was modified - we could trigger re-parsing here
         }
         
-        // Create a text edit that preserves formatting
-        ui.add(eframe::egui::TextEdit::multiline(&mut self.code)
-            .font(eframe::egui::TextStyle::Monospace)
-            .desired_width(f32::INFINITY)
-            .desired_rows(20));
+        // For now, use simpler highlighting approach since the overlay approach has borrowing issues
+        // In the future, we could implement proper syntax highlighting using syntect crate
     }
     
-    /// Simple Rust syntax highlighting
+    /// Render syntax highlighting overlay
+    fn render_syntax_overlay(&self, ui: &mut eframe::egui::Ui, lines: &[&str], rect: eframe::egui::Rect) {
+        let line_height = ui.text_style_height(&eframe::egui::TextStyle::Monospace);
+        let theme = &self.settings.current_theme;
+        
+        for (line_idx, line) in lines.iter().enumerate() {
+            let y_offset = line_idx as f32 * line_height;
+            let line_rect = eframe::egui::Rect::from_min_size(
+                rect.min + eframe::egui::Vec2::new(0.0, y_offset),
+                eframe::egui::Vec2::new(rect.width(), line_height)
+            );
+            
+            // Highlight keywords, strings, etc.
+            self.highlight_line_tokens(ui, line, line_rect, theme);
+        }
+    }
+    
+    /// Highlight tokens in a line
+    fn highlight_line_tokens(&self, ui: &mut eframe::egui::Ui, line: &str, rect: eframe::egui::Rect, theme: &EditorTheme) {
+        let keywords = ["fn", "let", "mut", "if", "else", "for", "while", "loop", "match", "struct", "enum", "impl", "pub", "use", "mod", "return", "const", "static"];
+        let types = ["String", "i32", "i64", "f32", "f64", "bool", "char", "Vec", "Option", "Result", "usize", "isize"];
+        
+        // Simple token-based highlighting
+        let _char_pos = 0.0;
+        let char_width = ui.fonts(|fonts| fonts.glyph_width(&eframe::egui::TextStyle::Monospace.resolve(ui.style()), ' '));
+        
+        let words: Vec<&str> = line.split_whitespace().collect();
+        let mut line_pos = 0;
+        
+        for word in words {
+            // Find word position in line
+            if let Some(word_start) = line[line_pos..].find(word) {
+                line_pos += word_start;
+                
+                let color = if keywords.contains(&word) {
+                    theme.keyword
+                } else if types.contains(&word) {
+                    theme.type_name
+                } else if word.starts_with("//") {
+                    theme.comment
+                } else if word.starts_with('"') && word.ends_with('"') {
+                    theme.string
+                } else if word.chars().all(|c| c.is_numeric() || c == '.') {
+                    theme.number
+                } else {
+                    continue; // Use default text color
+                };
+                
+                let word_rect = eframe::egui::Rect::from_min_size(
+                    rect.min + eframe::egui::Vec2::new(line_pos as f32 * char_width, 0.0),
+                    eframe::egui::Vec2::new(word.len() as f32 * char_width, rect.height())
+                );
+                
+                // Draw colored text overlay
+                ui.painter().text(
+                    word_rect.min,
+                    eframe::egui::Align2::LEFT_TOP,
+                    word,
+                    eframe::egui::FontId::monospace(14.0),
+                    color
+                );
+                
+                line_pos += word.len();
+            }
+        }
+    }
+
+    /// Simple Rust syntax highlighting (legacy method)
     fn highlight_rust_line(&self, line: &str, job: &mut eframe::egui::text::LayoutJob) {
         let keywords = ["fn", "let", "mut", "if", "else", "for", "while", "loop", "match", "struct", "enum", "impl", "pub", "use", "mod"];
         let types = ["String", "i32", "i64", "f32", "f64", "bool", "char", "Vec", "Option", "Result"];

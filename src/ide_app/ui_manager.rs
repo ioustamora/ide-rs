@@ -165,8 +165,8 @@ impl UiManager {
     }
     
     /// Render palette components with drag and drop support
-    fn render_palette_components(_app_state: &mut IdeAppState, ui: &mut egui::Ui) {
-        use super::drag_drop::ComponentType;
+    fn render_palette_components(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
+        use super::drag_drop::{ComponentType, DragType};
         
         let component_types = [
             ComponentType::Button,
@@ -185,9 +185,15 @@ impl UiManager {
         for component_type in &component_types {
             ui.horizontal(|ui| {
                 ui.label(component_type.icon());
-                if ui.button(component_type.display_name()).clicked() {
-                    // Start drag operation for this component type
-                    // TODO: Integrate with drag system
+                let button = ui.button(component_type.display_name());
+                
+                // Handle drag start from palette
+                if button.drag_started() {
+                    let drag_type = DragType::ComponentFromPalette(*component_type);
+                    app_state.visual_designer.drag_state.start_drag(drag_type, button.rect.center());
+                } else if button.clicked() {
+                    // Add component directly on click
+                    Self::add_component_to_form(app_state, *component_type, egui::Pos2::new(100.0, 100.0));
                 }
             });
         }
@@ -391,5 +397,38 @@ impl UiManager {
         
         // Smart AI assistant integration
         app_state.smart_ai.render_ai_panel(ui);
+    }
+    
+    /// Add a new component to the form
+    fn add_component_to_form(app_state: &mut IdeAppState, component_type: super::drag_drop::ComponentType, position: egui::Pos2) {
+        use crate::rcl::ui::component::Component;
+        
+        let component: Box<dyn Component> = match component_type {
+            super::drag_drop::ComponentType::Button => {
+                Box::new(crate::rcl::ui::basic::button::Button::new("Button".to_string()))
+            }
+            super::drag_drop::ComponentType::Label => {
+                Box::new(crate::rcl::ui::basic::label::Label::new("Label".to_string()))
+            }
+            super::drag_drop::ComponentType::TextBox => {
+                Box::new(crate::rcl::ui::basic::textbox::TextBox::new("".to_string()))
+            }
+            super::drag_drop::ComponentType::Checkbox => {
+                Box::new(crate::rcl::ui::basic::checkbox::Checkbox::new("Checkbox".to_string(), false))
+            }
+            super::drag_drop::ComponentType::Slider => {
+                Box::new(crate::rcl::ui::basic::slider::Slider::new(0.0, 0.0, 100.0))
+            }
+            _ => {
+                // Default to button for unsupported types
+                Box::new(crate::rcl::ui::basic::button::Button::new("New Component".to_string()))
+            }
+        };
+        
+        let component_idx = app_state.components.len();
+        app_state.components.push(component);
+        
+        // Set the layout position using the visual designer
+        app_state.visual_designer.layout.positions.insert(component_idx, position);
     }
 }

@@ -4,6 +4,8 @@
 //! The IDE features a visual drag-and-drop GUI builder, integrated AI assistance,
 //! and a comprehensive Rust Component Library (RCL).
 
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod rcl;      // Rust Component Library - UI, system, and network components
 mod ai_agent; // AI integration for code assistance and automation  
 mod ide_app;  // Main IDE application logic and UI

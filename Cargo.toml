@@ -3,6 +3,13 @@ name = "ide-rs"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "ide-rs"
+path = "src/main.rs"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "consoleapi"] }
+
 
 [dependencies]
 eframe = "0.27"

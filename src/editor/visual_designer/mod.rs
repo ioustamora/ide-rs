@@ -56,6 +56,8 @@ pub struct VisualDesigner {
     pub smart_editing: SmartEditingSystem,
     /// Accessibility validator
     pub accessibility: AccessibilityValidator,
+    /// Drag and drop state
+    pub drag_state: crate::ide_app::drag_drop::DragState,
 }
 
 impl VisualDesigner {
@@ -198,6 +200,9 @@ impl VisualDesigner {
                 }
             }
         }
+        
+        // Handle drag and drop operations
+        self.handle_drag_and_drop(ui, form_rect, components);
         
         // Draw guides
         let canvas_rect = egui::Rect::from_min_size(ui.cursor().left_top(), canvas_size);
@@ -383,5 +388,155 @@ impl VisualDesigner {
             painter.rect_filled(handle_rect, 0.0, handle_color);
             painter.rect_stroke(handle_rect, 0.0, egui::Stroke::new(1.0, egui::Color32::WHITE));
         }
+    }
+    
+    /// Handle drag and drop operations
+    fn handle_drag_and_drop(
+        &mut self, 
+        ui: &mut egui::Ui, 
+        form_rect: egui::Rect,
+        components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>
+    ) {
+        use crate::ide_app::drag_drop::{DragType, ComponentType};
+        
+        // Update drag position if dragging
+        if self.drag_state.is_dragging {
+            if let Some(pointer_pos) = ui.ctx().pointer_latest_pos() {
+                self.drag_state.update_drag_position(pointer_pos);
+                
+                // Check if drop is valid (over the form)
+                self.drag_state.drop_valid = form_rect.contains(pointer_pos);
+                
+                // Draw drag preview
+                if let Some(preview_pos) = self.drag_state.preview_position {
+                    self.draw_drag_preview(ui, preview_pos);
+                }
+            }
+            
+            // Check for drag end (mouse released)
+            if ui.input(|i| i.pointer.any_released()) {
+                if let Some(completion) = self.drag_state.end_drag() {
+                    self.complete_drag_operation(completion, form_rect, components);
+                }
+            }
+            
+            // Check for drag cancel (ESC key)
+            if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                self.drag_state.cancel_drag();
+            }
+        }
+    }
+    
+    /// Draw drag preview
+    fn draw_drag_preview(&self, ui: &mut egui::Ui, position: egui::Pos2) {
+        use crate::ide_app::drag_drop::DragType;
+        
+        let painter = ui.painter();
+        let preview_size = egui::Vec2::new(80.0, 30.0); // Default preview size
+        let preview_rect = egui::Rect::from_center_size(position, preview_size);
+        
+        // Draw preview based on drag type
+        match self.drag_state.drag_type {
+            DragType::ComponentFromPalette(component_type) => {
+                // Draw preview of the component being dragged
+                let color = if self.drag_state.drop_valid {
+                    egui::Color32::from_rgba_premultiplied(0, 255, 0, 100) // Green for valid drop
+                } else {
+                    egui::Color32::from_rgba_premultiplied(255, 0, 0, 100) // Red for invalid drop
+                };
+                
+                painter.rect_filled(preview_rect, 5.0, color);
+                painter.rect_stroke(preview_rect, 5.0, egui::Stroke::new(2.0, egui::Color32::WHITE));
+                
+                // Draw component type icon
+                painter.text(
+                    preview_rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    component_type.icon(),
+                    egui::FontId::proportional(16.0),
+                    egui::Color32::WHITE
+                );
+            }
+            _ => {
+                // Default preview for other drag types
+                painter.rect_filled(preview_rect, 5.0, egui::Color32::from_rgba_premultiplied(100, 100, 255, 100));
+            }
+        }
+    }
+    
+    /// Complete a drag operation
+    fn complete_drag_operation(
+        &mut self,
+        completion: crate::ide_app::drag_drop::DragCompletionResult,
+        form_rect: egui::Rect,
+        components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>
+    ) {
+        use crate::ide_app::drag_drop::{DragType, ComponentType};
+        use crate::rcl::ui::component::Component;
+        
+        match completion.drag_type {
+            DragType::ComponentFromPalette(component_type) => {
+                if let Some(drop_pos) = completion.preview_position {
+                    if form_rect.contains(drop_pos) {
+                        // Convert screen position to form-relative position
+                        let relative_pos = drop_pos - form_rect.min.to_vec2();
+                        
+                        // Create and add the new component
+                        self.create_and_add_component(component_type, egui::Pos2::new(relative_pos.x, relative_pos.y), components);
+                    }
+                }
+            }
+            DragType::ComponentMove => {
+                // Component movement is already handled in the main render loop
+                // This is just for cleanup
+            }
+            _ => {
+                // Handle other drag types as needed
+            }
+        }
+    }
+    
+    /// Create and add a new component
+    fn create_and_add_component(
+        &mut self,
+        component_type: crate::ide_app::drag_drop::ComponentType,
+        position: egui::Pos2,
+        components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>
+    ) {
+        use crate::rcl::ui::component::Component;
+        use crate::ide_app::drag_drop::ComponentType;
+        
+        let component: Box<dyn Component> = match component_type {
+            ComponentType::Button => {
+                Box::new(crate::rcl::ui::basic::button::Button::new("Button".to_string()))
+            }
+            ComponentType::Label => {
+                Box::new(crate::rcl::ui::basic::label::Label::new("Label".to_string()))
+            }
+            ComponentType::TextBox => {
+                Box::new(crate::rcl::ui::basic::textbox::TextBox::new("".to_string()))
+            }
+            ComponentType::Checkbox => {
+                Box::new(crate::rcl::ui::basic::checkbox::Checkbox::new("Checkbox".to_string(), false))
+            }
+            ComponentType::Slider => {
+                Box::new(crate::rcl::ui::basic::slider::Slider::new(0.0, 0.0, 100.0))
+            }
+            _ => {
+                // Default to button for unsupported types
+                Box::new(crate::rcl::ui::basic::button::Button::new("New Component".to_string()))
+            }
+        };
+        
+        let component_idx = components.len();
+        components.push(component);
+        
+        // Set the layout position for the new component
+        self.layout.positions.insert(component_idx, position);
+        
+        // Select the new component
+        self.selection.selected.clear();
+        self.selection.selected.insert(component_idx);
+        self.selection.primary = Some(component_idx);
     }
 }
