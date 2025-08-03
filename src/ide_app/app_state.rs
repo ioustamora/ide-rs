@@ -113,6 +113,10 @@ pub struct IdeAppState {
     pub show_project_panel: bool,
     /// Modern IDE features panel visibility (right panel).
     pub show_modern_ide_panel: bool,
+    /// Active tab in left panel
+    pub active_left_tab: String,
+    /// Active tab in right panel
+    pub active_right_tab: String,
     
     // ========================================================================================
     // SELECTION AND INTERACTION SYSTEM - Manages component selection and manipulation
@@ -261,6 +265,8 @@ impl IdeAppState {
             project_manager: ProjectManager::new(),
             show_project_panel: true,
             show_modern_ide_panel: false,
+            active_left_tab: "project".to_string(),
+            active_right_tab: "properties".to_string(),
             property_inspector: PropertyInspector::new(),
             live_feedback: LiveFeedbackSystem::new(),
             hierarchy_manager: HierarchyManager::new(),

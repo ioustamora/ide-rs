@@ -90,22 +90,85 @@ pub fn get_actions() -> &'static mut ActionManager {
 // Build actions
 pub fn build_debug(output_panel: &mut OutputPanel) {
     output_panel.log("🔨 Building debug version...");
-    output_panel.log("✅ Debug build completed");
+    
+    match execute_cargo_command(&["build"], output_panel) {
+        Ok(_) => output_panel.log("✅ Debug build completed successfully"),
+        Err(e) => output_panel.log(&format!("❌ Build failed: {}", e)),
+    }
 }
 
 pub fn build_release(output_panel: &mut OutputPanel) {
     output_panel.log("🔨 Building release version...");
-    output_panel.log("✅ Release build completed");
+    
+    match execute_cargo_command(&["build", "--release"], output_panel) {
+        Ok(_) => output_panel.log("✅ Release build completed successfully"),
+        Err(e) => output_panel.log(&format!("❌ Build failed: {}", e)),
+    }
 }
 
 pub fn run_debug(output_panel: &mut OutputPanel) {
     output_panel.log("🚀 Running debug version...");
-    output_panel.log("✅ Application started");
+    
+    match execute_cargo_command(&["run"], output_panel) {
+        Ok(_) => output_panel.log("✅ Application started"),
+        Err(e) => output_panel.log(&format!("❌ Run failed: {}", e)),
+    }
 }
 
 pub fn run_release(output_panel: &mut OutputPanel) {
     output_panel.log("🚀 Running release version...");
-    output_panel.log("✅ Application started");
+    
+    match execute_cargo_command(&["run", "--release"], output_panel) {
+        Ok(_) => output_panel.log("✅ Application started"),
+        Err(e) => output_panel.log(&format!("❌ Run failed: {}", e)),
+    }
+}
+
+/// Execute a cargo command and capture output
+fn execute_cargo_command(args: &[&str], output_panel: &mut OutputPanel) -> Result<(), String> {
+    use std::process::Command;
+    
+    let mut cmd = Command::new("cargo");
+    cmd.args(args);
+    
+    output_panel.log(&format!("Executing: cargo {}", args.join(" ")));
+    
+    match cmd.output() {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            
+            if !stdout.is_empty() {
+                for line in stdout.lines() {
+                    output_panel.log(line);
+                }
+            }
+            
+            if !stderr.is_empty() {
+                for line in stderr.lines() {
+                    if line.trim().starts_with("warning:") {
+                        output_panel.log(&format!("⚠️ {}", line));
+                    } else if line.trim().starts_with("error:") {
+                        output_panel.log(&format!("❌ {}", line));
+                    } else {
+                        output_panel.log(line);
+                    }
+                }
+            }
+            
+            if output.status.success() {
+                Ok(())
+            } else {
+                Err(format!("Command failed with exit code: {}", 
+                    output.status.code().unwrap_or(-1)))
+            }
+        }
+        Err(e) => {
+            let error_msg = format!("Failed to execute cargo: {}", e);
+            output_panel.log(&format!("❌ {}", error_msg));
+            Err(error_msg)
+        }
+    }
 }
 
 // Component packaging actions

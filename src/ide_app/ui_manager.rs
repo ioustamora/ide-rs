@@ -105,26 +105,21 @@ impl UiManager {
     
     /// Render the tabs in the left panel
     fn render_left_panel_tabs(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
-        // Determine active tab priorities
-        let mut active_tab = "project";
-        if app_state.show_component_palette { active_tab = "palette"; }
-        if app_state.hierarchy_manager.show_hierarchy_panel { active_tab = "hierarchy"; }
-        
         // Tab headers
         ui.horizontal(|ui| {
             if app_state.show_project_panel {
-                if ui.selectable_label(active_tab == "project", "📁 Project").clicked() {
-                    active_tab = "project";
+                if ui.selectable_label(app_state.active_left_tab == "project", "📁 Project").clicked() {
+                    app_state.active_left_tab = "project".to_string();
                 }
             }
             if app_state.show_component_palette {
-                if ui.selectable_label(active_tab == "palette", "🧰 Components").clicked() {
-                    active_tab = "palette";
+                if ui.selectable_label(app_state.active_left_tab == "palette", "🧰 Components").clicked() {
+                    app_state.active_left_tab = "palette".to_string();
                 }
             }
             if app_state.hierarchy_manager.show_hierarchy_panel {
-                if ui.selectable_label(active_tab == "hierarchy", "🗂 Hierarchy").clicked() {
-                    active_tab = "hierarchy";
+                if ui.selectable_label(app_state.active_left_tab == "hierarchy", "🗂 Hierarchy").clicked() {
+                    app_state.active_left_tab = "hierarchy".to_string();
                 }
             }
         });
@@ -132,7 +127,7 @@ impl UiManager {
         ui.separator();
         
         // Tab content
-        match active_tab {
+        match app_state.active_left_tab.as_str() {
             "project" if app_state.show_project_panel => {
                 Self::render_project_explorer(app_state, ui);
             }
@@ -152,7 +147,7 @@ impl UiManager {
     fn render_project_explorer(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
         ui.heading("Project Explorer");
         ui.separator();
-        app_state.project_manager.render_file_browser(ui, &mut app_state.menu.output_panel);
+        app_state.project_manager.render_project_ui(ui, &mut app_state.menu.output_panel);
     }
     
     /// Render the component palette
@@ -213,19 +208,16 @@ impl UiManager {
     
     /// Render the tabs in the right panel
     fn render_right_panel_tabs(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
-        let mut active_tab = "properties";
-        if app_state.show_modern_ide_panel { active_tab = "modern"; }
-        
         // Tab headers
         ui.horizontal(|ui| {
             if app_state.show_properties_inspector {
-                if ui.selectable_label(active_tab == "properties", "🔧 Properties").clicked() {
-                    active_tab = "properties";
+                if ui.selectable_label(app_state.active_right_tab == "properties", "🔧 Properties").clicked() {
+                    app_state.active_right_tab = "properties".to_string();
                 }
             }
             if app_state.show_modern_ide_panel {
-                if ui.selectable_label(active_tab == "modern", "🚀 Modern IDE").clicked() {
-                    active_tab = "modern";
+                if ui.selectable_label(app_state.active_right_tab == "modern", "🚀 Modern IDE").clicked() {
+                    app_state.active_right_tab = "modern".to_string();
                 }
             }
         });
@@ -233,7 +225,7 @@ impl UiManager {
         ui.separator();
         
         // Tab content
-        match active_tab {
+        match app_state.active_right_tab.as_str() {
             "properties" if app_state.show_properties_inspector => {
                 Self::render_properties_inspector(app_state, ui);
             }

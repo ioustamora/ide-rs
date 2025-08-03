@@ -25,6 +25,10 @@ pub struct EditorSettings {
     pub show_line_numbers: bool,
     pub show_inline_diagnostics: bool,
     pub auto_complete: bool,
+    pub show_minimap: bool,
+    pub current_theme: EditorTheme,
+    pub minimap_width: f32,
+    pub word_wrap: bool,
 }
 
 impl Default for EditorSettings {
@@ -35,6 +39,89 @@ impl Default for EditorSettings {
             show_line_numbers: true,
             show_inline_diagnostics: true,
             auto_complete: true,
+            show_minimap: true,
+            current_theme: EditorTheme::default(),
+            minimap_width: 120.0,
+            word_wrap: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct EditorTheme {
+    pub name: String,
+    pub background: egui::Color32,
+    pub text: egui::Color32,
+    pub comment: egui::Color32,
+    pub keyword: egui::Color32,
+    pub string: egui::Color32,
+    pub type_name: egui::Color32,
+    pub number: egui::Color32,
+    pub line_number: egui::Color32,
+    pub line_number_bg: egui::Color32,
+    pub selection: egui::Color32,
+    pub cursor: egui::Color32,
+    pub current_line: egui::Color32,
+}
+
+impl Default for EditorTheme {
+    fn default() -> Self {
+        Self::dark_theme()
+    }
+}
+
+impl EditorTheme {
+    pub fn dark_theme() -> Self {
+        Self {
+            name: "Dark".to_string(),
+            background: egui::Color32::from_rgb(30, 30, 30),
+            text: egui::Color32::from_rgb(220, 220, 220),
+            comment: egui::Color32::from_rgb(106, 153, 85),
+            keyword: egui::Color32::from_rgb(86, 156, 214),
+            string: egui::Color32::from_rgb(206, 145, 120),
+            type_name: egui::Color32::from_rgb(78, 201, 176),
+            number: egui::Color32::from_rgb(181, 206, 168),
+            line_number: egui::Color32::from_rgb(133, 133, 133),
+            line_number_bg: egui::Color32::from_rgb(37, 37, 38),
+            selection: egui::Color32::from_rgba_premultiplied(0, 122, 204, 60),
+            cursor: egui::Color32::WHITE,
+            current_line: egui::Color32::from_rgba_premultiplied(255, 255, 255, 8),
+        }
+    }
+    
+    pub fn light_theme() -> Self {
+        Self {
+            name: "Light".to_string(),
+            background: egui::Color32::WHITE,
+            text: egui::Color32::BLACK,
+            comment: egui::Color32::from_rgb(0, 128, 0),
+            keyword: egui::Color32::from_rgb(0, 0, 255),
+            string: egui::Color32::from_rgb(163, 21, 21),
+            type_name: egui::Color32::from_rgb(43, 145, 175),
+            number: egui::Color32::from_rgb(9, 134, 88),
+            line_number: egui::Color32::from_rgb(128, 128, 128),
+            line_number_bg: egui::Color32::from_rgb(245, 245, 245),
+            selection: egui::Color32::from_rgba_premultiplied(173, 214, 255, 120),
+            cursor: egui::Color32::BLACK,
+            current_line: egui::Color32::from_rgba_premultiplied(0, 0, 0, 8),
+        }
+    }
+    
+    pub fn monokai_theme() -> Self {
+        Self {
+            name: "Monokai".to_string(),
+            background: egui::Color32::from_rgb(39, 40, 34),
+            text: egui::Color32::from_rgb(248, 248, 242),
+            comment: egui::Color32::from_rgb(117, 113, 94),
+            keyword: egui::Color32::from_rgb(249, 38, 114),
+            string: egui::Color32::from_rgb(230, 219, 116),
+            type_name: egui::Color32::from_rgb(102, 217, 239),
+            number: egui::Color32::from_rgb(174, 129, 255),
+            line_number: egui::Color32::from_rgb(90, 90, 90),
+            line_number_bg: egui::Color32::from_rgb(35, 36, 31),
+            selection: egui::Color32::from_rgba_premultiplied(73, 72, 62, 180),
+            cursor: egui::Color32::WHITE,
+            current_line: egui::Color32::from_rgba_premultiplied(255, 255, 255, 6),
         }
     }
 }
@@ -197,24 +284,51 @@ impl CodeEditor {
             self.render_toolbar(ui);
             ui.separator();
             
-            // Main editor area with line numbers and syntax highlighting
+            // Main editor area with line numbers, code, and minimap
             ui.horizontal(|ui| {
-                // Line numbers column
-                if self.settings.show_line_numbers {
-                    self.render_line_numbers(ui);
-                }
+                // Apply theme background
+                let frame = eframe::egui::Frame::none()
+                    .fill(self.settings.current_theme.background)
+                    .inner_margin(eframe::egui::Margin::same(0.0));
                 
-                // Code editor with syntax highlighting
-                eframe::egui::ScrollArea::both()
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        if self.language == "rust" {
-                            self.render_with_syntax_highlighting(ui);
+                frame.show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        // Line numbers column
+                        if self.settings.show_line_numbers {
+                            self.render_line_numbers(ui);
+                        }
+                        
+                        // Code editor with syntax highlighting
+                        let available_width = if self.settings.show_minimap {
+                            ui.available_width() - self.settings.minimap_width - 8.0
                         } else {
-                            // Fallback to simple editor
-                            ui.text_edit_multiline(&mut self.code);
+                            ui.available_width()
+                        };
+                        
+                        ui.allocate_ui_with_layout(
+                            eframe::egui::Vec2::new(available_width, ui.available_height()),
+                            eframe::egui::Layout::top_down(eframe::egui::Align::LEFT),
+                            |ui| {
+                                eframe::egui::ScrollArea::both()
+                                    .auto_shrink([false, false])
+                                    .show(ui, |ui| {
+                                        if self.language == "rust" {
+                                            self.render_with_syntax_highlighting(ui);
+                                        } else {
+                                            // Fallback to simple editor
+                                            ui.text_edit_multiline(&mut self.code);
+                                        }
+                                    });
+                            }
+                        );
+                        
+                        // Minimap
+                        if self.settings.show_minimap {
+                            ui.separator();
+                            self.render_minimap(ui);
                         }
                     });
+                });
             });
             
             // Status bar
@@ -244,7 +358,26 @@ impl CodeEditor {
             
             // Settings toggles
             ui.checkbox(&mut self.settings.show_line_numbers, "Line Numbers");
+            ui.checkbox(&mut self.settings.show_minimap, "Minimap");
             ui.checkbox(&mut self.settings.auto_complete, "Auto Complete");
+            ui.checkbox(&mut self.settings.word_wrap, "Word Wrap");
+            
+            ui.separator();
+            
+            // Theme selector
+            egui::ComboBox::from_label("Theme")
+                .selected_text(&self.settings.current_theme.name)
+                .show_ui(ui, |ui| {
+                    if ui.selectable_label(self.settings.current_theme.name == "Dark", "Dark").clicked() {
+                        self.settings.current_theme = EditorTheme::dark_theme();
+                    }
+                    if ui.selectable_label(self.settings.current_theme.name == "Light", "Light").clicked() {
+                        self.settings.current_theme = EditorTheme::light_theme();
+                    }
+                    if ui.selectable_label(self.settings.current_theme.name == "Monokai", "Monokai").clicked() {
+                        self.settings.current_theme = EditorTheme::monokai_theme();
+                    }
+                });
         });
         
         // Find/Replace panel
@@ -275,14 +408,63 @@ impl CodeEditor {
             eframe::egui::Vec2::new(40.0, line_height * line_count as f32),
             eframe::egui::Layout::top_down(eframe::egui::Align::RIGHT),
             |ui| {
-                ui.style_mut().visuals.extreme_bg_color = eframe::egui::Color32::from_gray(245);
+                ui.style_mut().visuals.extreme_bg_color = self.settings.current_theme.line_number_bg;
                 
                 for line_num in 1..=line_count {
-                    ui.label(format!("{:3}", line_num));
+                    ui.colored_label(self.settings.current_theme.line_number, format!("{:3}", line_num));
                 }
             },
         );
         ui.separator();
+    }
+    
+    /// Render minimap
+    fn render_minimap(&self, ui: &mut eframe::egui::Ui) {
+        let minimap_width = self.settings.minimap_width;
+        let available_height = ui.available_height();
+        
+        ui.allocate_ui_with_layout(
+            eframe::egui::Vec2::new(minimap_width, available_height),
+            eframe::egui::Layout::top_down(eframe::egui::Align::LEFT),
+            |ui| {
+                ui.style_mut().visuals.extreme_bg_color = self.settings.current_theme.background;
+                
+                ui.heading("📍 Minimap");
+                ui.separator();
+                
+                let lines: Vec<&str> = self.code.lines().collect();
+                let total_lines = lines.len();
+                
+                if total_lines > 0 {
+                    let visible_lines = (available_height / 3.0) as usize; // Simplified minimap with smaller line height
+                    let lines_to_show = visible_lines.min(total_lines);
+                    
+                    eframe::egui::ScrollArea::vertical()
+                        .max_height(available_height - 40.0)
+                        .show(ui, |ui| {
+                            for (i, line) in lines.iter().enumerate().take(lines_to_show) {
+                                let preview = if line.len() > 20 {
+                                    format!("{}...", &line[..17])
+                                } else {
+                                    line.to_string()
+                                };
+                                
+                                if !preview.trim().is_empty() {
+                                    ui.small(preview);
+                                } else {
+                                    ui.small(" ");
+                                }
+                            }
+                            
+                            if total_lines > lines_to_show {
+                                ui.small(format!("... {} more lines", total_lines - lines_to_show));
+                            }
+                        });
+                } else {
+                    ui.small("Empty file");
+                }
+            },
+        );
     }
     
     /// Render code with basic syntax highlighting for Rust
@@ -305,6 +487,7 @@ impl CodeEditor {
     fn highlight_rust_line(&self, line: &str, job: &mut eframe::egui::text::LayoutJob) {
         let keywords = ["fn", "let", "mut", "if", "else", "for", "while", "loop", "match", "struct", "enum", "impl", "pub", "use", "mod"];
         let types = ["String", "i32", "i64", "f32", "f64", "bool", "char", "Vec", "Option", "Result"];
+        let theme = &self.settings.current_theme;
         
         let words: Vec<&str> = line.split_whitespace().collect();
         let mut pos = 0;
@@ -312,32 +495,44 @@ impl CodeEditor {
         for word in words {
             // Find the actual position in the line
             while pos < line.len() && !line[pos..].starts_with(word) {
-                job.append(&line[pos..pos+1], 0.0, eframe::egui::TextFormat::default());
+                let default_format = eframe::egui::TextFormat {
+                    color: theme.text,
+                    ..Default::default()
+                };
+                job.append(&line[pos..pos+1], 0.0, default_format);
                 pos += 1;
             }
             
             let format = if keywords.contains(&word) {
                 eframe::egui::TextFormat {
-                    color: eframe::egui::Color32::from_rgb(0, 0, 255), // Blue for keywords
+                    color: theme.keyword,
                     ..Default::default()
                 }
             } else if types.contains(&word) {
                 eframe::egui::TextFormat {
-                    color: eframe::egui::Color32::from_rgb(43, 145, 175), // Teal for types
+                    color: theme.type_name,
                     ..Default::default()
                 }
             } else if word.starts_with("//") {
                 eframe::egui::TextFormat {
-                    color: eframe::egui::Color32::from_rgb(0, 128, 0), // Green for comments
+                    color: theme.comment,
                     ..Default::default()
                 }
             } else if word.starts_with('"') && word.ends_with('"') {
                 eframe::egui::TextFormat {
-                    color: eframe::egui::Color32::from_rgb(163, 21, 21), // Red for strings
+                    color: theme.string,
+                    ..Default::default()
+                }
+            } else if word.chars().all(|c| c.is_numeric() || c == '.') {
+                eframe::egui::TextFormat {
+                    color: theme.number,
                     ..Default::default()
                 }
             } else {
-                eframe::egui::TextFormat::default()
+                eframe::egui::TextFormat {
+                    color: theme.text,
+                    ..Default::default()
+                }
             };
             
             job.append(word, 0.0, format);
@@ -346,7 +541,11 @@ impl CodeEditor {
         
         // Add remaining characters
         if pos < line.len() {
-            job.append(&line[pos..], 0.0, eframe::egui::TextFormat::default());
+            let default_format = eframe::egui::TextFormat {
+                color: theme.text,
+                ..Default::default()
+            };
+            job.append(&line[pos..], 0.0, default_format);
         }
     }
     

@@ -49,6 +49,11 @@ pub struct ProjectManager {
     pub operations: ProjectOperations,
     /// Project serializer
     pub serializer: ProjectSerializer,
+    /// UI state for new project dialog
+    pub show_new_project_dialog: bool,
+    pub new_project_name: String,
+    pub new_project_location: String,
+    pub selected_template_name: String,
 }
 
 /// Project manager settings
@@ -78,9 +83,19 @@ pub struct BackupSettings {
 impl ProjectManager {
     /// Create a new project manager
     pub fn new() -> Self {
-        let default_project_path = std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join("projects");
+        // Use a safe default path that always exists
+        let default_project_path = if let Some(home_dir) = dirs::home_dir() {
+            home_dir.join("Documents").join("IDE_Projects")
+        } else {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join("projects")
+        };
+
+        // Ensure the directory exists
+        if !default_project_path.exists() {
+            let _ = std::fs::create_dir_all(&default_project_path);
+        }
 
         let backup_dir = default_project_path.join(".ide-backups");
 
@@ -102,6 +117,10 @@ impl ProjectManager {
             },
             operations: ProjectOperations::new(),
             serializer: ProjectSerializer::new(),
+            show_new_project_dialog: false,
+            new_project_name: String::new(),
+            new_project_location: String::new(),
+            selected_template_name: "GUI Application".to_string(),
         }
     }
 
@@ -194,6 +213,154 @@ impl ProjectManager {
         self.file_browser.render(ui, output_panel, &self.current_project);
     }
 
+    /// Render project management UI
+    pub fn render_project_ui(&mut self, ui: &mut egui::Ui, output_panel: &mut OutputPanel) {
+        ui.vertical(|ui| {
+            // Project actions
+            ui.horizontal(|ui| {
+                if ui.button("📂 New Project").clicked() {
+                    self.show_new_project_dialog = true;
+                }
+                if ui.button("🔄 Open Project").clicked() {
+                    // TODO: Show open project dialog
+                    output_panel.log("📂 Open project dialog would appear here");
+                }
+                if let Some(_) = &self.current_project {
+                    if ui.button("💾 Save Project").clicked() {
+                        self.save_current_project_ui(output_panel);
+                    }
+                }
+            });
+            
+            ui.separator();
+            
+            // Show current project info
+            if let Some(ref project) = self.current_project {
+                ui.group(|ui| {
+                    ui.heading("Current Project");
+                    ui.label(format!("Name: {}", project.metadata.name));
+                    ui.label(format!("Type: {:?}", project.metadata.project_type));
+                    ui.label(format!("Components: {}", project.designer_data.components.len()));
+                });
+                ui.separator();
+            }
+            
+            // File browser
+            self.render_file_browser(ui, output_panel);
+            
+            // New project dialog
+            if self.show_new_project_dialog {
+                self.render_new_project_dialog(ui, output_panel);
+            }
+        });
+    }
+    
+    /// Render new project creation dialog
+    fn render_new_project_dialog(&mut self, ui: &mut egui::Ui, output_panel: &mut OutputPanel) {
+        egui::Window::new("Create New Project")
+            .collapsible(false)
+            .resizable(false)
+            .show(ui.ctx(), |ui| {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Project Name:");
+                        ui.text_edit_singleline(&mut self.new_project_name);
+                    });
+                    
+                    ui.horizontal(|ui| {
+                        ui.label("Location:");
+                        ui.text_edit_singleline(&mut self.new_project_location);
+                        if ui.button("Browse").clicked() {
+                            if let Some(folder) = rfd::FileDialog::new()
+                                .set_title("Select Project Directory")
+                                .pick_folder() {
+                                self.new_project_location = folder.display().to_string();
+                            }
+                        }
+                    });
+                    
+                    ui.horizontal(|ui| {
+                        ui.label("Template:");
+                        egui::ComboBox::from_label("")
+                            .selected_text(&self.selected_template_name)
+                            .show_ui(ui, |ui| {
+                                for template in &self.templates {
+                                    if ui.selectable_label(self.selected_template_name == template.name, &template.name).clicked() {
+                                        self.selected_template_name = template.name.clone();
+                                    }
+                                }
+                            });
+                    });
+                    
+                    ui.separator();
+                    
+                    ui.horizontal(|ui| {
+                        if ui.button("Create").clicked() {
+                            self.create_new_project(output_panel);
+                        }
+                        if ui.button("Cancel").clicked() {
+                            self.show_new_project_dialog = false;
+                            self.reset_new_project_dialog();
+                        }
+                    });
+                });
+            });
+    }
+    
+    /// Create a new project with the specified settings
+    fn create_new_project(&mut self, output_panel: &mut OutputPanel) {
+        if self.new_project_name.trim().is_empty() {
+            output_panel.log("❌ Project name cannot be empty");
+            return;
+        }
+        
+        let template = self.templates.iter()
+            .find(|t| t.name == self.selected_template_name)
+            .cloned()
+            .unwrap_or_else(|| self.templates[0].clone());
+        
+        let location = if self.new_project_location.trim().is_empty() {
+            self.settings.default_project_path.clone()
+        } else {
+            std::path::PathBuf::from(&self.new_project_location)
+        };
+        
+        match self.operations.create_project(&self.new_project_name, &template, &location, output_panel) {
+            Ok(project) => {
+                self.current_project = Some(project);
+                self.show_new_project_dialog = false;
+                self.reset_new_project_dialog();
+                output_panel.log(&format!("✅ Project '{}' created successfully!", self.new_project_name));
+            }
+            Err(e) => {
+                output_panel.log(&format!("❌ Failed to create project: {}", e));
+            }
+        }
+    }
+    
+    /// Reset new project dialog fields
+    fn reset_new_project_dialog(&mut self) {
+        self.new_project_name.clear();
+        self.new_project_location.clear();
+        self.selected_template_name = if !self.templates.is_empty() {
+            self.templates[0].name.clone()
+        } else {
+            "Default".to_string()
+        };
+    }
+
+    /// Save the current project with UI feedback
+    pub fn save_current_project_ui(&self, output_panel: &mut OutputPanel) {
+        if let Some(ref project) = self.current_project {
+            match self.save_project(project, output_panel) {
+                Ok(_) => output_panel.log("💾 Project saved successfully!"),
+                Err(e) => output_panel.log(&format!("❌ Failed to save project: {}", e)),
+            }
+        } else {
+            output_panel.log("❌ No project to save");
+        }
+    }
+
     /// Save the current project (placeholder implementation)
     pub fn save_current_project(&self) {
         // Placeholder implementation - would save the current project
@@ -210,12 +377,6 @@ impl ProjectManager {
     pub fn close_current_project(&mut self) {
         // Placeholder implementation - would close the current project
         self.current_project = None;
-    }
-
-    /// Create a new project (placeholder implementation)
-    pub fn create_new_project(&mut self) {
-        // Placeholder implementation - would create a new project
-        // In a real implementation, this would open a project creation dialog
     }
 
     /// Open project dialog (placeholder implementation)

@@ -236,7 +236,7 @@ impl EventHandlers {
         match command {
             // File operations
             IdeCommand::NewProject => {
-                app_state.project_manager.create_new_project();
+                app_state.project_manager.show_new_project_dialog = true;
             }
             IdeCommand::OpenProject => {
                 app_state.project_manager.open_project_dialog();
