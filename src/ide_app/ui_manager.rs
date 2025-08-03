@@ -147,7 +147,130 @@ impl UiManager {
     fn render_project_explorer(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
         ui.heading("Project Explorer");
         ui.separator();
+        
+        // Add new GUI project creation button
+        if ui.button("🚀 New GUI Project").clicked() {
+            Self::show_new_gui_project_dialog(app_state, ui);
+        }
+        
+        ui.separator();
+        
         app_state.project_manager.render_project_ui(ui, &mut app_state.menu.output_panel);
+    }
+    
+    /// Show new GUI project creation dialog
+    fn show_new_gui_project_dialog(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
+        ui.label("Create New GUI Project");
+        ui.separator();
+        
+        ui.horizontal(|ui| {
+            ui.label("Project Name:");
+            ui.text_edit_singleline(&mut app_state.new_project_name);
+        });
+        
+        ui.horizontal(|ui| {
+            ui.label("Location:");
+            ui.text_edit_singleline(&mut app_state.new_project_location);
+            if ui.button("Browse...").clicked() {
+                // TODO: Integrate with file picker
+                app_state.new_project_location = std::env::current_dir()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| ".".to_string());
+            }
+        });
+        
+        ui.horizontal(|ui| {
+            if ui.button("Create Project").clicked() && !app_state.new_project_name.is_empty() {
+                Self::create_new_gui_project(app_state);
+            }
+            if ui.button("Cancel").clicked() {
+                app_state.new_project_name.clear();
+                app_state.new_project_location.clear();
+            }
+        });
+    }
+    
+    /// Create new GUI project with cargo integration
+    fn create_new_gui_project(app_state: &mut IdeAppState) {
+        use std::path::Path;
+        
+        let project_name = app_state.new_project_name.clone();
+        let location = if app_state.new_project_location.is_empty() {
+            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+        } else {
+            std::path::PathBuf::from(&app_state.new_project_location)
+        };
+        
+        // Create project using cargo new integration
+        match app_state.project_manager.operations.create_gui_project_with_cargo(
+            &project_name,
+            &location,
+            &mut app_state.menu.output_panel
+        ) {
+            Ok(project) => {
+                app_state.menu.output_panel.log("✅ GUI project created successfully!");
+                
+                // Load project into IDE
+                app_state.project_manager.current_project = Some(project.clone());
+                
+                // Automatically open in design mode with visual designer
+                app_state.design_mode = true;
+                
+                // Load default components into visual designer
+                app_state.components.clear();
+                Self::load_project_components_to_designer(&project, app_state);
+                
+                // Open the ui.rs file in the visual designer
+                let ui_file_path = project.metadata.root_path.join("src").join("ui.rs");
+                if ui_file_path.exists() {
+                    app_state.menu.output_panel.log("🎨 Opening ui.rs in visual designer...");
+                    // TODO: Integrate with file manager to open the file
+                }
+                
+                app_state.menu.output_panel.log("🚀 Project ready for visual design!");
+            }
+            Err(e) => {
+                app_state.menu.output_panel.log(&format!("❌ Failed to create project: {}", e));
+            }
+        }
+        
+        // Clear form
+        app_state.new_project_name.clear();
+        app_state.new_project_location.clear();
+    }
+    
+    /// Load project components into visual designer
+    fn load_project_components_to_designer(project: &crate::editor::project_manager::project::IdeProject, app_state: &mut IdeAppState) {
+        use crate::rcl::ui::component::Component;
+        
+        // Create UI components from project component data
+        for comp_data in &project.designer_data.components {
+            let component: Box<dyn Component> = match comp_data.component_type.as_str() {
+                "Button" => {
+                    let label = comp_data.properties.get("label")
+                        .cloned()
+                        .unwrap_or_else(|| "Button".to_string());
+                    Box::new(crate::rcl::ui::basic::button::Button::new(label))
+                }
+                "Label" => {
+                    let text = comp_data.properties.get("text")
+                        .cloned()
+                        .unwrap_or_else(|| "Label".to_string());
+                    Box::new(crate::rcl::ui::basic::label::Label::new(text))
+                }
+                _ => {
+                    // Default to button
+                    Box::new(crate::rcl::ui::basic::button::Button::new("Component".to_string()))
+                }
+            };
+            
+            app_state.components.push(component);
+            
+            // Set position and size in visual designer
+            let idx = app_state.components.len() - 1;
+            app_state.visual_designer.layout.positions.insert(idx, egui::Pos2::new(comp_data.position.0, comp_data.position.1));
+            app_state.visual_designer.layout.sizes.insert(idx, egui::Vec2::new(comp_data.size.0, comp_data.size.1));
+        }
     }
     
     /// Render the component palette
@@ -315,46 +438,10 @@ impl UiManager {
         }
     }
     
-    /// Render form properties when form is selected
+    /// Render form properties when form is selected using advanced property inspector
     fn render_form_properties(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
-        ui.label("Form Properties");
-        ui.separator();
-        
-        // Form basic properties
-        ui.horizontal(|ui| {
-            ui.label("Title:");
-            ui.text_edit_singleline(&mut app_state.root_form.title);
-        });
-        
-        ui.horizontal(|ui| {
-            ui.label("Width:");
-            ui.add(egui::DragValue::new(&mut app_state.root_form.size.x).speed(1.0).clamp_range(100.0..=2000.0));
-        });
-        
-        ui.horizontal(|ui| {
-            ui.label("Height:");
-            ui.add(egui::DragValue::new(&mut app_state.root_form.size.y).speed(1.0).clamp_range(100.0..=1500.0));
-        });
-        
-        ui.horizontal(|ui| {
-            ui.label("Background Color:");
-            ui.color_edit_button_srgba(&mut app_state.root_form.background_color);
-        });
-        
-        ui.checkbox(&mut app_state.root_form.visible, "Visible");
-        ui.checkbox(&mut app_state.root_form.show_border, "Show Border");
-        
-        ui.separator();
-        ui.label("Form Layout");
-        ui.horizontal(|ui| {
-            ui.label("Padding:");
-            ui.add(egui::DragValue::new(&mut app_state.root_form.padding).speed(0.1).clamp_range(0.0..=50.0));
-        });
-        
-        ui.horizontal(|ui| {
-            ui.label("Corner Radius:");
-            ui.add(egui::DragValue::new(&mut app_state.root_form.corner_radius).speed(0.1).clamp_range(0.0..=25.0));
-        });
+        // Use the advanced property inspector for the form
+        app_state.property_inspector.render_form_properties(ui, &mut app_state.root_form);
     }
     
     /// Render the modern IDE features panel

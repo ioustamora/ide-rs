@@ -796,4 +796,198 @@ impl PropertyInspector {
         let component_id = 0; // This would normally be passed in, but for now use 0
         self.ui(ui, Some((component_id, component.as_ref())));
     }
+    
+    /// Render form properties with live updates
+    pub fn render_form_properties(&mut self, ui: &mut Ui, form: &mut crate::rcl::ui::basic::form::Form) {
+        ui.vertical(|ui| {
+            ui.heading("Form Properties");
+            ui.separator();
+            
+            // Appearance group
+            egui::CollapsingHeader::new("🎨 Appearance")
+                .default_open(true)
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.y = 6.0;
+                    
+                    // Title
+                    ui.horizontal(|ui| {
+                        ui.label("Title:");
+                        let old_title = form.title.clone();
+                        ui.text_edit_singleline(&mut form.title);
+                        if form.title != old_title {
+                            // Property changed - could trigger real-time sync here
+                        }
+                    });
+                    
+                    // Background Color
+                    ui.horizontal(|ui| {
+                        ui.label("Background:");
+                        ui.color_edit_button_srgba(&mut form.background_color);
+                    });
+                    
+                    // Visibility
+                    ui.horizontal(|ui| {
+                        ui.label("Visible:");
+                        ui.checkbox(&mut form.visible, "");
+                    });
+                    
+                    // Border settings
+                    ui.horizontal(|ui| {
+                        ui.label("Show Border:");
+                        ui.checkbox(&mut form.show_border, "");
+                    });
+                    
+                    if form.show_border {
+                        ui.horizontal(|ui| {
+                            ui.label("Border Color:");
+                            ui.color_edit_button_srgba(&mut form.border_color);
+                        });
+                        
+                        ui.horizontal(|ui| {
+                            ui.label("Border Width:");
+                            ui.add(egui::DragValue::new(&mut form.border_width)
+                                .speed(0.1)
+                                .clamp_range(0.0..=10.0)
+                                .suffix("px"));
+                        });
+                    }
+                    
+                    // Corner radius
+                    ui.horizontal(|ui| {
+                        ui.label("Corner Radius:");
+                        ui.add(egui::DragValue::new(&mut form.corner_radius)
+                            .speed(0.1)
+                            .clamp_range(0.0..=50.0)
+                            .suffix("px"));
+                    });
+                });
+            
+            ui.add_space(4.0);
+            
+            // Layout group
+            egui::CollapsingHeader::new("📐 Layout")
+                .default_open(true)
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.y = 6.0;
+                    
+                    // Size controls with constraints
+                    ui.horizontal(|ui| {
+                        ui.label("Width:");
+                        ui.add(egui::DragValue::new(&mut form.size.x)
+                            .speed(1.0)
+                            .clamp_range(200.0..=2000.0)
+                            .suffix("px"));
+                    });
+                    
+                    ui.horizontal(|ui| {
+                        ui.label("Height:");
+                        ui.add(egui::DragValue::new(&mut form.size.y)
+                            .speed(1.0)
+                            .clamp_range(150.0..=1500.0)
+                            .suffix("px"));
+                    });
+                    
+                    // Padding control
+                    ui.horizontal(|ui| {
+                        ui.label("Padding:");
+                        ui.add(egui::DragValue::new(&mut form.padding)
+                            .speed(0.1)
+                            .clamp_range(0.0..=100.0)
+                            .suffix("px"));
+                    });
+                });
+            
+            ui.add_space(4.0);
+            
+            // Advanced group (collapsible)
+            egui::CollapsingHeader::new("🔧 Advanced")
+                .default_open(false)
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.y = 6.0;
+                    
+                    // Form ID or name
+                    ui.horizontal(|ui| {
+                        ui.label("Form ID:");
+                        let mut form_id = format!("form_{}", form.title.to_lowercase().replace(' ', "_"));
+                        ui.add(egui::TextEdit::singleline(&mut form_id).desired_width(150.0));
+                    });
+                    
+                    // Resizable settings
+                    ui.horizontal(|ui| {
+                        ui.label("Resizable:");
+                        let mut resizable = true; // Form doesn't have this property yet
+                        ui.checkbox(&mut resizable, "");
+                    });
+                    
+                    // Z-index or layer
+                    ui.horizontal(|ui| {
+                        ui.label("Layer:");
+                        let mut layer = 0;
+                        ui.add(egui::DragValue::new(&mut layer)
+                            .speed(1.0)
+                            .clamp_range(0..=100));
+                    });
+                });
+                
+            ui.add_space(8.0);
+            
+            // Property actions
+            ui.horizontal(|ui| {
+                if ui.button("Reset to Default").clicked() {
+                    *form = crate::rcl::ui::basic::form::Form::new("Form1".to_string());
+                }
+                
+                if ui.button("Copy Properties").clicked() {
+                    // TODO: Implement property copying
+                }
+                
+                if ui.button("Paste Properties").clicked() {
+                    // TODO: Implement property pasting
+                }
+            });
+        });
+    }
+    
+    /// Apply property values to a form from the property system
+    pub fn apply_form_properties(&self, form: &mut crate::rcl::ui::basic::form::Form, form_id: usize) {
+        // Apply stored property values to the form
+        if let Some(PropertyValue::String(title)) = self.get_property_value(form_id, "title") {
+            form.title = title.clone();
+        }
+        
+        if let Some(PropertyValue::Number(width)) = self.get_property_value(form_id, "width") {
+            form.size.x = *width as f32;
+        }
+        
+        if let Some(PropertyValue::Number(height)) = self.get_property_value(form_id, "height") {
+            form.size.y = *height as f32;
+        }
+        
+        if let Some(PropertyValue::Number(padding)) = self.get_property_value(form_id, "padding") {
+            form.padding = *padding as f32;
+        }
+        
+        if let Some(PropertyValue::Number(radius)) = self.get_property_value(form_id, "corner_radius") {
+            form.corner_radius = *radius as f32;
+        }
+        
+        if let Some(PropertyValue::Boolean(visible)) = self.get_property_value(form_id, "visible") {
+            form.visible = *visible;
+        }
+        
+        if let Some(PropertyValue::Boolean(show_border)) = self.get_property_value(form_id, "show_border") {
+            form.show_border = *show_border;
+        }
+    }
+    
+    /// Extract property values from a form into the property system
+    pub fn extract_form_properties(&mut self, form: &crate::rcl::ui::basic::form::Form, form_id: usize) {
+        self.set_property_value(form_id, "title", PropertyValue::String(form.title.clone()));
+        self.set_property_value(form_id, "width", PropertyValue::Number(form.size.x as f64));
+        self.set_property_value(form_id, "height", PropertyValue::Number(form.size.y as f64));
+        self.set_property_value(form_id, "padding", PropertyValue::Number(form.padding as f64));
+        self.set_property_value(form_id, "corner_radius", PropertyValue::Number(form.corner_radius as f64));
+        self.set_property_value(form_id, "visible", PropertyValue::Boolean(form.visible));
+        self.set_property_value(form_id, "show_border", PropertyValue::Boolean(form.show_border));
+    }
 }

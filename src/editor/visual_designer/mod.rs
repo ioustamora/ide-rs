@@ -20,6 +20,19 @@ pub use layout::{
     GridAlignment, SizeConstraint, HorizontalConstraint, VerticalConstraint,
 };
 use crate::ide_app::animated_ui::MovementManager;
+
+/// Resize direction for interactive component resizing
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ResizeDirection {
+    Top,
+    Bottom,
+    Left,
+    Right,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
 pub use selection::{
     ComponentSelection, DragOperation, DragOperationType, ResizeHandle,
 };
@@ -208,27 +221,76 @@ impl VisualDesigner {
             }
             
             if response.dragged() && is_selected {
-                // Move selected components with smooth animation
+                // Get current component rect for smart guides
+                let current_rect = egui::Rect::from_min_size(
+                    form_rect.min + animated_pos.to_vec2(), 
+                    size
+                );
+                
+                // Collect other component rects for smart guides
+                let mut other_rects = Vec::new();
+                for (other_idx, _) in components.iter().enumerate() {
+                    if other_idx != idx && !self.selection.selected.contains(&other_idx) {
+                        let other_pos = self.layout.get_or_init_position(other_idx);
+                        let other_size = self.layout.get_or_init_size(other_idx, components[other_idx].name());
+                        let other_rect = egui::Rect::from_min_size(
+                            form_rect.min + other_pos.to_vec2(), 
+                            other_size
+                        );
+                        other_rects.push((other_idx, other_rect));
+                    }
+                }
+                
+                // Generate smart alignment guides
+                self.guides.generate_smart_guides(current_rect, &other_rects, form_rect);
+                
+                // Move selected components with smart snapping
                 let delta = response.drag_delta();
                 for &selected_idx in &self.selection.selected {
                     if let Some(pos) = self.layout.positions.get_mut(&selected_idx) {
-                        // Update layout position immediately for responsiveness
-                        *pos += delta;
+                        // Calculate new position with delta
+                        let new_pos = *pos + delta;
+                        
+                        // Apply smart snapping if enabled
+                        let snapped_pos = if self.grid.snap_enabled {
+                            let component_size = self.layout.get_or_init_size(selected_idx, 
+                                if selected_idx < components.len() { components[selected_idx].name() } else { "Unknown" });
+                            let component_rect = egui::Rect::from_min_size(form_rect.min + new_pos.to_vec2(), component_size);
+                            
+                            // First try smart guide snapping
+                            let guide_snapped = self.guides.get_snap_position(new_pos, component_size);
+                            
+                            // Then apply grid snapping if no guide snap occurred
+                            if guide_snapped == new_pos && self.grid.snap_enabled {
+                                self.snap_to_grid(new_pos)
+                            } else {
+                                guide_snapped
+                            }
+                        } else {
+                            new_pos
+                        };
+                        
+                        // Update layout position
+                        *pos = snapped_pos;
                         
                         // Animate to the new position
-                        let movement_anim = self.movement_manager.get_or_create(selected_idx, *pos);
-                        movement_anim.move_to(*pos);
+                        let movement_anim = self.movement_manager.get_or_create(selected_idx, snapped_pos);
+                        movement_anim.move_to(snapped_pos);
                     }
                 }
+            } else {
+                // Clear smart guides when not dragging
+                self.guides.clear_smart_guides();
             }
         }
         
         // Handle drag and drop operations
         self.handle_drag_and_drop(ui, form_rect, components);
         
-        // Draw guides
+        // Draw guides and smart alignment aids
         let canvas_rect = egui::Rect::from_min_size(ui.cursor().left_top(), canvas_size);
         self.guides.draw_guides(ui, canvas_rect);
+        self.guides.draw_smart_guides(ui, canvas_rect);
         
         // Return the clicked component for selection synchronization
         clicked_component
@@ -276,6 +338,19 @@ impl VisualDesigner {
     pub fn get_component_position(&mut self, component_idx: usize) -> egui::Pos2 {
         self.layout.positions.get(&component_idx).copied()
             .unwrap_or(egui::Pos2::ZERO)
+    }
+    
+    /// Snap position to grid
+    pub fn snap_to_grid(&self, pos: egui::Pos2) -> egui::Pos2 {
+        if !self.grid.snap_enabled {
+            return pos;
+        }
+        
+        let grid_size = self.grid.size;
+        egui::Pos2::new(
+            (pos.x / grid_size).round() * grid_size,
+            (pos.y / grid_size).round() * grid_size
+        )
     }
 
     /// Draw grid on the canvas
@@ -401,7 +476,189 @@ impl VisualDesigner {
         }
     }
 
-    /// Draw resize handles for selected components
+    /// Draw and handle interactive resize handles for components
+    fn draw_and_handle_resize_handles(&mut self, ui: &mut egui::Ui, rect: egui::Rect, component_idx: usize, components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) {
+        let painter = ui.painter();
+        let handle_size = 8.0;
+        let handle_color = egui::Color32::BLUE;
+        
+        // Define resize handles with their resize directions
+        let handles = [
+            (egui::pos2(rect.min.x, rect.min.y), ResizeDirection::TopLeft),     // Top-left
+            (egui::pos2(rect.max.x, rect.min.y), ResizeDirection::TopRight),    // Top-right
+            (egui::pos2(rect.min.x, rect.max.y), ResizeDirection::BottomLeft),  // Bottom-left
+            (egui::pos2(rect.max.x, rect.max.y), ResizeDirection::BottomRight), // Bottom-right
+            (egui::pos2(rect.center().x, rect.min.y), ResizeDirection::Top),    // Top
+            (egui::pos2(rect.center().x, rect.max.y), ResizeDirection::Bottom), // Bottom
+            (egui::pos2(rect.min.x, rect.center().y), ResizeDirection::Left),   // Left
+            (egui::pos2(rect.max.x, rect.center().y), ResizeDirection::Right),  // Right
+        ];
+        
+        for (handle_pos, resize_direction) in handles {
+            let handle_rect = egui::Rect::from_center_size(handle_pos, egui::Vec2::splat(handle_size));
+            
+            // Draw handle
+            painter.rect_filled(handle_rect, 1.0, handle_color);
+            painter.rect_stroke(handle_rect, 1.0, egui::Stroke::new(1.0, egui::Color32::WHITE));
+            
+            // Handle interaction
+            let handle_id = egui::Id::new(format!("resize_handle_{}_{:?}", component_idx, resize_direction));
+            let response = ui.interact(handle_rect, handle_id, egui::Sense::click_and_drag());
+            
+            // Change cursor based on resize direction
+            if response.hovered() {
+                match resize_direction {
+                    ResizeDirection::TopLeft | ResizeDirection::BottomRight => {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeNwSe);
+                    }
+                    ResizeDirection::TopRight | ResizeDirection::BottomLeft => {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeNeSw);
+                    }
+                    ResizeDirection::Top | ResizeDirection::Bottom => {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
+                    }
+                    ResizeDirection::Left | ResizeDirection::Right => {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                    }
+                }
+            }
+            
+            // Handle dragging for resizing
+            if response.dragged() {
+                let delta = response.drag_delta();
+                self.resize_component_interactive(component_idx, resize_direction, delta, components);
+            }
+        }
+    }
+    
+    /// Draw and handle interactive resize handles for the form
+    fn draw_and_handle_form_resize_handles(&mut self, ui: &mut egui::Ui, rect: egui::Rect) {
+        let painter = ui.painter();
+        let handle_size = 8.0;
+        let handle_color = egui::Color32::from_rgb(100, 150, 255);
+        
+        // Form only gets corner and edge handles (simpler than components)
+        let handles = [
+            (egui::pos2(rect.max.x, rect.max.y), ResizeDirection::BottomRight), // Primary resize handle
+            (egui::pos2(rect.max.x, rect.center().y), ResizeDirection::Right),  // Width only
+            (egui::pos2(rect.center().x, rect.max.y), ResizeDirection::Bottom), // Height only
+        ];
+        
+        for (handle_pos, resize_direction) in handles {
+            let handle_rect = egui::Rect::from_center_size(handle_pos, egui::Vec2::splat(handle_size));
+            
+            // Draw handle with different color for form
+            painter.rect_filled(handle_rect, 1.0, handle_color);
+            painter.rect_stroke(handle_rect, 1.0, egui::Stroke::new(1.0, egui::Color32::WHITE));
+            
+            // Handle interaction
+            let handle_id = egui::Id::new(format!("form_resize_handle_{:?}", resize_direction));
+            let response = ui.interact(handle_rect, handle_id, egui::Sense::click_and_drag());
+            
+            // Change cursor
+            if response.hovered() {
+                match resize_direction {
+                    ResizeDirection::BottomRight => {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeNwSe);
+                    }
+                    ResizeDirection::Right => {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                    }
+                    ResizeDirection::Bottom => {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
+                    }
+                    _ => {}
+                }
+            }
+            
+            // Handle form resizing (this would need to be connected to the form state)
+            if response.dragged() {
+                let delta = response.drag_delta();
+                // TODO: Resize form - this needs integration with the form state in app_state
+                // For now, just show visual feedback
+                println!("Form resize: {:?} by {:?}", resize_direction, delta);
+            }
+        }
+    }
+    
+    /// Resize component interactively based on handle drag
+    fn resize_component_interactive(&mut self, component_idx: usize, resize_direction: ResizeDirection, delta: egui::Vec2, components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) {
+        let current_size = self.layout.get_or_init_size(component_idx, 
+            if component_idx < components.len() { components[component_idx].name() } else { "Unknown" });
+        let current_pos = self.layout.get_or_init_position(component_idx);
+        
+        let (new_size, new_pos) = match resize_direction {
+            ResizeDirection::Right => {
+                (egui::Vec2::new((current_size.x + delta.x).max(20.0), current_size.y), current_pos)
+            }
+            ResizeDirection::Left => {
+                let new_width = (current_size.x - delta.x).max(20.0);
+                let width_diff = current_size.x - new_width;
+                (egui::Vec2::new(new_width, current_size.y), 
+                 egui::Pos2::new(current_pos.x + width_diff, current_pos.y))
+            }
+            ResizeDirection::Bottom => {
+                (egui::Vec2::new(current_size.x, (current_size.y + delta.y).max(20.0)), current_pos)
+            }
+            ResizeDirection::Top => {
+                let new_height = (current_size.y - delta.y).max(20.0);
+                let height_diff = current_size.y - new_height;
+                (egui::Vec2::new(current_size.x, new_height),
+                 egui::Pos2::new(current_pos.x, current_pos.y + height_diff))
+            }
+            ResizeDirection::BottomRight => {
+                (egui::Vec2::new((current_size.x + delta.x).max(20.0), (current_size.y + delta.y).max(20.0)), current_pos)
+            }
+            ResizeDirection::BottomLeft => {
+                let new_width = (current_size.x - delta.x).max(20.0);
+                let width_diff = current_size.x - new_width;
+                (egui::Vec2::new(new_width, (current_size.y + delta.y).max(20.0)),
+                 egui::Pos2::new(current_pos.x + width_diff, current_pos.y))
+            }
+            ResizeDirection::TopRight => {
+                let new_height = (current_size.y - delta.y).max(20.0);
+                let height_diff = current_size.y - new_height;
+                (egui::Vec2::new((current_size.x + delta.x).max(20.0), new_height),
+                 egui::Pos2::new(current_pos.x, current_pos.y + height_diff))
+            }
+            ResizeDirection::TopLeft => {
+                let new_width = (current_size.x - delta.x).max(20.0);
+                let new_height = (current_size.y - delta.y).max(20.0);
+                let width_diff = current_size.x - new_width;
+                let height_diff = current_size.y - new_height;
+                (egui::Vec2::new(new_width, new_height),
+                 egui::Pos2::new(current_pos.x + width_diff, current_pos.y + height_diff))
+            }
+        };
+        
+        // Apply constraints and snapping if enabled
+        let constrained_size = self.apply_size_constraints(new_size);
+        let snapped_pos = if self.grid.snap_enabled {
+            self.snap_to_grid(new_pos)
+        } else {
+            new_pos
+        };
+        
+        // Update layout
+        self.layout.sizes.insert(component_idx, constrained_size);
+        self.layout.positions.insert(component_idx, snapped_pos);
+        
+        // Animate to new position if position changed
+        if snapped_pos != current_pos {
+            let movement_anim = self.movement_manager.get_or_create(component_idx, snapped_pos);
+            movement_anim.move_to(snapped_pos);
+        }
+    }
+    
+    /// Apply size constraints to prevent components from becoming too small or large
+    fn apply_size_constraints(&self, size: egui::Vec2) -> egui::Vec2 {
+        egui::Vec2::new(
+            size.x.clamp(20.0, 800.0), // Min 20px, max 800px width
+            size.y.clamp(20.0, 600.0)  // Min 20px, max 600px height
+        )
+    }
+    
+    /// Draw resize handles for selected components (simple version)
     fn draw_resize_handles(&self, ui: &mut egui::Ui, rect: egui::Rect) {
         let painter = ui.painter();
         let handle_size = 6.0;

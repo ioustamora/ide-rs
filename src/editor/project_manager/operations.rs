@@ -24,6 +24,27 @@ impl ProjectOperations {
         Self
     }
 
+    /// Create a new project with cargo new integration
+    pub fn create_gui_project_with_cargo(
+        &self,
+        name: &str,
+        location: &Path,
+        output_panel: &mut OutputPanel
+    ) -> Result<IdeProject, Box<dyn std::error::Error>> {
+        output_panel.log(&format!("🚀 Creating new GUI project with cargo: {}", name));
+        
+        let project_path = location.join(name);
+        
+        // Step 1: Execute cargo new command
+        self.execute_cargo_new(name, location, output_panel)?;
+        
+        // Step 2: Enhance project with GUI-specific files
+        self.enhance_project_for_gui(name, &project_path, output_panel)?;
+        
+        // Step 3: Create and return IDE project structure
+        self.create_ide_project_structure(name, &project_path, output_panel)
+    }
+
     /// Create a new project from template
     pub fn create_project(
         &self, 
@@ -237,6 +258,351 @@ impl ProjectOperations {
         output_panel.log("✅ Project cleaned successfully!");
         
         Ok(())
+    }
+
+    /// Execute cargo new command
+    fn execute_cargo_new(
+        &self,
+        name: &str,
+        location: &Path,
+        output_panel: &mut OutputPanel
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::process::Command;
+        
+        output_panel.log(&format!("📦 Executing: cargo new {}", name));
+        
+        let output = Command::new("cargo")
+            .arg("new")
+            .arg(name)
+            .current_dir(location)
+            .output()?;
+        
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if !stdout.is_empty() {
+                output_panel.log(&stdout);
+            }
+            output_panel.log("✅ Cargo new completed successfully");
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            output_panel.log(&format!("❌ Cargo new failed: {}", stderr));
+            return Err(format!("Cargo new failed: {}", stderr).into());
+        }
+        
+        Ok(())
+    }
+    
+    /// Enhance project with GUI-specific files and dependencies
+    fn enhance_project_for_gui(
+        &self,
+        name: &str,
+        project_path: &Path,
+        output_panel: &mut OutputPanel
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        output_panel.log("🎨 Enhancing project for GUI development...");
+        
+        // Replace Cargo.toml with GUI-enhanced version
+        self.create_gui_cargo_toml(name, project_path, output_panel)?;
+        
+        // Replace main.rs with GUI template
+        self.create_gui_main_rs(name, project_path, output_panel)?;
+        
+        // Create additional GUI-specific files
+        self.create_gui_ui_file(name, project_path, output_panel)?;
+        
+        output_panel.log("✅ GUI enhancement completed");
+        Ok(())
+    }
+    
+    /// Create GUI-enhanced Cargo.toml
+    fn create_gui_cargo_toml(
+        &self,
+        name: &str,
+        project_path: &Path,
+        output_panel: &mut OutputPanel
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let cargo_content = format!(
+r#"[package]
+name = "{}"
+version = "0.1.0"
+edition = "2021"
+authors = ["{}"]
+description = "A GUI application created with RAD IDE"
+
+[dependencies]
+eframe = "0.27"
+egui = "0.27"
+serde = {{ version = "1.0", features = ["derive"] }}
+"#, 
+            name, 
+            std::env::var("USER").unwrap_or_else(|_| "Developer".to_string())
+        );
+        
+        let cargo_path = project_path.join("Cargo.toml");
+        fs::write(&cargo_path, cargo_content)?;
+        output_panel.log("📄 Created enhanced Cargo.toml with GUI dependencies");
+        Ok(())
+    }
+    
+    /// Create GUI main.rs file
+    fn create_gui_main_rs(
+        &self,
+        name: &str,
+        project_path: &Path,
+        output_panel: &mut OutputPanel
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let main_content = self.get_gui_main_template(name);
+        let main_path = project_path.join("src").join("main.rs");
+        fs::write(&main_path, main_content)?;
+        output_panel.log("📄 Created GUI main.rs with egui framework");
+        Ok(())
+    }
+    
+    /// Create dedicated UI file for visual designer
+    fn create_gui_ui_file(
+        &self,
+        name: &str,
+        project_path: &Path,
+        output_panel: &mut OutputPanel
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let ui_content = self.get_ui_module_template(name);
+        let ui_path = project_path.join("src").join("ui.rs");
+        fs::write(&ui_path, ui_content)?;
+        output_panel.log("📄 Created ui.rs for visual designer integration");
+        Ok(())
+    }
+    
+    /// Create IDE project structure from cargo-created project
+    fn create_ide_project_structure(
+        &self,
+        name: &str,
+        project_path: &Path,
+        output_panel: &mut OutputPanel
+    ) -> Result<IdeProject, Box<dyn std::error::Error>> {
+        output_panel.log("🏗️ Creating IDE project structure...");
+        
+        // Create project metadata
+        let metadata = super::project::ProjectMetadata {
+            name: name.to_string(),
+            description: format!("A GUI application created with RAD IDE"),
+            version: "0.1.0".to_string(),
+            author: std::env::var("USER").unwrap_or_else(|_| "Developer".to_string()),
+            root_path: project_path.to_path_buf(),
+            created_at: chrono::Utc::now(),
+            modified_at: chrono::Utc::now(),
+            project_type: super::project::ProjectType::GuiApplication,
+            targets: vec!["desktop".to_string()],
+        };
+
+        // Create project structure with GUI defaults
+        let project = super::project::IdeProject {
+            metadata,
+            designer_data: super::project::DesignerData {
+                components: self.get_default_gui_components(),
+                grid_settings: super::project::GridSettings {
+                    size: 20.0,
+                    visible: true,
+                    snap_enabled: true,
+                    color: (128, 128, 128, 64),
+                },
+                layout_config: super::project::LayoutConfiguration {
+                    layout_type: super::project::LayoutType::Free,
+                    spacing: 10.0,
+                    padding: 20.0,
+                    alignment: super::project::AlignmentSettings {
+                        horizontal: super::project::HorizontalAlign::Left,
+                        vertical: super::project::VerticalAlign::Top,
+                    },
+                },
+                styles: HashMap::new(),
+            },
+            file_structure: super::project::ProjectFileStructure {
+                source_files: Vec::new(),
+                resources: Vec::new(),
+                config_files: Vec::new(),
+                generated_files: Vec::new(),
+            },
+            build_config: super::project::BuildConfiguration {
+                target_name: name.to_string(),
+                profiles: super::project::create_default_build_profiles(),
+                dependencies: self.get_gui_dependencies(),
+                features: vec!["default".to_string()],
+                build_scripts: Vec::new(),
+            },
+            custom_settings: HashMap::new(),
+        };
+        
+        output_panel.log("✅ IDE project structure created successfully");
+        Ok(project)
+    }
+    
+    /// Get GUI main.rs template
+    fn get_gui_main_template(&self, project_name: &str) -> String {
+        let pascal_name = self.to_pascal_case(project_name);
+        format!(
+r#"//! {} - Generated by RAD IDE
+//! 
+//! A GUI application created with the RAD IDE visual designer.
+//! This file contains the main application structure and entry point.
+
+mod ui;
+
+use eframe::egui;
+use ui::AppUi;
+
+/// Main application structure
+#[derive(Default)]
+pub struct {}App {{
+    /// UI state and components
+    ui: AppUi,
+}}
+
+impl eframe::App for {}App {{
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {{
+        // Render the main application UI
+        self.ui.render(ctx);
+    }}
+}}
+
+fn main() -> Result<(), eframe::Error> {{
+    let options = eframe::NativeOptions {{
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([800.0, 600.0])
+            .with_title("{}"),
+        ..Default::default()
+    }};
+    
+    eframe::run_native(
+        "{}",
+        options,
+        Box::new(|_cc| Box::new({}App::default())),
+    )
+}}
+"#, 
+            project_name, pascal_name, pascal_name, project_name, project_name, pascal_name
+        )
+    }
+    
+    /// Get UI module template for visual designer
+    fn get_ui_module_template(&self, project_name: &str) -> String {
+        format!(
+r#"//! UI Module for {} - Generated by RAD IDE
+//! 
+//! This module contains the user interface components and layout
+//! that can be edited with the RAD IDE visual designer.
+
+use eframe::egui;
+
+/// Application UI state and components
+#[derive(Default)]
+pub struct AppUi {{
+    // Add your UI state here
+    button_clicked: bool,
+    text_input: String,
+}}
+
+impl AppUi {{
+    /// Render the main UI
+    pub fn render(&mut self, ctx: &egui::Context) {{
+        egui::CentralPanel::default().show(ctx, |ui| {{
+            ui.heading("Welcome to {}!");
+            ui.separator();
+            
+            ui.label("This is a GUI application created with RAD IDE.");
+            ui.label("You can modify this code or use the visual designer to add components.");
+            
+            ui.horizontal(|ui| {{
+                ui.label("Enter text:");
+                ui.text_edit_singleline(&mut self.text_input);
+            }});
+            
+            if ui.button("Click me!").clicked() {{
+                self.button_clicked = !self.button_clicked;
+                println!("Button was clicked! Text: {{}}", self.text_input);
+            }}
+            
+            if self.button_clicked {{
+                ui.label("Button was clicked!");
+            }}
+            
+            ui.separator();
+            ui.label("💡 Tip: Open this project in RAD IDE to use the visual designer!");
+        }});
+    }}
+}}
+"#, 
+            project_name, project_name
+        )
+    }
+    
+    /// Get default GUI components for new projects
+    fn get_default_gui_components(&self) -> Vec<super::project::ComponentData> {
+        vec![
+            super::project::ComponentData {
+                component_type: "Button".to_string(),
+                properties: {
+                    let mut props = HashMap::new();
+                    props.insert("label".to_string(), "Welcome Button".to_string());
+                    props
+                },
+                position: (50.0, 50.0),
+                size: (120.0, 35.0),
+                z_order: 0,
+                locked: false,
+                id: "welcome_button".to_string(),
+            },
+            super::project::ComponentData {
+                component_type: "Label".to_string(),
+                properties: {
+                    let mut props = HashMap::new();
+                    props.insert("text".to_string(), "Created with RAD IDE".to_string());
+                    props
+                },
+                position: (50.0, 100.0),
+                size: (200.0, 25.0),
+                z_order: 1,
+                locked: false,
+                id: "info_label".to_string(),
+            },
+        ]
+    }
+    
+    /// Get GUI-specific dependencies
+    fn get_gui_dependencies(&self) -> Vec<super::project::Dependency> {
+        vec![
+            super::project::Dependency {
+                name: "eframe".to_string(),
+                version: "0.27".to_string(),
+                features: vec!["default".to_string()],
+                optional: false,
+            },
+            super::project::Dependency {
+                name: "egui".to_string(),
+                version: "0.27".to_string(),
+                features: vec!["default".to_string()],
+                optional: false,
+            },
+            super::project::Dependency {
+                name: "serde".to_string(),
+                version: "1.0".to_string(),
+                features: vec!["derive".to_string()],
+                optional: false,
+            },
+        ]
+    }
+    
+    /// Convert string to PascalCase
+    fn to_pascal_case(&self, s: &str) -> String {
+        s.split(|c: char| !c.is_alphanumeric())
+            .filter(|word| !word.is_empty())
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
+                }
+            })
+            .collect()
     }
 
     /// Determine project type from template category

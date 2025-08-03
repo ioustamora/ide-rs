@@ -218,7 +218,7 @@ impl super::ComponentSelection {
         }
     }
 }
-/// Visual guides and rulers system
+/// Visual guides and rulers system with smart alignment features
 pub struct GuideSystem {
     /// Horizontal guides
     pub horizontal_guides: Vec<f32>,
@@ -230,6 +230,65 @@ pub struct GuideSystem {
     pub ruler_color: egui::Color32,
     /// Guide color
     pub guide_color: egui::Color32,
+    /// Smart alignment guides (temporary during drag operations)
+    pub smart_guides: SmartGuides,
+    /// Distance measurement display
+    pub show_distances: bool,
+}
+
+/// Smart alignment guides for enhanced visual design
+pub struct SmartGuides {
+    /// Active alignment guides during drag operations
+    pub active_guides: Vec<AlignmentGuide>,
+    /// Distance measurements between components
+    pub distance_guides: Vec<DistanceGuide>,
+    /// Snap threshold in pixels
+    pub snap_threshold: f32,
+}
+
+/// Individual alignment guide
+#[derive(Clone)]
+pub struct AlignmentGuide {
+    /// Position of the guide line
+    pub position: f32,
+    /// Whether this is a horizontal or vertical guide
+    pub is_horizontal: bool,
+    /// Type of alignment (center, edge, etc.)
+    pub guide_type: AlignmentType,
+    /// Color for this specific guide
+    pub color: egui::Color32,
+}
+
+/// Distance measurement guide
+#[derive(Clone)]
+pub struct DistanceGuide {
+    /// Start point of measurement
+    pub start: egui::Pos2,
+    /// End point of measurement
+    pub end: egui::Pos2,
+    /// Distance value in pixels
+    pub distance: f32,
+    /// Display label for the distance
+    pub label: String,
+}
+
+/// Types of alignment guides
+#[derive(Clone, PartialEq)]
+pub enum AlignmentType {
+    /// Align to left edge
+    LeftEdge,
+    /// Align to right edge
+    RightEdge,
+    /// Align to horizontal center
+    HorizontalCenter,
+    /// Align to top edge
+    TopEdge,
+    /// Align to bottom edge
+    BottomEdge,
+    /// Align to vertical center
+    VerticalCenter,
+    /// Align to baseline (for text)
+    Baseline,
 }
 
 impl Default for GuideSystem {
@@ -240,6 +299,306 @@ impl Default for GuideSystem {
             rulers_visible: true,
             ruler_color: egui::Color32::from_rgb(100, 100, 100),
             guide_color: egui::Color32::from_rgb(0, 150, 255),
+            smart_guides: SmartGuides::default(),
+            show_distances: true,
         }
+    }
+}
+
+impl Default for SmartGuides {
+    fn default() -> Self {
+        Self {
+            active_guides: Vec::new(),
+            distance_guides: Vec::new(),
+            snap_threshold: 5.0,
+        }
+    }
+}
+
+impl GuideSystem {
+    /// Generate smart alignment guides for a dragging component
+    pub fn generate_smart_guides(&mut self, 
+        dragging_rect: egui::Rect, 
+        other_rects: &[(usize, egui::Rect)],
+        form_rect: egui::Rect
+    ) {
+        self.smart_guides.active_guides.clear();
+        self.smart_guides.distance_guides.clear();
+        
+        // Generate alignment guides from other components
+        for (_idx, other_rect) in other_rects {
+            self.generate_alignment_guides_from_rect(dragging_rect, *other_rect);
+        }
+        
+        // Generate alignment guides from form bounds
+        self.generate_form_alignment_guides(dragging_rect, form_rect);
+        
+        // Generate distance measurements
+        self.generate_distance_guides(dragging_rect, other_rects);
+    }
+    
+    /// Generate alignment guides from a single component
+    fn generate_alignment_guides_from_rect(&mut self, dragging_rect: egui::Rect, target_rect: egui::Rect) {
+        let snap_threshold = self.smart_guides.snap_threshold;
+        
+        // Vertical alignment guides
+        let left_distance = (dragging_rect.left() - target_rect.left()).abs();
+        let right_distance = (dragging_rect.right() - target_rect.right()).abs();
+        let h_center_distance = (dragging_rect.center().x - target_rect.center().x).abs();
+        
+        if left_distance <= snap_threshold {
+            self.smart_guides.active_guides.push(AlignmentGuide {
+                position: target_rect.left(),
+                is_horizontal: false,
+                guide_type: AlignmentType::LeftEdge,
+                color: egui::Color32::from_rgb(255, 100, 100),
+            });
+        }
+        
+        if right_distance <= snap_threshold {
+            self.smart_guides.active_guides.push(AlignmentGuide {
+                position: target_rect.right(),
+                is_horizontal: false,
+                guide_type: AlignmentType::RightEdge,
+                color: egui::Color32::from_rgb(255, 100, 100),
+            });
+        }
+        
+        if h_center_distance <= snap_threshold {
+            self.smart_guides.active_guides.push(AlignmentGuide {
+                position: target_rect.center().x,
+                is_horizontal: false,
+                guide_type: AlignmentType::HorizontalCenter,
+                color: egui::Color32::from_rgb(100, 255, 100),
+            });
+        }
+        
+        // Horizontal alignment guides
+        let top_distance = (dragging_rect.top() - target_rect.top()).abs();
+        let bottom_distance = (dragging_rect.bottom() - target_rect.bottom()).abs();
+        let v_center_distance = (dragging_rect.center().y - target_rect.center().y).abs();
+        
+        if top_distance <= snap_threshold {
+            self.smart_guides.active_guides.push(AlignmentGuide {
+                position: target_rect.top(),
+                is_horizontal: true,
+                guide_type: AlignmentType::TopEdge,
+                color: egui::Color32::from_rgb(255, 100, 100),
+            });
+        }
+        
+        if bottom_distance <= snap_threshold {
+            self.smart_guides.active_guides.push(AlignmentGuide {
+                position: target_rect.bottom(),
+                is_horizontal: true,
+                guide_type: AlignmentType::BottomEdge,
+                color: egui::Color32::from_rgb(255, 100, 100),
+            });
+        }
+        
+        if v_center_distance <= snap_threshold {
+            self.smart_guides.active_guides.push(AlignmentGuide {
+                position: target_rect.center().y,
+                is_horizontal: true,
+                guide_type: AlignmentType::VerticalCenter,
+                color: egui::Color32::from_rgb(100, 255, 100),
+            });
+        }
+    }
+    
+    /// Generate alignment guides from form bounds
+    fn generate_form_alignment_guides(&mut self, dragging_rect: egui::Rect, form_rect: egui::Rect) {
+        let snap_threshold = self.smart_guides.snap_threshold;
+        
+        // Form center alignment
+        let h_center_distance = (dragging_rect.center().x - form_rect.center().x).abs();
+        let v_center_distance = (dragging_rect.center().y - form_rect.center().y).abs();
+        
+        if h_center_distance <= snap_threshold {
+            self.smart_guides.active_guides.push(AlignmentGuide {
+                position: form_rect.center().x,
+                is_horizontal: false,
+                guide_type: AlignmentType::HorizontalCenter,
+                color: egui::Color32::from_rgb(100, 100, 255),
+            });
+        }
+        
+        if v_center_distance <= snap_threshold {
+            self.smart_guides.active_guides.push(AlignmentGuide {
+                position: form_rect.center().y,
+                is_horizontal: true,
+                guide_type: AlignmentType::VerticalCenter,
+                color: egui::Color32::from_rgb(100, 100, 255),
+            });
+        }
+    }
+    
+    /// Generate distance measurement guides
+    fn generate_distance_guides(&mut self, dragging_rect: egui::Rect, other_rects: &[(usize, egui::Rect)]) {
+        for (_idx, other_rect) in other_rects {
+            // Horizontal distance
+            if dragging_rect.top() <= other_rect.bottom() && dragging_rect.bottom() >= other_rect.top() {
+                let distance = if dragging_rect.right() < other_rect.left() {
+                    other_rect.left() - dragging_rect.right()
+                } else if other_rect.right() < dragging_rect.left() {
+                    dragging_rect.left() - other_rect.right()
+                } else {
+                    0.0 // Overlapping
+                };
+                
+                if distance > 0.0 && distance < 100.0 {
+                    let start = if dragging_rect.right() < other_rect.left() {
+                        egui::pos2(dragging_rect.right(), dragging_rect.center().y)
+                    } else {
+                        egui::pos2(other_rect.right(), other_rect.center().y)
+                    };
+                    let end = if dragging_rect.right() < other_rect.left() {
+                        egui::pos2(other_rect.left(), other_rect.center().y)
+                    } else {
+                        egui::pos2(dragging_rect.left(), dragging_rect.center().y)
+                    };
+                    
+                    self.smart_guides.distance_guides.push(DistanceGuide {
+                        start,
+                        end,
+                        distance,
+                        label: format!("{:.0}px", distance),
+                    });
+                }
+            }
+            
+            // Vertical distance
+            if dragging_rect.left() <= other_rect.right() && dragging_rect.right() >= other_rect.left() {
+                let distance = if dragging_rect.bottom() < other_rect.top() {
+                    other_rect.top() - dragging_rect.bottom()
+                } else if other_rect.bottom() < dragging_rect.top() {
+                    dragging_rect.top() - other_rect.bottom()
+                } else {
+                    0.0 // Overlapping
+                };
+                
+                if distance > 0.0 && distance < 100.0 {
+                    let start = if dragging_rect.bottom() < other_rect.top() {
+                        egui::pos2(dragging_rect.center().x, dragging_rect.bottom())
+                    } else {
+                        egui::pos2(other_rect.center().x, other_rect.bottom())
+                    };
+                    let end = if dragging_rect.bottom() < other_rect.top() {
+                        egui::pos2(other_rect.center().x, other_rect.top())
+                    } else {
+                        egui::pos2(dragging_rect.center().x, dragging_rect.top())
+                    };
+                    
+                    self.smart_guides.distance_guides.push(DistanceGuide {
+                        start,
+                        end,
+                        distance,
+                        label: format!("{:.0}px", distance),
+                    });
+                }
+            }
+        }
+    }
+    
+    /// Draw smart alignment guides
+    pub fn draw_smart_guides(&self, ui: &mut egui::Ui, canvas_rect: egui::Rect) {
+        let painter = ui.painter();
+        
+        // Draw alignment guides
+        for guide in &self.smart_guides.active_guides {
+            if guide.is_horizontal {
+                painter.line_segment(
+                    [egui::pos2(canvas_rect.min.x, guide.position), egui::pos2(canvas_rect.max.x, guide.position)],
+                    egui::Stroke::new(1.5, guide.color)
+                );
+            } else {
+                painter.line_segment(
+                    [egui::pos2(guide.position, canvas_rect.min.y), egui::pos2(guide.position, canvas_rect.max.y)],
+                    egui::Stroke::new(1.5, guide.color)
+                );
+            }
+        }
+        
+        // Draw distance guides
+        if self.show_distances {
+            for distance_guide in &self.smart_guides.distance_guides {
+                // Draw measurement line
+                painter.line_segment(
+                    [distance_guide.start, distance_guide.end],
+                    egui::Stroke::new(1.0, egui::Color32::from_rgb(255, 150, 0))
+                );
+                
+                // Draw end caps
+                let cap_size = 3.0;
+                painter.circle_filled(distance_guide.start, cap_size, egui::Color32::from_rgb(255, 150, 0));
+                painter.circle_filled(distance_guide.end, cap_size, egui::Color32::from_rgb(255, 150, 0));
+                
+                // Draw distance label
+                let mid_point = egui::pos2(
+                    (distance_guide.start.x + distance_guide.end.x) / 2.0,
+                    (distance_guide.start.y + distance_guide.end.y) / 2.0
+                );
+                
+                // Background for text
+                let text_size = painter.layout_no_wrap(
+                    distance_guide.label.clone(),
+                    egui::FontId::proportional(10.0),
+                    egui::Color32::WHITE
+                ).size();
+                
+                let text_rect = egui::Rect::from_center_size(mid_point, text_size + egui::vec2(4.0, 2.0));
+                painter.rect_filled(text_rect, 2.0, egui::Color32::from_rgba_unmultiplied(0, 0, 0, 180));
+                
+                painter.text(
+                    mid_point,
+                    egui::Align2::CENTER_CENTER,
+                    &distance_guide.label,
+                    egui::FontId::proportional(10.0),
+                    egui::Color32::WHITE
+                );
+            }
+        }
+    }
+    
+    /// Get snap position for alignment
+    pub fn get_snap_position(&self, original_pos: egui::Pos2, dragging_size: egui::Vec2) -> egui::Pos2 {
+        let mut snapped_pos = original_pos;
+        
+        // Find the closest alignment guide
+        for guide in &self.smart_guides.active_guides {
+            if !guide.is_horizontal {
+                // Vertical guide - adjust X position
+                let target_x = match guide.guide_type {
+                    AlignmentType::LeftEdge => guide.position,
+                    AlignmentType::RightEdge => guide.position - dragging_size.x,
+                    AlignmentType::HorizontalCenter => guide.position - dragging_size.x / 2.0,
+                    _ => continue,
+                };
+                
+                if (original_pos.x - target_x).abs() <= self.smart_guides.snap_threshold {
+                    snapped_pos.x = target_x;
+                }
+            } else {
+                // Horizontal guide - adjust Y position
+                let target_y = match guide.guide_type {
+                    AlignmentType::TopEdge => guide.position,
+                    AlignmentType::BottomEdge => guide.position - dragging_size.y,
+                    AlignmentType::VerticalCenter => guide.position - dragging_size.y / 2.0,
+                    _ => continue,
+                };
+                
+                if (original_pos.y - target_y).abs() <= self.smart_guides.snap_threshold {
+                    snapped_pos.y = target_y;
+                }
+            }
+        }
+        
+        snapped_pos
+    }
+    
+    /// Clear all smart guides
+    pub fn clear_smart_guides(&mut self) {
+        self.smart_guides.active_guides.clear();
+        self.smart_guides.distance_guides.clear();
     }
 }

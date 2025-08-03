@@ -276,6 +276,22 @@ pub struct IdeAppState {
     /// - Component additions/modifications trigger code regeneration
     /// - Bidirectional sync with debouncing for performance
     pub realtime_sync: RealtimeSync,
+    
+    // ========================================================================================
+    // PROJECT CREATION SYSTEM - New GUI project creation with cargo integration
+    // ========================================================================================
+    
+    /// New project name for GUI project creation dialog
+    /// 
+    /// Stores the user-entered project name for cargo new integration.
+    /// Validated for cargo compatibility before project creation.
+    pub new_project_name: String,
+    
+    /// New project location path for GUI project creation dialog
+    /// 
+    /// Stores the selected directory path where the new project will be created.
+    /// Defaults to current working directory if not specified.
+    pub new_project_location: String,
 }
 
 impl IdeAppState {
@@ -319,6 +335,8 @@ impl IdeAppState {
             movement_manager: super::animated_ui::MovementManager::new(),
             file_manager: FileManager::new(),
             realtime_sync: RealtimeSync::new(),
+            new_project_name: String::new(),
+            new_project_location: String::new(),
         }
     }
 
