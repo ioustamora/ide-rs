@@ -48,6 +48,158 @@ impl LayoutManager {
             default_size
         })
     }
+    
+    /// Align selected components
+    pub fn align_components(&mut self, component_indices: &[usize], operation: AlignmentOperation) {
+        if component_indices.len() < 2 {
+            return;
+        }
+        
+        let mut component_bounds: Vec<ComponentBounds> = component_indices
+            .iter()
+            .filter_map(|&idx| {
+                let pos = self.positions.get(&idx)?;
+                let size = self.sizes.get(&idx)?;
+                Some(ComponentBounds {
+                    position: *pos,
+                    size: *size,
+                    index: idx,
+                })
+            })
+            .collect();
+        
+        if component_bounds.is_empty() {
+            return;
+        }
+        
+        match operation {
+            AlignmentOperation::AlignLeft => {
+                let min_x = component_bounds
+                    .iter()
+                    .map(|b| b.position.x)
+                    .fold(f32::INFINITY, f32::min);
+                for bounds in &mut component_bounds {
+                    bounds.position.x = min_x;
+                    self.positions.insert(bounds.index, bounds.position);
+                }
+            }
+            AlignmentOperation::AlignRight => {
+                let max_x = component_bounds
+                    .iter()
+                    .map(|b| b.position.x + b.size.x)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                for bounds in &mut component_bounds {
+                    bounds.position.x = max_x - bounds.size.x;
+                    self.positions.insert(bounds.index, bounds.position);
+                }
+            }
+            AlignmentOperation::AlignTop => {
+                let min_y = component_bounds
+                    .iter()
+                    .map(|b| b.position.y)
+                    .fold(f32::INFINITY, f32::min);
+                for bounds in &mut component_bounds {
+                    bounds.position.y = min_y;
+                    self.positions.insert(bounds.index, bounds.position);
+                }
+            }
+            AlignmentOperation::AlignBottom => {
+                let max_y = component_bounds
+                    .iter()
+                    .map(|b| b.position.y + b.size.y)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                for bounds in &mut component_bounds {
+                    bounds.position.y = max_y - bounds.size.y;
+                    self.positions.insert(bounds.index, bounds.position);
+                }
+            }
+            AlignmentOperation::AlignCenterHorizontal => {
+                // Get the center of all selected components
+                let total_x = component_bounds.iter().map(|b| b.position.x + b.size.x / 2.0).sum::<f32>();
+                let center_x = total_x / component_bounds.len() as f32;
+                for bounds in &mut component_bounds {
+                    bounds.position.x = center_x - bounds.size.x / 2.0;
+                    self.positions.insert(bounds.index, bounds.position);
+                }
+            }
+            AlignmentOperation::AlignCenterVertical => {
+                // Get the center of all selected components
+                let total_y = component_bounds.iter().map(|b| b.position.y + b.size.y / 2.0).sum::<f32>();
+                let center_y = total_y / component_bounds.len() as f32;
+                for bounds in &mut component_bounds {
+                    bounds.position.y = center_y - bounds.size.y / 2.0;
+                    self.positions.insert(bounds.index, bounds.position);
+                }
+            }
+            _ => {} // Other operations not implemented
+        }
+    }
+    
+    /// Distribute components evenly
+    pub fn distribute_components(&mut self, component_indices: &[usize], horizontal: bool) {
+        if component_indices.len() < 3 {
+            return;
+        }
+        
+        let mut component_bounds: Vec<ComponentBounds> = component_indices
+            .iter()
+            .filter_map(|&idx| {
+                let pos = self.positions.get(&idx)?;
+                let size = self.sizes.get(&idx)?;
+                Some(ComponentBounds {
+                    position: *pos,
+                    size: *size,
+                    index: idx,
+                })
+            })
+            .collect();
+        
+        if component_bounds.len() < 3 {
+            return;
+        }
+        
+        if horizontal {
+            // Sort by X position
+            component_bounds.sort_by(|a, b| a.position.x.partial_cmp(&b.position.x).unwrap());
+            
+            let first_x = component_bounds.first().unwrap().position.x;
+            let last_x = component_bounds.last().unwrap().position.x + component_bounds.last().unwrap().size.x;
+            let total_width = last_x - first_x;
+            
+            // Calculate spacing
+            let component_widths: f32 = component_bounds.iter().map(|b| b.size.x).sum();
+            let available_space = total_width - component_widths;
+            let spacing = available_space / (component_bounds.len() - 1) as f32;
+            
+            // Distribute components
+            let mut current_x = first_x;
+            for bounds in &mut component_bounds {
+                bounds.position.x = current_x;
+                self.positions.insert(bounds.index, bounds.position);
+                current_x += bounds.size.x + spacing;
+            }
+        } else {
+            // Sort by Y position
+            component_bounds.sort_by(|a, b| a.position.y.partial_cmp(&b.position.y).unwrap());
+            
+            let first_y = component_bounds.first().unwrap().position.y;
+            let last_y = component_bounds.last().unwrap().position.y + component_bounds.last().unwrap().size.y;
+            let total_height = last_y - first_y;
+            
+            // Calculate spacing
+            let component_heights: f32 = component_bounds.iter().map(|b| b.size.y).sum();
+            let available_space = total_height - component_heights;
+            let spacing = available_space / (component_bounds.len() - 1) as f32;
+            
+            // Distribute components
+            let mut current_y = first_y;
+            for bounds in &mut component_bounds {
+                bounds.position.y = current_y;
+                self.positions.insert(bounds.index, bounds.position);
+                current_y += bounds.size.y + spacing;
+            }
+        }
+    }
 }
 
 /// Alignment and distribution tools

@@ -271,6 +271,9 @@ impl ContentManager {
             crate::editor::visual_designer::history::DesignOperation::Add {
                 component_id: new_component_idx,
                 position,
+                size: egui::Vec2::new(100.0, 32.0), // Default size
+                component_type: "Button".to_string(), // Default type
+                component_data: "{}".to_string(), // Default empty data
             }
         );
     }
@@ -324,22 +327,57 @@ impl ContentManager {
             // LSP status
             let lsp_status = if app_state.lsp_client.is_connected() {
                 "🟢 LSP Connected"
+            } else if app_state.enhanced_lsp_client.is_connected() {
+                "🟢 Enhanced LSP Connected"
             } else {
                 "🔴 LSP Disconnected"
             };
             ui.label(lsp_status);
+            
+            // Enhanced LSP features toggle
+            if ui.button("⚡").on_hover_text("Enable Enhanced LSP Features").clicked() {
+                Self::enable_enhanced_code_editor(app_state);
+            }
         });
         
         ui.separator();
         
-        // Main code editor area
-        app_state.code_editor.render(ui);
-        
-        // Render LSP diagnostics if available
-        if app_state.lsp_client.has_diagnostics() {
-            ui.separator();
-            ui.label("Diagnostics:");
-            app_state.lsp_client.render_diagnostics(ui);
+        // Use advanced code editor if available, otherwise fallback to basic editor
+        if let Some(ref mut advanced_editor) = app_state.advanced_code_editor {
+            advanced_editor.render(ui, &mut app_state.lsp_client);
+        } else {
+            // Main code editor area
+            app_state.code_editor.render(ui);
+            
+            // Render LSP diagnostics if available
+            if app_state.lsp_client.has_diagnostics() {
+                ui.separator();
+                ui.label("Diagnostics:");
+                app_state.lsp_client.render_diagnostics(ui);
+            }
+        }
+    }
+    
+    /// Enable enhanced code editor with advanced LSP features
+    fn enable_enhanced_code_editor(app_state: &mut IdeAppState) {
+        if app_state.advanced_code_editor.is_none() {
+            // Create advanced code editor with current file content
+            let current_content = app_state.code_editor.code.clone();
+            let file_uri = "file:///current_file.rs".to_string(); // TODO: Use actual file URI
+            let language = "rust".to_string();
+            
+            let mut advanced_editor = crate::editor::advanced_code_editor::AdvancedCodeEditor::new(
+                file_uri,
+                language,
+                current_content
+            );
+            
+            // Start LSP integration
+            if let Err(e) = advanced_editor.start_lsp() {
+                eprintln!("Failed to start enhanced LSP: {:?}", e);
+            }
+            
+            app_state.advanced_code_editor = Some(advanced_editor);
         }
     }
     
@@ -360,11 +398,11 @@ impl ContentManager {
             if app_state.design_mode {
                 if i.modifiers.ctrl && i.key_pressed(egui::Key::Z) {
                     // Undo
-                    app_state.visual_designer.undo();
+                    app_state.visual_designer.undo(&mut app_state.components);
                 }
                 if i.modifiers.ctrl && i.key_pressed(egui::Key::Y) {
                     // Redo
-                    app_state.visual_designer.redo();
+                    app_state.visual_designer.redo(&mut app_state.components);
                 }
                 if i.key_pressed(egui::Key::Delete) {
                     // Delete selected component
@@ -393,6 +431,9 @@ impl ContentManager {
             app_state.visual_designer.history.add_to_history(
                 crate::editor::visual_designer::history::DesignOperation::Delete {
                     component_id: component_idx,
+                    position: egui::Pos2::ZERO, // Would need actual position
+                    size: egui::Vec2::new(100.0, 32.0), // Would need actual size
+                    component_type: "Button".to_string(), // Would need actual type
                     component_data: format!("Deleted component {}", component_idx),
                 }
             );

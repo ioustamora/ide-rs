@@ -786,6 +786,18 @@ impl LspClient {
         !self.diagnostics.is_empty()
     }
 
+    /// Stop the language server
+    pub fn stop(&mut self) {
+        if let Some(mut process) = self.server_process.take() {
+            let _ = process.kill();
+            let _ = process.wait();
+        }
+        self.pending_requests.clear();
+        self.diagnostics.clear();
+        self.document_versions.clear();
+        self.server_capabilities = None;
+    }
+
     /// Render diagnostics in the UI
     pub fn render_diagnostics(&self, ui: &mut egui::Ui) {
         ui.heading("Diagnostics");

@@ -10,8 +10,11 @@ use crate::editor::visual_designer::VisualDesigner;
 use crate::editor::smart_ai_assistant::SmartAiAssistant;
 use crate::editor::lsp_integration::LspClient;
 use crate::editor::code_editor::CodeEditor;
+use crate::editor::advanced_code_editor::AdvancedCodeEditor;
+use crate::editor::enhanced_lsp_client::EnhancedLspClient;
 use crate::editor::project_manager::ProjectManager;
 use crate::editor::inspector::PropertyInspector;
+use crate::editor::object_inspector::ObjectInspector;
 use crate::editor::live_feedback::LiveFeedbackSystem;
 use crate::editor::hierarchy_manager::HierarchyManager;
 use crate::editor::modern_ide_integration::ModernIdeIntegration;
@@ -174,6 +177,24 @@ pub struct IdeAppState {
     /// - Code completion and IntelliSense
     /// - Go-to-definition and symbol search
     pub lsp_client: LspClient,
+    
+    /// Enhanced LSP client with advanced IDE features.
+    /// 
+    /// Professional LSP client providing VS Code-style capabilities:
+    /// - Advanced go-to-definition and find references
+    /// - Code actions and quick fixes
+    /// - Signature help and parameter hints
+    /// - Enhanced diagnostics with error squiggles
+    pub enhanced_lsp_client: EnhancedLspClient,
+    
+    /// Advanced code editor with enhanced LSP integration.
+    /// 
+    /// Professional code editor providing:
+    /// - Real-time diagnostics with error squiggles
+    /// - Go-to-definition click handling
+    /// - Advanced autocomplete with documentation
+    /// - Multi-cursor support and advanced text editing
+    pub advanced_code_editor: Option<AdvancedCodeEditor>,
 
     // ========================================================================================
     // PROJECT AND FILE MANAGEMENT - Handles project lifecycle and file operations
@@ -196,6 +217,15 @@ pub struct IdeAppState {
     /// - Component property validation
     /// - Real-time property updates
     pub property_inspector: PropertyInspector,
+    
+    /// Object Inspector with component hierarchy tree (Delphi/C++ Builder inspired).
+    /// 
+    /// Provides hierarchical component navigation:
+    /// - Tree view of all form components
+    /// - Parent-child relationship visualization
+    /// - Component selection and navigation
+    /// - Rename and organize components
+    pub object_inspector: ObjectInspector,
     
     /// Live visual feedback system for real-time design assistance.
     /// 
@@ -318,14 +348,17 @@ impl IdeAppState {
             visual_designer: VisualDesigner::new(),
             smart_ai: SmartAiAssistant::new(),
             lsp_client: LspClient::new(),
+            enhanced_lsp_client: EnhancedLspClient::new(),
+            advanced_code_editor: None,
             design_mode: true,
             code_editor: CodeEditor::with_content("rust", Self::default_rust_code()),
             project_manager: ProjectManager::new(),
             show_project_panel: true,
             show_modern_ide_panel: false,
             active_left_tab: "project".to_string(),
-            active_right_tab: "properties".to_string(),
+            active_right_tab: "objects".to_string(),
             property_inspector: PropertyInspector::new(),
+            object_inspector: ObjectInspector::new(),
             live_feedback: LiveFeedbackSystem::new(),
             hierarchy_manager: HierarchyManager::new(),
             modern_ide: ModernIdeIntegration::new(),

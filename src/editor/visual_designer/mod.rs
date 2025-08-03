@@ -10,6 +10,7 @@ pub mod smart_editing;
 pub mod performance;
 pub mod accessibility;
 pub mod state;
+pub mod context_menu;
 
 // Re-export key types for easier access
 pub use layout::{
@@ -50,6 +51,7 @@ pub use state::{
 };
 pub use smart_editing::SmartEditingSystem;
 pub use accessibility::{AccessibilityValidator, AccessibilityReport};
+pub use context_menu::{ContextMenuManager, ContextMenuAction};
 
 /// Main Visual Designer struct that orchestrates all subsystems
 #[derive(Default)]
@@ -74,12 +76,15 @@ pub struct VisualDesigner {
     pub drag_state: crate::ide_app::drag_drop::DragState,
     /// Movement animation manager for smooth component transitions
     pub movement_manager: MovementManager,
+    /// Context menu manager for right-click operations
+    pub context_menu: ContextMenuManager,
 }
 
 impl VisualDesigner {
     pub fn new() -> Self {
         let mut designer = Self::default();
         designer.movement_manager = MovementManager::new();
+        designer.context_menu = ContextMenuManager::new();
         designer
     }
 
@@ -95,13 +100,38 @@ impl VisualDesigner {
     }
 
     /// Undo last operation
-    pub fn undo(&mut self) -> bool {
-        self.history.undo(&mut self.layout)
+    pub fn undo(&mut self, components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) -> bool {
+        self.history.undo(&mut self.layout, components)
     }
 
     /// Redo last undone operation
-    pub fn redo(&mut self) -> bool {
-        self.history.redo(&mut self.layout)
+    pub fn redo(&mut self, components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) -> bool {
+        self.history.redo(&mut self.layout, components)
+    }
+    
+    /// Start a batch of operations for undo/redo
+    pub fn begin_operation_batch(&mut self, description: String) {
+        self.history.begin_batch(description);
+    }
+    
+    /// End the current batch of operations
+    pub fn end_operation_batch(&mut self) {
+        self.history.end_batch();
+    }
+    
+    /// Check for batch timeout and auto-end if needed
+    pub fn update_history(&mut self) {
+        self.history.maybe_end_batch_on_timeout();
+    }
+    
+    /// Get undo/redo information for UI display
+    pub fn get_history_info(&self) -> (usize, usize, Option<&str>, Option<&str>) {
+        (
+            self.history.undo_count(),
+            self.history.redo_count(),
+            self.history.next_undo_description(),
+            self.history.next_redo_description(),
+        )
     }
 
     /// Render the design canvas with the root form and all components
@@ -168,11 +198,25 @@ impl VisualDesigner {
             self.selection.primary = Some(usize::MAX);
             clicked_component = Some(usize::MAX);
         }
+        
+        // Handle right-click on form for context menu
+        if form_response.secondary_clicked() {
+            if let Some(pointer_pos) = ui.ctx().pointer_latest_pos() {
+                self.context_menu.show_at(pointer_pos, Some(usize::MAX));
+            }
+        }
 
         // Update movement animations
         self.movement_manager.update_all(ui.ctx());
         
-        // Render components on top of the form
+        // Update history (check for batch timeout)
+        self.update_history();
+        
+        // Collect component data and handle interactions separately to avoid borrowing conflicts
+        let mut component_data = Vec::new();
+        let mut component_responses = Vec::new();
+        
+        // First pass: collect component data and render
         for (idx, component) in components.iter_mut().enumerate() {
             let layout_pos = self.layout.get_or_init_position(idx);
             let size = self.layout.get_or_init_size(idx, component.name());
@@ -210,6 +254,12 @@ impl VisualDesigner {
             // Handle interaction
             let response = ui.interact(component_rect, egui::Id::new(format!("component_{}", idx)), egui::Sense::click_and_drag());
             
+            component_data.push((idx, layout_pos, size, animated_pos, component_rect, component.name().to_string()));
+            component_responses.push((idx, response, is_selected));
+        }
+        
+        // Second pass: handle interactions without borrowing conflicts
+        for (idx, response, is_selected) in component_responses {
             if response.clicked() {
                 // Select component
                 if !ui.input(|i| i.modifiers.ctrl) {
@@ -220,24 +270,51 @@ impl VisualDesigner {
                 clicked_component = Some(idx);
             }
             
+            // Handle right-click for context menu
+            if response.secondary_clicked() {
+                // Ensure component is selected when right-clicked
+                if !self.selection.selected.contains(&idx) {
+                    self.selection.selected.clear();
+                    self.selection.selected.insert(idx);
+                    self.selection.primary = Some(idx);
+                }
+                
+                if let Some(pointer_pos) = ui.ctx().pointer_latest_pos() {
+                    self.context_menu.show_at(pointer_pos, Some(idx));
+                }
+            }
+            
+            if response.drag_started() && is_selected {
+                // Start a move operation batch
+                let description = if self.selection.selected.len() == 1 {
+                    "Move Component".to_string()
+                } else {
+                    format!("Move {} Components", self.selection.selected.len())
+                };
+                self.begin_operation_batch(description);
+            }
+            
             if response.dragged() && is_selected {
+                // Find component data for this index
+                let (_, _, size, animated_pos, _, _) = component_data.iter()
+                    .find(|(i, _, _, _, _, _)| *i == idx)
+                    .unwrap();
+                
                 // Get current component rect for smart guides
                 let current_rect = egui::Rect::from_min_size(
                     form_rect.min + animated_pos.to_vec2(), 
-                    size
+                    *size
                 );
                 
                 // Collect other component rects for smart guides
                 let mut other_rects = Vec::new();
-                for (other_idx, _) in components.iter().enumerate() {
-                    if other_idx != idx && !self.selection.selected.contains(&other_idx) {
-                        let other_pos = self.layout.get_or_init_position(other_idx);
-                        let other_size = self.layout.get_or_init_size(other_idx, components[other_idx].name());
+                for (other_idx, other_pos, other_size, _, _, _) in &component_data {
+                    if *other_idx != idx && !self.selection.selected.contains(other_idx) {
                         let other_rect = egui::Rect::from_min_size(
                             form_rect.min + other_pos.to_vec2(), 
-                            other_size
+                            *other_size
                         );
-                        other_rects.push((other_idx, other_rect));
+                        other_rects.push((*other_idx, other_rect));
                     }
                 }
                 
@@ -253,16 +330,23 @@ impl VisualDesigner {
                         
                         // Apply smart snapping if enabled
                         let snapped_pos = if self.grid.snap_enabled {
-                            let component_size = self.layout.get_or_init_size(selected_idx, 
-                                if selected_idx < components.len() { components[selected_idx].name() } else { "Unknown" });
-                            let component_rect = egui::Rect::from_min_size(form_rect.min + new_pos.to_vec2(), component_size);
+                            // Find component size
+                            let component_size = component_data.iter()
+                                .find(|(i, _, _, _, _, _)| *i == selected_idx)
+                                .map(|(_, _, size, _, _, _)| *size)
+                                .unwrap_or_else(|| egui::Vec2::new(100.0, 32.0));
                             
                             // First try smart guide snapping
                             let guide_snapped = self.guides.get_snap_position(new_pos, component_size);
                             
                             // Then apply grid snapping if no guide snap occurred
                             if guide_snapped == new_pos && self.grid.snap_enabled {
-                                self.snap_to_grid(new_pos)
+                                // Calculate grid snapping without borrowing self
+                                let grid_size = self.grid.size;
+                                egui::Pos2::new(
+                                    (new_pos.x / grid_size).round() * grid_size,
+                                    (new_pos.y / grid_size).round() * grid_size
+                                )
                             } else {
                                 guide_snapped
                             }
@@ -278,7 +362,14 @@ impl VisualDesigner {
                         movement_anim.move_to(snapped_pos);
                     }
                 }
-            } else {
+            }
+            
+            if response.drag_stopped() && is_selected {
+                // End the move operation batch
+                self.end_operation_batch();
+                // Clear smart guides when drag stops
+                self.guides.clear_smart_guides();
+            } else if !response.dragged() {
                 // Clear smart guides when not dragging
                 self.guides.clear_smart_guides();
             }
@@ -291,6 +382,16 @@ impl VisualDesigner {
         let canvas_rect = egui::Rect::from_min_size(ui.cursor().left_top(), canvas_size);
         self.guides.draw_guides(ui, canvas_rect);
         self.guides.draw_smart_guides(ui, canvas_rect);
+        
+        // Handle keyboard shortcuts
+        if let Some(action) = self.context_menu.handle_keyboard_shortcuts(ui, &self.selection.selected) {
+            self.handle_context_menu_action(action, components);
+        }
+        
+        // Render context menu and handle actions
+        if let Some(action) = self.context_menu.render_context_menu(ui, &self.selection.selected) {
+            self.handle_context_menu_action(action, components);
+        }
         
         // Return the clicked component for selection synchronization
         clicked_component
@@ -832,5 +933,332 @@ impl VisualDesigner {
         self.selection.selected.clear();
         self.selection.selected.insert(component_idx);
         self.selection.primary = Some(component_idx);
+    }
+    
+    /// Handle context menu actions
+    fn handle_context_menu_action(
+        &mut self,
+        action: ContextMenuAction,
+        components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>
+    ) {
+        match action {
+            ContextMenuAction::Copy => {
+                self.context_menu.copy_to_clipboard(components, &self.selection.selected);
+            }
+            ContextMenuAction::Cut => {
+                self.context_menu.cut_to_clipboard(components, &self.selection.selected);
+                // Mark selected components for deletion (handled below)
+                self.delete_selected_components(components);
+            }
+            ContextMenuAction::Paste => {
+                if self.context_menu.can_paste() {
+                    // Implementation would depend on clipboard format
+                    // For now, just clear clipboard
+                    self.context_menu.clear_clipboard();
+                }
+            }
+            ContextMenuAction::Delete => {
+                self.delete_selected_components(components);
+            }
+            ContextMenuAction::Duplicate => {
+                self.duplicate_selected_components(components);
+            }
+            ContextMenuAction::BringToFront => {
+                self.bring_selected_to_front(components);
+            }
+            ContextMenuAction::SendToBack => {
+                self.send_selected_to_back(components);
+            }
+            ContextMenuAction::BringForward => {
+                self.bring_selected_forward(components);
+            }
+            ContextMenuAction::SendBackward => {
+                self.send_selected_backward(components);
+            }
+            ContextMenuAction::AlignLeft => {
+                self.align_selected_components(AlignmentOperation::AlignLeft);
+            }
+            ContextMenuAction::AlignCenter => {
+                self.align_selected_components(AlignmentOperation::AlignCenterHorizontal);
+            }
+            ContextMenuAction::AlignRight => {
+                self.align_selected_components(AlignmentOperation::AlignRight);
+            }
+            ContextMenuAction::AlignTop => {
+                self.align_selected_components(AlignmentOperation::AlignTop);
+            }
+            ContextMenuAction::AlignMiddle => {
+                self.align_selected_components(AlignmentOperation::AlignCenterVertical);
+            }
+            ContextMenuAction::AlignBottom => {
+                self.align_selected_components(AlignmentOperation::AlignBottom);
+            }
+            ContextMenuAction::DistributeHorizontally => {
+                self.distribute_selected_components(true);
+            }
+            ContextMenuAction::DistributeVertically => {
+                self.distribute_selected_components(false);
+            }
+            ContextMenuAction::MakeSameWidth => {
+                self.make_selected_same_width(components);
+            }
+            ContextMenuAction::MakeSameHeight => {
+                self.make_selected_same_height(components);
+            }
+            ContextMenuAction::MakeSameSize => {
+                self.make_selected_same_size(components);
+            }
+            ContextMenuAction::ResetToDefault => {
+                self.reset_selected_to_default(components);
+            }
+            _ => {
+                // Handle other actions or show not implemented message
+                println!("Context menu action {:?} not yet implemented", action);
+            }
+        }
+    }
+    
+    /// Delete selected components
+    fn delete_selected_components(&mut self, components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) {
+        let mut indices_to_remove: Vec<usize> = self.selection.selected.iter().copied().collect();
+        indices_to_remove.sort_by(|a, b| b.cmp(a)); // Sort in reverse order to avoid index shifting
+        
+        for &idx in &indices_to_remove {
+            if idx != usize::MAX && idx < components.len() { // Don't delete the form
+                components.remove(idx);
+                // Remove from layout data
+                self.layout.positions.remove(&idx);
+                self.layout.sizes.remove(&idx);
+                // Shift indices for remaining components
+                self.shift_component_indices_after_removal(idx);
+            }
+        }
+        
+        self.selection.selected.clear();
+        self.selection.primary = None;
+    }
+    
+    /// Duplicate selected components
+    fn duplicate_selected_components(&mut self, components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) {
+        let selected: Vec<usize> = self.selection.selected.iter().copied().collect();
+        let offset = egui::Vec2::new(20.0, 20.0); // Offset for duplicated components
+        
+        self.selection.selected.clear();
+        
+        for &idx in &selected {
+            if idx != usize::MAX && idx < components.len() {
+                // Clone component (this is a simplified approach)
+                let original_component = &components[idx];
+                let new_component = self.clone_component(original_component);
+                
+                let new_idx = components.len();
+                components.push(new_component);
+                
+                // Copy layout data with offset
+                if let Some(&pos) = self.layout.positions.get(&idx) {
+                    self.layout.positions.insert(new_idx, pos + offset);
+                }
+                if let Some(&size) = self.layout.sizes.get(&idx) {
+                    self.layout.sizes.insert(new_idx, size);
+                }
+                
+                // Select the new component
+                self.selection.selected.insert(new_idx);
+                self.selection.primary = Some(new_idx);
+            }
+        }
+    }
+    
+    /// Clone a component (simplified implementation)
+    fn clone_component(&self, component: &Box<dyn crate::rcl::ui::component::Component>) -> Box<dyn crate::rcl::ui::component::Component> {
+        // This is a simplified approach - in a real implementation you'd need proper component cloning
+        use crate::rcl::ui::component::Component;
+        
+        match component.name() {
+            "Button" => Box::new(crate::rcl::ui::basic::button::Button::new("Button Copy".to_string())),
+            "Label" => Box::new(crate::rcl::ui::basic::label::Label::new("Label Copy".to_string())),
+            "TextBox" => Box::new(crate::rcl::ui::basic::textbox::TextBox::new("".to_string())),
+            "Checkbox" => Box::new(crate::rcl::ui::basic::checkbox::Checkbox::new("Checkbox Copy".to_string(), false)),
+            "Slider" => Box::new(crate::rcl::ui::basic::slider::Slider::new(0.0, 0.0, 100.0)),
+            _ => Box::new(crate::rcl::ui::basic::button::Button::new("Copy".to_string())),
+        }
+    }
+    
+    /// Shift component indices after a component is removed
+    fn shift_component_indices_after_removal(&mut self, removed_idx: usize) {
+        // Update layout positions and sizes
+        let mut new_positions = std::collections::HashMap::new();
+        let mut new_sizes = std::collections::HashMap::new();
+        
+        for (&idx, &pos) in &self.layout.positions {
+            if idx > removed_idx {
+                new_positions.insert(idx - 1, pos);
+            } else if idx < removed_idx {
+                new_positions.insert(idx, pos);
+            }
+        }
+        
+        for (&idx, &size) in &self.layout.sizes {
+            if idx > removed_idx {
+                new_sizes.insert(idx - 1, size);
+            } else if idx < removed_idx {
+                new_sizes.insert(idx, size);
+            }
+        }
+        
+        self.layout.positions = new_positions;
+        self.layout.sizes = new_sizes;
+        
+        // Update selection indices
+        let mut new_selection = std::collections::HashSet::new();
+        for &idx in &self.selection.selected {
+            if idx > removed_idx {
+                new_selection.insert(idx - 1);
+            } else if idx < removed_idx {
+                new_selection.insert(idx);
+            }
+        }
+        self.selection.selected = new_selection;
+        
+        // Update primary selection
+        if let Some(primary) = self.selection.primary {
+            if primary > removed_idx {
+                self.selection.primary = Some(primary - 1);
+            } else if primary == removed_idx {
+                self.selection.primary = None;
+            }
+        }
+    }
+    
+    /// Bring selected components to front (layer management placeholder)
+    fn bring_selected_to_front(&mut self, _components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) {
+        // Layer management would be implemented here
+        println!("Bring to front - layer management not yet implemented");
+    }
+    
+    /// Send selected components to back (layer management placeholder)
+    fn send_selected_to_back(&mut self, _components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) {
+        // Layer management would be implemented here
+        println!("Send to back - layer management not yet implemented");
+    }
+    
+    /// Bring selected components forward (layer management placeholder)
+    fn bring_selected_forward(&mut self, _components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) {
+        // Layer management would be implemented here
+        println!("Bring forward - layer management not yet implemented");
+    }
+    
+    /// Send selected components backward (layer management placeholder)
+    fn send_selected_backward(&mut self, _components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) {
+        // Layer management would be implemented here
+        println!("Send backward - layer management not yet implemented");
+    }
+    
+    /// Align selected components using existing alignment system
+    fn align_selected_components(&mut self, alignment: AlignmentOperation) {
+        if self.selection.selected.len() < 2 {
+            return;
+        }
+        
+        let selected: Vec<usize> = self.selection.selected.iter().copied().collect();
+        self.layout.align_components(&selected, alignment);
+        
+        // Animate components to their new positions
+        for &idx in &selected {
+            if let Some(&new_pos) = self.layout.positions.get(&idx) {
+                let movement_anim = self.movement_manager.get_or_create(idx, new_pos);
+                movement_anim.move_to(new_pos);
+            }
+        }
+    }
+    
+    /// Distribute selected components horizontally or vertically
+    fn distribute_selected_components(&mut self, horizontal: bool) {
+        if self.selection.selected.len() < 3 {
+            return;
+        }
+        
+        let selected: Vec<usize> = self.selection.selected.iter().copied().collect();
+        self.layout.distribute_components(&selected, horizontal);
+        
+        // Animate components to their new positions
+        for &idx in &selected {
+            if let Some(&new_pos) = self.layout.positions.get(&idx) {
+                let movement_anim = self.movement_manager.get_or_create(idx, new_pos);
+                movement_anim.move_to(new_pos);
+            }
+        }
+    }
+    
+    /// Make selected components the same width
+    fn make_selected_same_width(&mut self, components: &[Box<dyn crate::rcl::ui::component::Component>]) {
+        if self.selection.selected.len() < 2 {
+            return;
+        }
+        
+        // Find the reference width (from primary selection or first component)
+        let reference_idx = self.selection.primary.unwrap_or_else(|| *self.selection.selected.iter().next().unwrap());
+        let reference_width = self.layout.get_or_init_size(
+            reference_idx,
+            if reference_idx < components.len() { components[reference_idx].name() } else { "Unknown" }
+        ).x;
+        
+        // Apply the width to all selected components
+        for &idx in &self.selection.selected {
+            if let Some(current_size) = self.layout.sizes.get_mut(&idx) {
+                current_size.x = reference_width;
+            }
+        }
+    }
+    
+    /// Make selected components the same height
+    fn make_selected_same_height(&mut self, components: &[Box<dyn crate::rcl::ui::component::Component>]) {
+        if self.selection.selected.len() < 2 {
+            return;
+        }
+        
+        // Find the reference height (from primary selection or first component)
+        let reference_idx = self.selection.primary.unwrap_or_else(|| *self.selection.selected.iter().next().unwrap());
+        let reference_height = self.layout.get_or_init_size(
+            reference_idx,
+            if reference_idx < components.len() { components[reference_idx].name() } else { "Unknown" }
+        ).y;
+        
+        // Apply the height to all selected components
+        for &idx in &self.selection.selected {
+            if let Some(current_size) = self.layout.sizes.get_mut(&idx) {
+                current_size.y = reference_height;
+            }
+        }
+    }
+    
+    /// Make selected components the same size
+    fn make_selected_same_size(&mut self, components: &[Box<dyn crate::rcl::ui::component::Component>]) {
+        if self.selection.selected.len() < 2 {
+            return;
+        }
+        
+        // Find the reference size (from primary selection or first component)
+        let reference_idx = self.selection.primary.unwrap_or_else(|| *self.selection.selected.iter().next().unwrap());
+        let reference_size = self.layout.get_or_init_size(
+            reference_idx,
+            if reference_idx < components.len() { components[reference_idx].name() } else { "Unknown" }
+        );
+        
+        // Apply the size to all selected components
+        for &idx in &self.selection.selected {
+            self.layout.sizes.insert(idx, reference_size);
+        }
+    }
+    
+    /// Reset selected components to default properties
+    fn reset_selected_to_default(&mut self, components: &mut [Box<dyn crate::rcl::ui::component::Component>]) {
+        for &idx in &self.selection.selected {
+            if idx != usize::MAX && idx < components.len() {
+                // Reset component properties to default
+                // This would depend on having a reset method on components
+                println!("Reset to default for component {} - not yet implemented", idx);
+            }
+        }
     }
 }

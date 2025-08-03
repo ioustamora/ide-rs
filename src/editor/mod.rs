@@ -96,6 +96,12 @@ pub mod palette;
 /// through a context-sensitive interface.
 pub mod inspector;
 
+/// Object Inspector with component hierarchy tree (Delphi/C++ Builder inspired)
+/// 
+/// Provides a hierarchical view of all components in the form, allowing users to
+/// navigate parent-child relationships, select components, and manage hierarchy.
+pub mod object_inspector;
+
 /// Enhanced property inspector with modern UX features
 /// 
 /// Advanced property editing system with multi-selection, design system integration,
@@ -114,6 +120,12 @@ pub mod state;
 /// Provides rich text editing capabilities with language-specific features
 /// for viewing and editing generated code.
 pub mod code_editor;
+
+/// Advanced code editor with enhanced LSP integration
+/// 
+/// Professional code editor with VS Code-style features including real-time
+/// diagnostics, go-to-definition, find references, code actions, and signature help.
+pub mod advanced_code_editor;
 
 /// Advanced syntax highlighting using syntect
 /// 
@@ -192,6 +204,12 @@ pub mod smart_ai_assistant;
 /// Generic LSP support for multiple programming languages with
 /// standardized interfaces for code intelligence features.
 pub mod lsp_integration;
+
+/// Enhanced LSP client with advanced IDE features
+/// 
+/// Professional LSP client with VS Code-style capabilities including
+/// go-to-definition, find references, code actions, signature help, and more.
+pub mod enhanced_lsp_client;
 
 /// File system operations and workspace management
 /// 

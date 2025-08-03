@@ -389,6 +389,9 @@ impl UiManager {
     fn render_right_panel_tabs(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
         // Tab headers
         ui.horizontal(|ui| {
+            if ui.selectable_label(app_state.active_right_tab == "objects", "🔍 Objects").clicked() {
+                app_state.active_right_tab = "objects".to_string();
+            }
             if app_state.show_properties_inspector {
                 if ui.selectable_label(app_state.active_right_tab == "properties", "🔧 Properties").clicked() {
                     app_state.active_right_tab = "properties".to_string();
@@ -405,6 +408,9 @@ impl UiManager {
         
         // Tab content
         match app_state.active_right_tab.as_str() {
+            "objects" => {
+                Self::render_object_inspector(app_state, ui);
+            }
             "properties" if app_state.show_properties_inspector => {
                 Self::render_properties_inspector(app_state, ui);
             }
@@ -414,6 +420,49 @@ impl UiManager {
             _ => {
                 ui.label("No active panel");
             }
+        }
+    }
+    
+    /// Render the Object Inspector
+    fn render_object_inspector(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
+        // Get current visual designer selection
+        let selected_components = &app_state.visual_designer.selection.selected;
+        
+        // Render the Object Inspector UI and handle component selection
+        if let Some(clicked_component) = app_state.object_inspector.render_ui(
+            ui,
+            &mut app_state.components,
+            &app_state.root_form,
+            selected_components,
+        ) {
+            // Update visual designer selection based on Object Inspector click
+            app_state.visual_designer.selection.selected.clear();
+            
+            if clicked_component == usize::MAX {
+                // Form was clicked
+                app_state.visual_designer.selection.selected.insert(usize::MAX);
+                app_state.visual_designer.selection.primary = Some(usize::MAX);
+                app_state.selected_component = Some(usize::MAX);
+            } else if clicked_component < app_state.components.len() {
+                // Component was clicked
+                app_state.visual_designer.selection.selected.insert(clicked_component);
+                app_state.visual_designer.selection.primary = Some(clicked_component);
+                app_state.selected_component = Some(clicked_component);
+            }
+            
+            // Update Object Inspector selection to match
+            app_state.object_inspector.select_component(Some(clicked_component));
+        }
+        
+        // Synchronize Object Inspector selection with visual designer
+        if let Some(primary) = app_state.visual_designer.selection.primary {
+            if app_state.object_inspector.get_selected_component() != Some(primary) {
+                app_state.object_inspector.select_component(Some(primary));
+            }
+        } else if !app_state.visual_designer.selection.selected.is_empty() {
+            // Select the first component if no primary selection
+            let first_selected = *app_state.visual_designer.selection.selected.iter().next().unwrap();
+            app_state.object_inspector.select_component(Some(first_selected));
         }
     }
     

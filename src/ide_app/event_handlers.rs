@@ -254,14 +254,14 @@ impl EventHandlers {
             // Edit operations
             IdeCommand::Undo => {
                 if app_state.design_mode {
-                    app_state.visual_designer.undo();
+                    app_state.visual_designer.undo(&mut app_state.components);
                 } else {
                     app_state.code_editor.undo();
                 }
             }
             IdeCommand::Redo => {
                 if app_state.design_mode {
-                    app_state.visual_designer.redo();
+                    app_state.visual_designer.redo(&mut app_state.components);
                 } else {
                     app_state.code_editor.redo();
                 }
