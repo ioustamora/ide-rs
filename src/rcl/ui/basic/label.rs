@@ -125,6 +125,64 @@ impl Label {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_label_creation() {
+        let label = Label::new("Test Label".to_string());
+        assert_eq!(label.text(), "Test Label");
+        assert_eq!(label.name(), "Label");
+        assert!(!label.is_editable());
+    }
+
+    #[test]
+    fn test_label_text_modification() {
+        let mut label = Label::new("Initial Text".to_string());
+        assert_eq!(label.text(), "Initial Text");
+        
+        label.set_text("Modified Text".to_string());
+        assert_eq!(label.text(), "Modified Text");
+    }
+
+    #[test]
+    fn test_label_editable_state() {
+        let mut label = Label::new("Test".to_string());
+        assert!(!label.is_editable());
+        
+        label.set_editable(true);
+        assert!(label.is_editable());
+        
+        label.set_editable(false);
+        assert!(!label.is_editable());
+    }
+
+    #[test]
+    fn test_label_component_interface() {
+        let label = Label::new("Interface Test".to_string());
+        assert_eq!(label.name(), "Label");
+        
+        // Test that it implements Component trait
+        let component: &dyn Component = &label;
+        assert_eq!(component.name(), "Label");
+    }
+
+    #[test]
+    fn test_label_empty_text() {
+        let label = Label::new("".to_string());
+        assert_eq!(label.text(), "");
+        assert!(!label.is_editable());
+    }
+
+    #[test]
+    fn test_label_long_text() {
+        let long_text = "A".repeat(1000);
+        let label = Label::new(long_text.clone());
+        assert_eq!(label.text(), &long_text);
+    }
+}
+
 impl Component for Label {
     /// Returns the component name for identification
     /// 

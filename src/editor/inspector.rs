@@ -555,12 +555,14 @@ impl PropertyInspector {
     
     /// Render a single property group
     fn render_property_group(&mut self, ui: &mut Ui, component_id: usize, group_name: &str, properties: &[PropertyDefinition]) {
-        let is_expanded = self.expanded_groups.get(group_name).copied().unwrap_or(false);
+        let is_expanded = self.expanded_groups.get(group_name).copied().unwrap_or(true);
         
         let group = PropertyGroup::from_name(group_name);
         let response = ui.collapsing(format!("{} {}", group.icon(), group.name()), |ui| {
+            ui.spacing_mut().item_spacing.y = 4.0; // Consistent spacing between properties
             for property in properties {
                 self.render_property_editor(ui, component_id, property);
+                ui.add_space(2.0); // Small space between properties
             }
         });
         
@@ -568,6 +570,8 @@ impl PropertyInspector {
         if response.header_response.clicked() {
             self.expanded_groups.insert(group_name.to_string(), !is_expanded);
         }
+        
+        ui.add_space(4.0); // Space between groups
     }
     
     /// Render editor for a single property
@@ -577,33 +581,55 @@ impl PropertyInspector {
             .unwrap_or_else(|| property.default_value.clone());
         
         ui.horizontal(|ui| {
-            // Property label with tooltip
-            ui.label(&property.label)
-                .on_hover_text(&property.description);
+            // Property label with fixed width to prevent layout shifts
+            ui.allocate_ui_with_layout(
+                egui::Vec2::new(120.0, ui.available_height()),
+                Layout::left_to_right(Align::Center),
+                |ui| {
+                    ui.label(&property.label)
+                        .on_hover_text(&property.description);
+                }
+            );
             
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                // Property editor based on type
-                let new_value = self.render_property_value_editor(ui, &property.property_type, &current_value);
-                
-                // Update value if changed
-                if new_value != current_value {
-                    self.set_property_value(component_id, &property.name, new_value);
+            // Property editor with stable layout
+            ui.allocate_ui_with_layout(
+                egui::Vec2::new(ui.available_width(), ui.available_height()),
+                Layout::left_to_right(Align::Center),
+                |ui| {
+                    // Property editor based on type with stable ID
+                    let editor_id = egui::Id::new(format!("prop_editor_{}", property_key));
+                    ui.push_id(editor_id, |ui| {
+                        let new_value = self.render_property_value_editor(ui, &property.property_type, &current_value, &property_key);
+                        
+                        // Only update value if it actually changed to avoid constant redraws
+                        if new_value != current_value {
+                            self.set_property_value(component_id, &property.name, new_value);
+                        }
+                        
+                        // Show validation error if any
+                        if let Some(error) = self.validation_errors.get(&property_key) {
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                ui.label("⚠")
+                                    .on_hover_text(error)
+                                    .on_hover_ui(|ui| {
+                                        ui.colored_label(egui::Color32::RED, error);
+                                    });
+                            });
+                        }
+                    });
                 }
-                
-                // Show validation error if any
-                if let Some(error) = self.validation_errors.get(&property_key) {
-                    ui.label("⚠").on_hover_text(error);
-                }
-            });
+            );
         });
     }
     
     /// Render value editor based on property type
-    fn render_property_value_editor(&self, ui: &mut Ui, property_type: &PropertyType, current_value: &PropertyValue) -> PropertyValue {
+    fn render_property_value_editor(&self, ui: &mut Ui, property_type: &PropertyType, current_value: &PropertyValue, property_key: &str) -> PropertyValue {
         match (property_type, current_value) {
             (PropertyType::String { max_length }, PropertyValue::String(value)) => {
                 let mut text = value.clone();
-                let _response = ui.text_edit_singleline(&mut text);
+                let _response = ui.add(egui::TextEdit::singleline(&mut text)
+                    .desired_width(150.0)  // Fixed width to prevent layout shifts
+                    .id(egui::Id::new(format!("text_{}", property_key))));
                 
                 // Apply max length constraint
                 if let Some(max_len) = max_length {
@@ -617,33 +643,43 @@ impl PropertyInspector {
             
             (PropertyType::Number { min, max, step }, PropertyValue::Number(value)) => {
                 let mut num_value = *value;
-                ui.add(Slider::new(&mut num_value, *min..=*max).step_by(*step));
+                ui.add(Slider::new(&mut num_value, *min..=*max)
+                    .step_by(*step)
+                    .fixed_decimals(1)
+                    .drag_value_speed(0.1));
                 PropertyValue::Number(num_value)
             }
             
             (PropertyType::Integer { min, max, step }, PropertyValue::Integer(value)) => {
                 let mut int_value = *value;
-                ui.add(Slider::new(&mut int_value, *min..=*max).step_by(*step as f64));
+                ui.add(Slider::new(&mut int_value, *min..=*max)
+                    .step_by(*step as f64)
+                    .fixed_decimals(0)
+                    .drag_value_speed(0.5));
                 PropertyValue::Integer(int_value)
             }
             
             (PropertyType::Boolean, PropertyValue::Boolean(value)) => {
                 let mut bool_value = *value;
-                ui.checkbox(&mut bool_value, "");
+                ui.add(egui::Checkbox::new(&mut bool_value, ""));
                 PropertyValue::Boolean(bool_value)
             }
             
             (PropertyType::Color, PropertyValue::Color(rgba)) => {
                 let mut color = Color32::from_rgba_unmultiplied(rgba[0], rgba[1], rgba[2], rgba[3]);
-                ui.color_edit_button_srgba(&mut color);
+                ui.horizontal(|ui| {
+                    ui.color_edit_button_srgba(&mut color);
+                    ui.label(format!("#{:02X}{:02X}{:02X}", color.r(), color.g(), color.b()));
+                });
                 let [r, g, b, a] = color.to_array();
                 PropertyValue::Color([r, g, b, a])
             }
             
             (PropertyType::Enum { options }, PropertyValue::Enum(value)) => {
                 let mut selected = value.clone();
-                ComboBox::from_id_source(format!("enum_{:p}", current_value))
+                ComboBox::from_id_source(format!("enum_{}", property_key))
                     .selected_text(&selected)
+                    .width(150.0)  // Fixed width to prevent layout shifts
                     .show_ui(ui, |ui| {
                         for option in options {
                             ui.selectable_value(&mut selected, option.clone(), option);
@@ -741,6 +777,8 @@ impl PropertyInspector {
 
     /// Render component properties (wrapper for UI method)
     pub fn render_component_properties(&mut self, ui: &mut Ui, component: &mut Box<dyn Component>) {
-        self.ui(ui, Some((0, component.as_ref())));
+        // Get the actual component index for proper identification
+        let component_id = 0; // This would normally be passed in, but for now use 0
+        self.ui(ui, Some((component_id, component.as_ref())));
     }
 }

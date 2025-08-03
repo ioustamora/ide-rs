@@ -69,8 +69,10 @@ impl ContentManager {
             }
         }
         
-        // Render the visual designer canvas with root form
-        app_state.visual_designer.render_design_canvas(ui, &mut app_state.root_form, &mut app_state.components, canvas_size);
+        // Render the visual designer canvas with root form and update selection
+        if let Some(clicked_component) = app_state.visual_designer.render_design_canvas(ui, &mut app_state.root_form, &mut app_state.components, canvas_size) {
+            app_state.selected_component = Some(clicked_component);
+        }
         
         // Handle drag and drop interactions
         Self::handle_drag_drop_interactions(app_state, drag_state, ui);

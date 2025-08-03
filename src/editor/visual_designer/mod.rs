@@ -94,7 +94,7 @@ impl VisualDesigner {
         root_form: &mut crate::rcl::ui::basic::form::Form,
         components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>,
         canvas_size: egui::Vec2,
-    ) {
+    ) -> Option<usize> {
         // Get the available rect for the canvas
         let canvas_rect = ui.available_rect_before_wrap();
         
@@ -136,6 +136,9 @@ impl VisualDesigner {
             self.guides.draw_rulers(ui, canvas_rect);
         }
 
+        // Track if any component was clicked
+        let mut clicked_component = None;
+        
         // Handle form interaction (clicking on empty form area)
         let form_response = ui.interact(form_rect, egui::Id::new("root_form"), egui::Sense::click());
         if form_response.clicked() {
@@ -145,6 +148,7 @@ impl VisualDesigner {
             }
             self.selection.selected.insert(usize::MAX); // Use MAX as form indicator
             self.selection.primary = Some(usize::MAX);
+            clicked_component = Some(usize::MAX);
         }
 
         // Render components on top of the form
@@ -188,6 +192,7 @@ impl VisualDesigner {
                 }
                 self.selection.selected.insert(idx);
                 self.selection.primary = Some(idx);
+                clicked_component = Some(idx);
             }
             
             if response.dragged() && is_selected {
@@ -207,6 +212,9 @@ impl VisualDesigner {
         // Draw guides
         let canvas_rect = egui::Rect::from_min_size(ui.cursor().left_top(), canvas_size);
         self.guides.draw_guides(ui, canvas_rect);
+        
+        // Return the clicked component for selection synchronization
+        clicked_component
     }
 
     /// Move a component by a delta vector

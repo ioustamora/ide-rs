@@ -222,8 +222,7 @@ impl ProjectManager {
                     self.show_new_project_dialog = true;
                 }
                 if ui.button("🔄 Open Project").clicked() {
-                    // TODO: Show open project dialog
-                    output_panel.log("📂 Open project dialog would appear here");
+                    self.open_project_dialog();
                 }
                 if let Some(_) = &self.current_project {
                     if ui.button("💾 Save Project").clicked() {
@@ -379,10 +378,21 @@ impl ProjectManager {
         self.current_project = None;
     }
 
-    /// Open project dialog (placeholder implementation)
+    /// Open project dialog
     pub fn open_project_dialog(&mut self) {
-        // Placeholder implementation - would open a file dialog to select project
-        // In a real implementation, this would open a file picker dialog
+        if let Some(project_file) = rfd::FileDialog::new()
+            .set_title("Open Project")
+            .add_filter("IDE Project", &["ideproj", "toml"])
+            .add_filter("All Files", &["*"])
+            .pick_file() {
+            
+            // For now, just log the selected file
+            // In a full implementation, this would load the project
+            println!("Selected project file: {}", project_file.display());
+            
+            // You could implement actual project loading here
+            // self.load_project(&project_file, output_panel);
+        }
     }
 }
 

@@ -288,6 +288,17 @@ impl ComponentType {
             ComponentType::Chart => "Chart",
             ComponentType::Table => "Table",
             ComponentType::Tree => "Tree",
+            ComponentType::Custom(1) => "Progress Bar",
+            ComponentType::Custom(2) => "Tab Control",
+            ComponentType::Custom(3) => "Menu Bar",
+            ComponentType::Custom(4) => "Toolbar",
+            ComponentType::Custom(5) => "Status Bar",
+            ComponentType::Custom(6) => "Split Container",
+            ComponentType::Custom(7) => "Calendar",
+            ComponentType::Custom(8) => "Color Picker",
+            ComponentType::Custom(9) => "File Picker",
+            ComponentType::Custom(10) => "Rich Text Editor",
+            ComponentType::Custom(11) => "Code Editor",
             ComponentType::Custom(_) => "Custom",
         }
     }
@@ -306,6 +317,17 @@ impl ComponentType {
             ComponentType::Chart => "📊",
             ComponentType::Table => "🗂️",
             ComponentType::Tree => "🌳",
+            ComponentType::Custom(1) => "📈", // Progress Bar
+            ComponentType::Custom(2) => "📑", // Tab Control
+            ComponentType::Custom(3) => "☰", // Menu Bar
+            ComponentType::Custom(4) => "🔧", // Toolbar
+            ComponentType::Custom(5) => "📊", // Status Bar
+            ComponentType::Custom(6) => "⌘", // Split Container
+            ComponentType::Custom(7) => "📅", // Calendar
+            ComponentType::Custom(8) => "🎨", // Color Picker
+            ComponentType::Custom(9) => "📁", // File Picker
+            ComponentType::Custom(10) => "📖", // Rich Text Editor
+            ComponentType::Custom(11) => "⌨️", // Code Editor
             ComponentType::Custom(_) => "🔧",
         }
     }
