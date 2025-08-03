@@ -24,6 +24,7 @@ pub mod ui_manager;
 pub mod content_manager;
 pub mod drag_drop;
 pub mod event_handlers;
+pub mod animated_ui;
 
 use eframe::egui;
 use app_state::IdeAppState;

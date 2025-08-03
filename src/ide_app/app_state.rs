@@ -234,6 +234,26 @@ pub struct IdeAppState {
     /// - Template inheritance with property overrides
     /// - Template library and reuse patterns
     pub template_system: Vec<ComponentTemplate>,
+    
+    // ========================================================================================
+    // ANIMATION SYSTEMS - Smooth animations for enhanced user experience
+    // ========================================================================================
+    
+    /// Animation manager for collapsible UI elements
+    /// 
+    /// Provides smooth dropdown animations for:
+    /// - Component palette categories
+    /// - Property groups
+    /// - Panel sections
+    pub animation_manager: super::animated_ui::AnimationManager,
+    
+    /// Movement animation manager for component dragging
+    /// 
+    /// Handles smooth component movement animations:
+    /// - Drag and drop operations
+    /// - Component repositioning
+    /// - Snap-to-grid animations
+    pub movement_manager: super::animated_ui::MovementManager,
 }
 
 impl IdeAppState {
@@ -273,6 +293,8 @@ impl IdeAppState {
             modern_ide: ModernIdeIntegration::new(),
             multi_device_preview: MultiDevicePreview::new(),
             template_system: Vec::new(),
+            animation_manager: super::animated_ui::AnimationManager::new(),
+            movement_manager: super::animated_ui::MovementManager::new(),
         }
     }
 

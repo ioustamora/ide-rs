@@ -111,6 +111,37 @@ pub enum DragType {
     },
 }
 
+/// # Component Categories
+/// 
+/// Defines the categories for organizing components in the palette.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum ComponentCategory {
+    Simple,    // Basic UI controls
+    Advanced,  // Complex components
+    System,    // System integration components
+    Network,   // Network-related components
+}
+
+impl ComponentCategory {
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            ComponentCategory::Simple => "Simple",
+            ComponentCategory::Advanced => "Advanced", 
+            ComponentCategory::System => "System",
+            ComponentCategory::Network => "Network",
+        }
+    }
+    
+    pub fn icon(&self) -> &'static str {
+        match self {
+            ComponentCategory::Simple => "🔧",
+            ComponentCategory::Advanced => "⚙️",
+            ComponentCategory::System => "💻",
+            ComponentCategory::Network => "🌐",
+        }
+    }
+}
+
 /// # Component Types for Palette Dragging
 /// 
 /// Defines the types of components that can be dragged from the palette.
@@ -329,6 +360,24 @@ impl ComponentType {
             ComponentType::Custom(10) => "📖", // Rich Text Editor
             ComponentType::Custom(11) => "⌨️", // Code Editor
             ComponentType::Custom(_) => "🔧",
+        }
+    }
+    
+    /// Get the category for this component type
+    pub fn category(&self) -> ComponentCategory {
+        match self {
+            ComponentType::Button | ComponentType::Label | ComponentType::TextBox | 
+            ComponentType::Checkbox | ComponentType::Slider | ComponentType::Dropdown => ComponentCategory::Simple,
+            
+            ComponentType::Panel | ComponentType::Chart | ComponentType::Table | 
+            ComponentType::Tree | ComponentType::Custom(1) | ComponentType::Custom(2) |
+            ComponentType::Custom(6) | ComponentType::Custom(10) | ComponentType::Custom(11) => ComponentCategory::Advanced,
+            
+            ComponentType::Image | ComponentType::Custom(3) | ComponentType::Custom(4) |
+            ComponentType::Custom(5) | ComponentType::Custom(7) | ComponentType::Custom(8) |
+            ComponentType::Custom(9) => ComponentCategory::System,
+            
+            ComponentType::Custom(_) => ComponentCategory::Network,
         }
     }
 }

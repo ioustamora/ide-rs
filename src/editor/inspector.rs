@@ -553,23 +553,27 @@ impl PropertyInspector {
         }
     }
     
-    /// Render a single property group
-    fn render_property_group(&mut self, ui: &mut Ui, component_id: usize, group_name: &str, properties: &[PropertyDefinition]) {
-        let is_expanded = self.expanded_groups.get(group_name).copied().unwrap_or(true);
+    /// Render a single property group with animated collapse
+    fn render_property_group(&mut self, ui: &mut Ui, component_id: usize, group_name: &str, properties: &[PropertyDefinition], animation_manager: &mut crate::ide_app::animated_ui::AnimationManager) {
+        use crate::ide_app::animated_ui::AnimatedCollapsing;
         
         let group = PropertyGroup::from_name(group_name);
-        let response = ui.collapsing(format!("{} {}", group.icon(), group.name()), |ui| {
+        let group_id = egui::Id::new(format!("prop_group_{}", group_name));
+        
+        AnimatedCollapsing::new(
+            group_id,
+            format!("{} {}", group.icon(), group.name()),
+            animation_manager
+        )
+        .default_open(true)
+        .show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 4.0; // Consistent spacing between properties
+            
             for property in properties {
                 self.render_property_editor(ui, component_id, property);
                 ui.add_space(2.0); // Small space between properties
             }
         });
-        
-        // Track expansion state
-        if response.header_response.clicked() {
-            self.expanded_groups.insert(group_name.to_string(), !is_expanded);
-        }
         
         ui.add_space(4.0); // Space between groups
     }
@@ -580,43 +584,58 @@ impl PropertyInspector {
         let current_value = self.current_values.get(&property_key).cloned()
             .unwrap_or_else(|| property.default_value.clone());
         
-        ui.horizontal(|ui| {
-            // Property label with fixed width to prevent layout shifts
+        // Use stable ID for each property row to prevent animation issues
+        let row_id = egui::Id::new(format!("prop_row_{}", property_key));
+        
+        ui.push_id(row_id, |ui| {
+            // Set fixed height for each property row to prevent vertical shifting
+            let row_height = ui.spacing().button_padding.y * 2.0 + ui.text_style_height(&egui::TextStyle::Body);
             ui.allocate_ui_with_layout(
-                egui::Vec2::new(120.0, ui.available_height()),
+                egui::Vec2::new(ui.available_width(), row_height),
                 Layout::left_to_right(Align::Center),
                 |ui| {
-                    ui.label(&property.label)
-                        .on_hover_text(&property.description);
-                }
-            );
-            
-            // Property editor with stable layout
-            ui.allocate_ui_with_layout(
-                egui::Vec2::new(ui.available_width(), ui.available_height()),
-                Layout::left_to_right(Align::Center),
-                |ui| {
-                    // Property editor based on type with stable ID
-                    let editor_id = egui::Id::new(format!("prop_editor_{}", property_key));
-                    ui.push_id(editor_id, |ui| {
-                        let new_value = self.render_property_value_editor(ui, &property.property_type, &current_value, &property_key);
-                        
-                        // Only update value if it actually changed to avoid constant redraws
-                        if new_value != current_value {
-                            self.set_property_value(component_id, &property.name, new_value);
+                    // Property label with fixed width to prevent layout shifts
+                    ui.allocate_ui_with_layout(
+                        egui::Vec2::new(120.0, row_height),
+                        Layout::left_to_right(Align::Center),
+                        |ui| {
+                            ui.label(&property.label)
+                                .on_hover_text(&property.description);
                         }
-                        
-                        // Show validation error if any
-                        if let Some(error) = self.validation_errors.get(&property_key) {
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label("⚠")
-                                    .on_hover_text(error)
-                                    .on_hover_ui(|ui| {
-                                        ui.colored_label(egui::Color32::RED, error);
-                                    });
+                    );
+                    
+                    // Property editor with stable layout
+                    ui.allocate_ui_with_layout(
+                        egui::Vec2::new(ui.available_width().max(150.0), row_height),
+                        Layout::left_to_right(Align::Center),
+                        |ui| {
+                            // Property editor based on type with stable ID
+                            let editor_id = egui::Id::new(format!("prop_editor_{}", property_key));
+                            ui.push_id(editor_id, |ui| {
+                                let new_value = self.render_property_value_editor(ui, &property.property_type, &current_value, &property_key);
+                                
+                                // Only update value if it actually changed to avoid constant redraws
+                                if new_value != current_value {
+                                    self.set_property_value(component_id, &property.name, new_value);
+                                }
+                                
+                                // Show validation error if any with fixed layout
+                                if let Some(error) = self.validation_errors.get(&property_key) {
+                                    ui.allocate_ui_with_layout(
+                                        egui::Vec2::new(20.0, row_height),
+                                        Layout::right_to_left(Align::Center),
+                                        |ui| {
+                                            ui.label("⚠")
+                                                .on_hover_text(error)
+                                                .on_hover_ui(|ui| {
+                                                    ui.colored_label(egui::Color32::RED, error);
+                                                });
+                                        }
+                                    );
+                                }
                             });
                         }
-                    });
+                    );
                 }
             );
         });

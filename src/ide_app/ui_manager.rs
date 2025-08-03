@@ -166,7 +166,9 @@ impl UiManager {
     
     /// Render palette components with drag and drop support
     fn render_palette_components(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
-        use super::drag_drop::{ComponentType, DragType};
+        use super::drag_drop::{ComponentType, ComponentCategory, DragType};
+        use super::animated_ui::AnimatedCollapsing;
+        use std::collections::BTreeMap;
         
         let component_types = [
             ComponentType::Button,
@@ -193,18 +195,39 @@ impl UiManager {
             ComponentType::Custom(11), // Code Editor
         ];
         
-        for component_type in &component_types {
-            ui.horizontal(|ui| {
-                ui.label(component_type.icon());
-                let button = ui.button(component_type.display_name());
-                
-                // Handle drag start from palette
-                if button.drag_started() {
-                    let drag_type = DragType::ComponentFromPalette(*component_type);
-                    app_state.visual_designer.drag_state.start_drag(drag_type, button.rect.center());
-                } else if button.clicked() {
-                    // Add component directly on click
-                    Self::add_component_to_form(app_state, *component_type, egui::Pos2::new(100.0, 100.0));
+        // Group components by category
+        let mut categories: BTreeMap<ComponentCategory, Vec<ComponentType>> = BTreeMap::new();
+        for &component_type in &component_types {
+            categories.entry(component_type.category())
+                     .or_insert_with(Vec::new)
+                     .push(component_type);
+        }
+        
+        // Render each category with smooth animations
+        for (category, components) in categories {
+            let category_id = egui::Id::new(format!("palette_category_{:?}", category));
+            
+            AnimatedCollapsing::new(
+                category_id,
+                format!("{} {}", category.icon(), category.display_name()),
+                &mut app_state.animation_manager
+            )
+            .default_open(true)
+            .show(ui, |ui| {
+                for component_type in components {
+                    ui.horizontal(|ui| {
+                        ui.label(component_type.icon());
+                        let button = ui.button(component_type.display_name());
+                        
+                        // Handle drag start from palette
+                        if button.drag_started() {
+                            let drag_type = DragType::ComponentFromPalette(component_type);
+                            app_state.visual_designer.drag_state.start_drag(drag_type, button.rect.center());
+                        } else if button.clicked() {
+                            // Add component directly on click
+                            Self::add_component_to_form(app_state, component_type, egui::Pos2::new(100.0, 100.0));
+                        }
+                    });
                 }
             });
         }
