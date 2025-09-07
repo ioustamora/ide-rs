@@ -706,7 +706,9 @@ impl GitIntegration {
         // Commit dialog
         if self.ui_state.show_commit_dialog {
             let mut commit_message = self.ui_state.commit_message.clone();
-            let mut show_dialog = self.ui_state.show_commit_dialog;
+            let mut show_dialog = true;
+            let mut should_commit = false;
+            let mut should_cancel = false;
             
             egui::Window::new("Commit Changes")
                 .open(&mut show_dialog)
@@ -716,25 +718,33 @@ impl GitIntegration {
                     
                     ui.horizontal(|ui| {
                         if ui.button("Commit").clicked() && !commit_message.trim().is_empty() {
-                            match self.commit(&commit_message) {
-                                Ok(_) => {
-                                    commit_message.clear();
-                                    show_dialog = false;
-                                    let _ = self.refresh_status();
-                                }
-                                Err(_) => {
-                                    // Show error message
-                                }
-                            }
+                            should_commit = true;
                         }
                         if ui.button("Cancel").clicked() {
-                            show_dialog = false;
+                            should_cancel = true;
                         }
                     });
                 });
                 
-            self.ui_state.commit_message = commit_message;
-            self.ui_state.show_commit_dialog = show_dialog;
+            // Handle actions outside the closure
+            if should_commit {
+                match self.commit(&commit_message) {
+                    Ok(_) => {
+                        commit_message.clear();
+                        show_dialog = false;
+                        let _ = self.refresh_status();
+                    }
+                    Err(_) => {
+                        // Show error message
+                    }
+                }
+            }
+            
+            if should_cancel || !show_dialog {
+                self.ui_state.show_commit_dialog = false;
+            } else {
+                self.ui_state.commit_message = commit_message;
+            }
         }
 
         // Branch selector

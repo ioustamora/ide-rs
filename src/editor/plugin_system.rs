@@ -722,19 +722,19 @@ impl PluginManager {
                         PluginState::Paused => {
                             ui.colored_label(Color32::YELLOW, "Paused");
                             if ui.small_button("Activate").clicked() {
-                                let _ = self.activate_plugin(plugin_id);
+                                let _ = self.activate_plugin(&plugin_id);
                             }
                         }
                         PluginState::Error(ref error) => {
                             ui.colored_label(Color32::RED, format!("Error: {}", error));
                         }
                         _ => {
-                            ui.colored_label(Color32::GRAY, format!("{:?}", plugin.state));
+                            ui.colored_label(Color32::GRAY, format!("{:?}", state));
                         }
                     }
                     
                     if ui.small_button("Unload").clicked() {
-                        let _ = self.unload_plugin(plugin_id);
+                        let _ = self.unload_plugin(&plugin_id);
                     }
                 });
             }

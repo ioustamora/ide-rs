@@ -525,32 +525,32 @@ impl TerminalManager {
 
         // Active terminal content
         if let Some(terminal_id) = self.active_terminal {
-            // Clone terminal data to avoid borrowing issues
-            if let Some(terminal) = self.terminals.get(&terminal_id).cloned() {
-                // Display terminal output
-                ui.vertical(|ui| {
-                    ScrollArea::vertical()
-                        .auto_shrink([false; 2])
-                        .stick_to_bottom(true)
-                        .show(ui, |ui| {
-                            for line in &terminal.output_buffer {
-                                let color = match line.line_type {
-                                    TerminalLineType::Output => Color32::WHITE,
-                                    TerminalLineType::Input => Color32::LIGHT_BLUE,
-                                    TerminalLineType::Error => Color32::RED,
-                                    TerminalLineType::Warning => Color32::YELLOW,
-                                    TerminalLineType::System => Color32::GRAY,
-                                };
-                                ui.colored_label(color, &line.content);
-                            }
-                        });
-                });
-                
-                // Update the terminal back
-                if let Some(mut_terminal) = self.terminals.get_mut(&terminal_id) {
-                    mut_terminal.current_input = terminal.current_input;
-                }
-            }
+            // Extract the data we need without cloning the entire terminal
+            let (output_lines, current_input) = if let Some(terminal) = self.terminals.get(&terminal_id) {
+                (terminal.output_buffer.iter().collect::<Vec<_>>(), terminal.current_input.clone())
+            } else {
+                (vec![], String::new())
+            };
+            
+            // Display terminal output
+            ui.vertical(|ui| {
+                ScrollArea::vertical()
+                    .auto_shrink([false; 2])
+                    .stick_to_bottom(true)
+                    .show(ui, |ui| {
+                        for line in output_lines {
+                            let color = match line.line_type {
+                                TerminalLineType::Output => Color32::WHITE,
+                                TerminalLineType::Input => Color32::LIGHT_BLUE,
+                                TerminalLineType::Error => Color32::RED,
+                                TerminalLineType::Warning => Color32::YELLOW,
+                                TerminalLineType::System => Color32::GRAY,
+                                TerminalLineType::Success => Color32::GREEN,
+                            };
+                            ui.colored_label(color, &line.content);
+                        }
+                    });
+            });
         } else {
             ui.centered_and_justified(|ui| {
                 ui.heading("No terminal active");
