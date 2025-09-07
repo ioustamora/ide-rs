@@ -562,9 +562,11 @@ impl TerminalManager {
 
         // New terminal dialog
         if self.ui_state.show_new_terminal_dialog {
-            let mut show_dialog = self.ui_state.show_new_terminal_dialog;
+            let mut show_dialog = true;
             let mut new_terminal_dir = self.ui_state.new_terminal_dir.clone();
             let mut new_terminal_shell = self.ui_state.new_terminal_shell.clone();
+            let mut should_create = false;
+            let mut should_cancel = false;
             
             egui::Window::new("New Terminal")
                 .open(&mut show_dialog)
@@ -587,27 +589,33 @@ impl TerminalManager {
 
                     ui.horizontal(|ui| {
                         if ui.button("Create").clicked() {
-                            let working_dir = if new_terminal_dir.is_empty() {
-                                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-                            } else {
-                                PathBuf::from(&new_terminal_dir)
-                            };
-
-                            let name = format!("Terminal {}", self.next_terminal_id);
-                            if let Ok(_) = self.create_terminal(name, working_dir, new_terminal_shell.clone()) {
-                                show_dialog = false;
-                                new_terminal_dir.clear();
-                            }
+                            should_create = true;
                         }
                         if ui.button("Cancel").clicked() {
-                            show_dialog = false;
+                            should_cancel = true;
                         }
                     });
                 });
                 
-            self.ui_state.show_new_terminal_dialog = show_dialog;
-            self.ui_state.new_terminal_dir = new_terminal_dir;
-            self.ui_state.new_terminal_shell = new_terminal_shell;
+            // Handle actions outside closure
+            if should_create {
+                let working_dir = if new_terminal_dir.is_empty() {
+                    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+                } else {
+                    PathBuf::from(&new_terminal_dir)
+                };
+
+                let name = format!("Terminal {}", self.next_terminal_id);
+                if let Ok(_) = self.create_terminal(name, working_dir, new_terminal_shell.clone()) {
+                    self.ui_state.show_new_terminal_dialog = false;
+                    self.ui_state.new_terminal_dir.clear();
+                }
+            } else if should_cancel || !show_dialog {
+                self.ui_state.show_new_terminal_dialog = false;
+            } else {
+                self.ui_state.new_terminal_dir = new_terminal_dir;
+                self.ui_state.new_terminal_shell = new_terminal_shell;
+            }
         }
     }
 

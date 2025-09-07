@@ -745,16 +745,17 @@ impl PluginManager {
             let loaded_plugin_ids: std::collections::HashSet<_> = self.plugins.keys().collect();
             let available_plugins: Vec<_> = self.registry.installed.values()
                 .filter(|metadata| !loaded_plugin_ids.contains(&metadata.id))
+                .map(|metadata| (metadata.id.clone(), metadata.name.clone(), metadata.version.clone(), metadata.description.clone()))
                 .collect();
                 
-            for metadata in available_plugins {
+            for (id, name, version, description) in available_plugins {
                 ui.horizontal(|ui| {
-                    ui.label(&metadata.name);
-                    ui.label(&metadata.version);
-                    ui.label(&metadata.description);
+                    ui.label(&name);
+                    ui.label(&version);
+                    ui.label(&description);
                     
                     if ui.small_button("Load").clicked() {
-                        let _ = self.load_plugin(&metadata.id);
+                        let _ = self.load_plugin(&id);
                     }
                 });
             }
