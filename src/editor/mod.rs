@@ -169,6 +169,36 @@ pub mod code_completion;
 /// variable watching, and interactive debugging sessions.
 pub mod debugger;
 
+/// Code folding system for hierarchical code navigation
+/// 
+/// Provides collapsible code regions based on language syntax
+/// and custom folding markers for better code organization.
+pub mod code_folding;
+
+/// Minimap component showing bird's-eye view of code
+/// 
+/// Visual overview of entire file with syntax highlighting,
+/// annotations, and navigation capabilities.
+pub mod minimap;
+
+/// Git version control integration
+/// 
+/// Comprehensive Git support with visual diff, branch management,
+/// commit history, and file status tracking.
+pub mod git_integration;
+
+/// Integrated terminal and console system
+/// 
+/// Embedded terminal with multiple shell support, command history,
+/// and process management within the IDE.
+pub mod terminal;
+
+/// Plugin and extension system architecture
+/// 
+/// Flexible plugin framework for extending IDE functionality with
+/// custom components, language support, and integrations.
+pub mod plugin_system;
+
 /// Component discovery and registration system
 /// 
 /// Manages available components, their metadata, and integration

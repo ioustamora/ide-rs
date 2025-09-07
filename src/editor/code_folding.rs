@@ -5,7 +5,6 @@
 
 use egui::*;
 use std::collections::{HashMap, BTreeSet};
-use std::ops::Range;
 
 /// Code folding manager
 pub struct CodeFoldingManager {
@@ -86,6 +85,7 @@ pub trait FoldingProvider: Send + Sync {
 }
 
 /// Generic folding provider for brace-based languages
+#[derive(Debug, Clone)]
 pub struct BraceFoldingProvider {
     /// Language name
     pub language: String,
@@ -365,9 +365,9 @@ impl CodeFoldingManager {
                 // Draw fold level indicator
                 if region.level > 0 {
                     let level_color = Color32::from_rgb(
-                        100 + (region.level * 30) % 155,
-                        50 + (region.level * 50) % 155,
-                        200 - (region.level * 20) % 100,
+                        (100 + (region.level * 30) % 155) as u8,
+                        (50 + (region.level * 50) % 155) as u8,
+                        (200 - (region.level * 20) % 100) as u8,
                     );
                     
                     painter.line_segment(

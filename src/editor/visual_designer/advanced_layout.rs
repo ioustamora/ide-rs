@@ -475,7 +475,7 @@ impl AdvancedLayoutManager {
     /// Draw visual indicator for layout type
     fn draw_layout_indicator(&self, painter: &Painter, container: &LayoutContainer) {
         let icon_pos = container.bounds.min + Vec2::new(8.0, 8.0);
-        let icon_size = 16.0;
+        let _icon_size = 16.0;
         
         match &container.layout_type {
             LayoutType::Flexbox { direction, .. } => {

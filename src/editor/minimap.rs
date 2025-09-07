@@ -289,7 +289,7 @@ impl Minimap {
     }
 
     /// Render a line with syntax highlighting
-    fn render_line_with_highlighting(&self, painter: &Painter, rect: Rect, line_index: usize, content: &str) {
+    fn render_line_with_highlighting(&self, painter: &Painter, rect: Rect, _line_index: usize, content: &str) {
         // Simple highlighting based on content patterns
         let mut x_offset = 0.0;
         let char_width = 1.0; // Very small character width for minimap
@@ -384,7 +384,7 @@ impl Minimap {
     }
 
     /// Render viewport indicator showing currently visible area
-    fn render_viewport_indicator(&self, painter: &Painter, minimap_rect: Rect, scroll_ratio: f32) {
+    fn render_viewport_indicator(&self, painter: &Painter, minimap_rect: Rect, _scroll_ratio: f32) {
         if self.viewport.total_lines == 0 {
             return;
         }
