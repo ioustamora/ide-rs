@@ -19,6 +19,7 @@ pub mod file_browser;
 pub mod serialization;
 pub mod operations;
 pub mod workspace;
+pub mod advanced_workspace;
 
 use std::path::{Path, PathBuf};
 use crate::editor::output_panel::OutputPanel;
@@ -30,7 +31,8 @@ pub use templates::ProjectTemplate;
 pub use file_browser::FileBrowser;
 pub use serialization::ProjectSerializer;
 pub use operations::ProjectOperations;
-pub use workspace::{Workspace, WorkspaceManager, WorkspaceTask};
+pub use workspace::{Workspace, WorkspaceManager};
+pub use advanced_workspace::{AdvancedWorkspace, ProjectType, ProgrammingLanguage, WorkspaceTask};
 
 /// Main project manager handling all project operations
 /// 

@@ -8,6 +8,8 @@ pub mod render;
 pub mod history;
 pub mod smart_editing;
 pub mod performance;
+pub mod enhanced_canvas;
+pub mod smart_palette;
 pub mod accessibility;
 pub mod state;
 pub mod context_menu;
