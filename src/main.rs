@@ -10,16 +10,28 @@ mod rcl;      // Rust Component Library - UI, system, and network components
 mod ai_agent; // AI integration for code assistance and automation  
 mod ide_app;  // Main IDE application logic and UI
 mod editor;   // IDE editor features: panels, actions, project management
+mod core;     // Core infrastructure: logging, events, services
 
 /// Main entry point for the Rust RAD IDE application
 /// 
-/// Initializes the eframe/egui application with default settings
-/// and launches the main IDE interface.
+/// Initializes logging, then launches the eframe/egui application with default settings
+/// and starts the main IDE interface.
 fn main() {
+    // Initialize logging as early as possible
+    core::logging::init_logging();
+    
+    #[cfg(feature = "logging")]
+    tracing::info!("Starting Rust RAD IDE");
+
     let options = eframe::NativeOptions::default();
     eframe::run_native(
         "Rust RAD IDE",
         options,
-        Box::new(|cc| Box::new(ide_app::IdeApp::new(cc))),
+        Box::new(|cc| {
+            #[cfg(feature = "logging")]
+            tracing::debug!("Creating IDE app with creation context");
+            
+            Box::new(ide_app::IdeApp::new(cc))
+        }),
     ).unwrap();
 }

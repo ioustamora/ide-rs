@@ -9,6 +9,103 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
+// Import types from other modules - only the ones that exist
+use crate::ai_development_assistant::{AIModel, UserPreferences, ProductivityMetrics};
+// use crate::editor::visual_designer::smart_palette::LearningData; // Comment out if not exists
+
+// Define missing types that aren't imported
+#[derive(Debug, Clone)]
+pub struct CodeSuggestions {
+    pub suggestions: Vec<String>,
+    pub confidence: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct LanguageServer {
+    pub name: String,
+    pub version: String,
+    pub capabilities: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CodeIndex {
+    pub indexed_files: HashMap<PathBuf, Vec<String>>,
+    pub last_update: Instant,
+}
+
+#[derive(Debug, Clone)]
+pub struct SymbolDatabase {
+    pub symbols: HashMap<String, Vec<String>>,
+    pub references: HashMap<String, Vec<PathBuf>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReferenceGraph {
+    pub nodes: HashMap<String, Vec<String>>,
+    pub edges: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SemanticSearch {
+    pub enabled: bool,
+    pub index: HashMap<String, Vec<String>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CodeNavigation {
+    pub enabled: bool,
+    pub history: VecDeque<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RefactoringEngine {
+    pub enabled: bool,
+    pub rules: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DependencyAnalysis {
+    pub dependencies: HashMap<String, Vec<String>>,
+    pub vulnerabilities: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProjectInsights {
+    pub insights: Vec<String>,
+    pub recommendations: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct OptimizationRecommendations {
+    pub recommendations: Vec<String>,
+    pub priority: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct AnomalyDetection {
+    pub anomalies: Vec<String>,
+    pub confidence: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct UsagePatterns {
+    pub patterns: HashMap<String, u32>,
+    pub trends: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LearningData {
+    pub data: HashMap<String, String>,
+    pub last_update: Instant,
+}
+
+#[derive(Debug, Clone)]
+pub struct UsagePattern {
+    pub pattern_id: String,
+    pub frequency: u32,
+    pub context: String,
+}
+
 /// Advanced workspace manager with enterprise features
 pub struct AdvancedWorkspace {
     /// Workspace configuration
@@ -1500,6 +1597,66 @@ pub struct Repository {
     pub url: String,
     pub branch: String,
     pub provider: String,
+}
+
+/// Build matrix configuration for multiple build variations
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BuildMatrix {
+    pub enabled: bool,
+    pub os_variants: Vec<String>,
+    pub language_versions: Vec<String>,
+    pub environment_configs: HashMap<String, String>,
+    pub parallel_builds: bool,
+}
+
+/// Notification hook for build events
+#[derive(Clone, Serialize, Deserialize)]
+pub struct NotificationHook {
+    pub hook_id: String,
+    pub name: String,
+    pub hook_type: NotificationHookType,
+    pub url: String,
+    pub events: Vec<String>,
+    pub enabled: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum NotificationHookType {
+    Webhook,
+    Slack,
+    Discord,
+    Email,
+    Teams,
+}
+
+/// Individual quality gate configuration
+#[derive(Clone, Serialize, Deserialize)]
+pub struct QualityGate {
+    pub gate_id: String,
+    pub name: String,
+    pub condition: QualityCondition,
+    pub threshold: f32,
+    pub operator: QualityOperator,
+    pub enabled: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum QualityCondition {
+    CodeCoverage,
+    Complexity,
+    Duplication,
+    SecurityRating,
+    ReliabilityRating,
+    MaintainabilityRating,
+    TechnicalDebt,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum QualityOperator {
+    GreaterThan,
+    LessThan,
+    Equals,
+    NotEquals,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

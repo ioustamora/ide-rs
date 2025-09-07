@@ -897,29 +897,266 @@ mod tests {
         assert_eq!(buffer.to_string(), "Hello World");
         
         // Undo
-        let undo_result = buffer.undo();
-        assert!(undo_result.is_ok());
+        let undo_result = buffer.undo().unwrap();
         assert_eq!(buffer.to_string(), "Hello");
+        assert_eq!(undo_result.cursors.len(), 1);
         
         // Redo
-        let redo_result = buffer.redo();
-        assert!(redo_result.is_ok());
+        let redo_result = buffer.redo().unwrap();
         assert_eq!(buffer.to_string(), "Hello World");
+        assert_eq!(redo_result.cursors.len(), 1);
     }
 
     #[test]
-    fn test_position_offset_conversion() {
-        let buffer = TextBuffer::from_string("Hello\nWorld".to_string());
+    fn test_multi_line_operations() {
+        let mut buffer = TextBuffer::from_string("Line 1\nLine 2\nLine 3".to_string());
+        assert_eq!(buffer.metadata.line_count, 3);
         
-        // Test position to offset
-        let pos = TextPosition { line: 1, column: 2, offset: 0 }; // Will be corrected by conversion
-        let offset = buffer.position_to_offset(&pos);
-        // "Hello\n" = 6 bytes, then "Wo" = 2 bytes = offset 8
+        // Insert at beginning of line 2
+        let position = TextPosition { line: 1, column: 0, offset: 7 };
+        let selection = SelectionSet::single(position.clone());
+        buffer.insert(position, "New ", selection).unwrap();
         
-        // Test offset to position
-        let offset = 8;
-        let position = buffer.offset_to_position(offset).unwrap();
+        assert_eq!(buffer.to_string(), "Line 1\nNew Line 2\nLine 3");
+        assert_eq!(buffer.metadata.line_count, 3);
+    }
+
+    #[test]
+    fn test_position_conversions() {
+        let buffer = TextBuffer::from_string("Hello\nWorld\nRust".to_string());
+        
+        // Test line/column to offset
+        let pos = TextPosition { line: 1, column: 2, offset: 0 };
+        let offset = buffer.position_to_offset(&pos).unwrap();
+        assert_eq!(offset, 8); // "Hello\n" (6) + "Wo" (2) = 8
+        
+        // Test offset to line/column
+        let position = buffer.offset_to_position(8).unwrap();
         assert_eq!(position.line, 1);
         assert_eq!(position.column, 2);
+    }
+
+    #[test]
+    fn test_line_operations() {
+        let buffer = TextBuffer::from_string("Line 1\nLine 2\nLine 3".to_string());
+        
+        let line1 = buffer.line_content(1).unwrap();
+        assert_eq!(line1, "Line 2");
+        
+        let lines = buffer.lines_in_range(0, 2).unwrap();
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "Line 1");
+        assert_eq!(lines[1], "Line 2");
+    }
+
+    #[test]
+    fn test_search_functionality() {
+        let buffer = TextBuffer::from_string("Hello World\nHello Rust\nGoodbye World".to_string());
+        
+        let matches = buffer.find_all("Hello");
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].start.line, 0);
+        assert_eq!(matches[0].start.column, 0);
+        assert_eq!(matches[1].start.line, 1);
+        assert_eq!(matches[1].start.column, 0);
+    }
+
+    #[test]
+    fn test_replace_functionality() {
+        let mut buffer = TextBuffer::from_string("Hello World Hello".to_string());
+        let selection = SelectionSet::single(TextPosition { line: 0, column: 0, offset: 0 });
+        
+        let replaced_count = buffer.replace_all("Hello", "Hi", selection).unwrap();
+        assert_eq!(replaced_count, 2);
+        assert_eq!(buffer.to_string(), "Hi World Hi");
+    }
+
+    #[test]
+    fn test_change_tracking() {
+        let mut buffer = TextBuffer::new();
+        
+        // Make some changes
+        let pos1 = TextPosition { line: 0, column: 0, offset: 0 };
+        let selection1 = SelectionSet::single(pos1.clone());
+        buffer.insert(pos1, "Hello", selection1).unwrap();
+        
+        let pos2 = TextPosition { line: 0, column: 5, offset: 5 };
+        let selection2 = SelectionSet::single(pos2.clone());
+        buffer.insert(pos2, " World", selection2).unwrap();
+        
+        // Check LSP changes
+        let changes = buffer.get_lsp_changes();
+        assert_eq!(changes.len(), 2);
+        assert_eq!(buffer.version, 2);
+    }
+
+    #[test]
+    fn test_selection_operations() {
+        let mut buffer = TextBuffer::from_string("Hello World".to_string());
+        let mut selection = SelectionSet::new();
+        
+        // Add multiple cursors
+        selection.add_cursor(Cursor::new(TextPosition { line: 0, column: 0, offset: 0 }));
+        selection.add_cursor(Cursor::new(TextPosition { line: 0, column: 6, offset: 6 }));
+        
+        assert_eq!(selection.cursors.len(), 2);
+        
+        // Test selection text extraction
+        let range = TextRange {
+            start: TextPosition { line: 0, column: 0, offset: 0 },
+            end: TextPosition { line: 0, column: 5, offset: 5 },
+        };
+        let selected_text = buffer.text_in_range(&range).unwrap();
+        assert_eq!(selected_text, "Hello");
+    }
+
+    #[test]
+    fn test_file_operations() {
+        use std::fs;
+        use std::io::Write;
+        
+        // Create a temporary file
+        let test_content = "Test file content\nSecond line";
+        let temp_file = std::env::temp_dir().join("test_buffer.txt");
+        
+        // Write test content to file
+        fs::write(&temp_file, test_content).unwrap();
+        
+        // Load buffer from file
+        let buffer = TextBuffer::from_file(temp_file.clone()).unwrap();
+        assert_eq!(buffer.to_string(), test_content);
+        assert_eq!(buffer.file_path, Some(temp_file.clone()));
+        assert!(!buffer.is_dirty);
+        
+        // Clean up
+        fs::remove_file(temp_file).ok();
+    }
+
+    #[test]
+    fn test_large_text_performance() {
+        // Test with larger text to ensure rope efficiency
+        let large_text = "A line of text.\n".repeat(1000);
+        let mut buffer = TextBuffer::from_string(large_text.clone());
+        
+        assert_eq!(buffer.metadata.line_count, 1000);
+        assert_eq!(buffer.to_string(), large_text);
+        
+        // Test insertion in middle
+        let middle_pos = TextPosition { line: 500, column: 0, offset: 500 * 16 };
+        let selection = SelectionSet::single(middle_pos.clone());
+        buffer.insert(middle_pos, "INSERTED ", selection).unwrap();
+        
+        // Should be efficient and maintain correctness
+        let line_500 = buffer.line_content(500).unwrap();
+        assert!(line_500.starts_with("INSERTED "));
+    }
+
+    #[test]
+    fn test_unicode_handling() {
+        let unicode_text = "Hello 🦀 Rust 🌍 World";
+        let mut buffer = TextBuffer::from_string(unicode_text.to_string());
+        
+        // Test position calculations with unicode
+        let pos = TextPosition { line: 0, column: 6, offset: 0 };
+        let offset = buffer.position_to_offset(&pos).unwrap();
+        
+        // Insert after the crab emoji
+        let insert_pos = TextPosition { line: 0, column: 7, offset: offset + 4 };
+        let selection = SelectionSet::single(insert_pos.clone());
+        buffer.insert(insert_pos, " and", selection).unwrap();
+        
+        assert!(buffer.to_string().contains("🦀 and Rust"));
+    }
+
+    #[test]
+    fn test_error_conditions() {
+        let buffer = TextBuffer::from_string("Short text".to_string());
+        
+        // Test invalid line
+        assert!(buffer.line_content(10).is_err());
+        
+        // Test invalid position
+        let invalid_pos = TextPosition { line: 10, column: 0, offset: 100 };
+        assert!(buffer.position_to_offset(&invalid_pos).is_err());
+        
+        // Test invalid offset
+        assert!(buffer.offset_to_position(1000).is_err());
+    }
+
+    #[test]
+    fn test_metadata_updates() {
+        let mut buffer = TextBuffer::new();
+        assert_eq!(buffer.metadata.line_count, 1);
+        assert_eq!(buffer.metadata.char_count, 0);
+        
+        // Insert text with newlines
+        let pos = TextPosition { line: 0, column: 0, offset: 0 };
+        let selection = SelectionSet::single(pos.clone());
+        buffer.insert(pos, "Line 1\nLine 2\nLine 3", selection).unwrap();
+        
+        assert_eq!(buffer.metadata.line_count, 3);
+        assert_eq!(buffer.metadata.char_count, 20);
+        assert!(buffer.metadata.last_modified.is_some());
+    }
+
+    #[test]
+    fn test_concurrent_modifications() {
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+        
+        let buffer = Arc::new(Mutex::new(TextBuffer::from_string("Initial text".to_string())));
+        let mut handles = vec![];
+        
+        // Spawn multiple threads that modify the buffer
+        for i in 0..5 {
+            let buffer_clone = Arc::clone(&buffer);
+            let handle = thread::spawn(move || {
+                let mut buf = buffer_clone.lock().unwrap();
+                let pos = TextPosition { line: 0, column: 12, offset: 12 };
+                let selection = SelectionSet::single(pos.clone());
+                buf.insert(pos, &format!(" {}", i), selection).unwrap();
+            });
+            handles.push(handle);
+        }
+        
+        // Wait for all threads to complete
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        
+        let final_buffer = buffer.lock().unwrap();
+        assert!(final_buffer.to_string().len() > "Initial text".len());
+        assert!(final_buffer.version >= 5);
+    }
+    
+    #[test]
+    fn test_benchmark_operations() {
+        // Benchmark test for performance validation with larger operations
+        use std::time::Instant;
+        
+        let start = Instant::now();
+        let mut buffer = TextBuffer::new();
+        
+        // Insert a large amount of text
+        for i in 0..1000 {
+            let pos = TextPosition { 
+                line: i, 
+                column: 0, 
+                offset: buffer.rope.len_chars()
+            };
+            let selection = SelectionSet::single(pos.clone());
+            buffer.insert(pos, &format!("Line {} with some content\n", i), selection).unwrap();
+        }
+        
+        let insert_duration = start.elapsed();
+        assert!(insert_duration.as_millis() < 1000, "Large insert should complete in under 1 second");
+        
+        // Test search performance
+        let start = Instant::now();
+        let matches = buffer.find_all("Line 500");
+        let search_duration = start.elapsed();
+        
+        assert!(!matches.is_empty());
+        assert!(search_duration.as_millis() < 100, "Search should complete quickly");
     }
 }

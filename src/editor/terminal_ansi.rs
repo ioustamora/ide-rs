@@ -735,8 +735,8 @@ impl ScrollbackBuffer {
     /// Add styled spans to current line
     pub fn add_spans(&mut self, spans: Vec<StyledSpan>) {
         for span in spans {
-            self.current_line.spans.push(span);
             self.stats.total_chars += span.text.len();
+            self.current_line.spans.push(span);
         }
     }
 

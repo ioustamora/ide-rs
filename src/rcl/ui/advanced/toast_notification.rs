@@ -6,6 +6,7 @@
 use egui::*;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
+use uuid::Uuid;
 
 /// Toast notification manager
 pub struct ToastManager {
@@ -427,7 +428,7 @@ impl Toast {
     /// Create a new text toast
     pub fn new_text(message: String, toast_type: ToastType, duration: Duration) -> Self {
         Self {
-            id: format!("toast_{}", uuid::Uuid::new_v4().to_string()),
+            id: format!("toast_{}", Uuid::new_v4().to_string()),
             content: ToastContent::Text(message),
             toast_type,
             created_at: Instant::now(),
@@ -443,7 +444,7 @@ impl Toast {
     /// Create a new rich text toast
     pub fn new_rich(title: String, message: String, icon: Option<String>, toast_type: ToastType, duration: Duration) -> Self {
         Self {
-            id: format!("toast_{}", uuid::Uuid::new_v4().to_string()),
+            id: format!("toast_{}", Uuid::new_v4().to_string()),
             content: ToastContent::RichText { title, message, icon },
             toast_type,
             created_at: Instant::now(),
@@ -459,7 +460,7 @@ impl Toast {
     /// Create a new loading toast
     pub fn new_loading(message: String, progress: Option<f32>) -> Self {
         Self {
-            id: format!("toast_{}", uuid::Uuid::new_v4().to_string()),
+            id: format!("toast_{}", Uuid::new_v4().to_string()),
             content: ToastContent::Loading { message, progress },
             toast_type: ToastType::Loading,
             created_at: Instant::now(),

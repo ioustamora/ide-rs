@@ -307,8 +307,8 @@ pub struct TaskExecutor {
 
 /// Task handler trait
 pub trait TaskHandler: Send + Sync {
-    /// Execute task
-    async fn execute(&self, task: &WorkspaceTask) -> Result<TaskResult, TaskError>;
+    /// Execute task synchronously
+    fn execute_sync(&self, task: &WorkspaceTask) -> Result<TaskResult, TaskError>;
     /// Check if can handle task type
     fn can_handle(&self, task_type: &WorkspaceTaskType) -> bool;
     /// Get estimated duration
@@ -476,7 +476,7 @@ impl BufferManager {
         
         // Load file content
         let text_buffer = TextBuffer::from_file(path.clone())
-            .map_err(BufferManagerError::TextBuffer)?;
+            .map_err(BufferManagerError::Io)?;
         
         // Create buffer
         let buffer_id = BufferId::new_v4();
@@ -706,13 +706,15 @@ impl BufferManager {
 
     /// Process file system events
     pub async fn process_file_events(&mut self) -> Result<(), BufferManagerError> {
+        let mut fs_events = Vec::new();
+        
+        // First collect all events to avoid borrowing issues
         if let Some(ref mut watcher) = self.file_watcher {
             while let Ok(event) = watcher.event_receiver.try_recv() {
                 match event {
                     Ok(notify_event) => {
                         let fs_event = Self::convert_notify_event(notify_event);
-                        self.handle_file_system_event(&fs_event).await?;
-                        self.stats.fs_events_processed += 1;
+                        fs_events.push(fs_event);
                     }
                     Err(e) => {
                         eprintln!("File watcher error: {:?}", e);
@@ -720,12 +722,19 @@ impl BufferManager {
                 }
             }
         }
+        
+        // Now process collected events
+        for fs_event in fs_events {
+            self.handle_file_system_event(&fs_event).await?;
+            self.stats.fs_events_processed += 1;
+        }
+        
         Ok(())
     }
 
     /// Handle file system event
     async fn handle_file_system_event(&mut self, event: &FileSystemEvent) -> Result<(), BufferManagerError> {
-        match event.event_type {
+        match &event.event_type {
             FileSystemEventType::Modified => {
                 // Check if file is open and update if needed
                 if let Some(buffer) = self.buffers.get_mut(&event.path) {
@@ -752,10 +761,10 @@ impl BufferManager {
             }
             FileSystemEventType::Renamed(old_path) => {
                 // Update buffer path if renamed
-                if let Some(buffer) = self.buffers.remove(&old_path) {
+                if let Some(buffer) = self.buffers.remove(old_path) {
                     self.buffers.insert(event.path.clone(), buffer);
                     
-                    if self.active_buffer == Some(old_path) {
+                    if self.active_buffer.as_ref() == Some(old_path) {
                         self.active_buffer = Some(event.path.clone());
                     }
                 }
@@ -785,7 +794,7 @@ impl BufferManager {
                     
                     // Notify listeners
                     for listener in &self.change_listeners {
-                        listener.on_buffer_saved(buffer.buffer_id, path);
+                        listener.on_buffer_saved(buffer.buffer_id, &path);
                         listener.on_dirty_state_changed(buffer.buffer_id, false);
                     }
                 }

@@ -6,6 +6,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
+use uuid::Uuid;
 
 /// Advanced AI development assistant with multi-modal capabilities
 pub struct AIDevelopmentAssistant {
@@ -1965,7 +1966,7 @@ impl ContextManager {
                 workspace_settings: HashMap::new(),
             },
             session_context: SessionContext {
-                session_id: uuid::Uuid::new_v4().to_string(),
+                session_id: Uuid::new_v4().to_string(),
                 start_time: std::time::Instant::now(),
                 active_tasks: Vec::new(),
                 recent_actions: VecDeque::new(),

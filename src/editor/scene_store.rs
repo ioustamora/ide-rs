@@ -860,6 +860,7 @@ impl Command for AddComponentCommand {
         }
         
         // Record change
+        let version = store.change_tracker.next_version();
         store.change_tracker.record_change(SceneChange {
             change_type: ChangeType::ComponentAdded,
             component_id,
@@ -867,7 +868,7 @@ impl Command for AddComponentCommand {
             old_value: None,
             new_value: None,
             timestamp: Instant::now(),
-            version: store.change_tracker.next_version(),
+            version,
         });
         
         Ok(())
@@ -966,6 +967,7 @@ impl Command for UpdatePropertyCommand {
         component.modified_at = Instant::now();
         
         // Record change
+        let version = store.change_tracker.next_version();
         store.change_tracker.record_change(SceneChange {
             change_type: ChangeType::PropertyChanged,
             component_id: self.component_id,
@@ -973,7 +975,7 @@ impl Command for UpdatePropertyCommand {
             old_value: Some(self.old_value.clone()),
             new_value: Some(self.new_value.clone()),
             timestamp: Instant::now(),
-            version: store.change_tracker.next_version(),
+            version,
         });
         
         Ok(())

@@ -302,6 +302,8 @@ pub enum SortDirection {
 
 /// Edit manager
 pub struct EditManager<T> {
+    /// Type marker
+    _phantom: std::marker::PhantomData<T>,
     /// Currently editing cell
     pub editing_cell: Option<(usize, String)>,
     /// Pending changes
@@ -921,6 +923,7 @@ impl<T> SortManager<T> {
 impl<T> EditManager<T> {
     fn new() -> Self {
         Self {
+            _phantom: std::marker::PhantomData,
             editing_cell: None,
             pending_changes: HashMap::new(),
             validation_errors: HashMap::new(),
