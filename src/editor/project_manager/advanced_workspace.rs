@@ -1801,5 +1801,107 @@ pub enum NotificationType {
     CodeReview,
 }
 
+/// Code review settings
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct CodeReviewSettings {
+    pub require_code_review: bool,
+    pub minimum_approvals: u32,
+    pub auto_assign_reviewers: bool,
+    pub default_reviewers: Vec<String>,
+    pub review_timeout_hours: u32,
+    pub dismiss_stale_reviews: bool,
+}
+
+/// Merge policy configuration
+#[derive(Clone, Serialize, Deserialize)]
+pub struct MergePolicy {
+    pub policy_name: String,
+    pub branch_pattern: String,
+    pub require_linear_history: bool,
+    pub require_status_checks: bool,
+    pub required_status_checks: Vec<String>,
+    pub dismiss_stale_reviews_on_push: bool,
+    pub restrict_pushes: bool,
+    pub allowed_push_actors: Vec<String>,
+}
+
+/// Notification settings
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct NotificationSettings {
+    pub email_notifications: bool,
+    pub slack_notifications: bool,
+    pub discord_notifications: bool,
+    pub notification_channels: Vec<CommunicationChannel>,
+    pub notification_filters: Vec<NotificationFilter>,
+    pub quiet_hours: QuietHours,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct NotificationFilter {
+    pub filter_type: String,
+    pub pattern: String,
+    pub enabled: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct QuietHours {
+    pub enabled: bool,
+    pub start_time: String,
+    pub end_time: String,
+    pub timezone: String,
+}
+
+/// Build configuration
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct BuildConfiguration {
+    pub build_command: String,
+    pub test_command: String,
+    pub clean_command: String,
+    pub output_directory: PathBuf,
+    pub build_targets: Vec<String>,
+    pub environment_variables: HashMap<String, String>,
+    pub parallel_jobs: u32,
+}
+
+/// Build stage definition
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BuildStage {
+    pub name: String,
+    pub command: String,
+    pub working_directory: PathBuf,
+    pub environment_variables: HashMap<String, String>,
+    pub timeout_seconds: u32,
+    pub continue_on_failure: bool,
+}
+
+/// Build stage execution result
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BuildStageResult {
+    pub stage_name: String,
+    pub success: bool,
+    pub duration_seconds: f64,
+    pub output: String,
+    pub error: Option<String>,
+}
+
+/// Build artifacts
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BuildArtifact {
+    pub name: String,
+    pub artifact_type: String,
+    pub file_path: PathBuf,
+    pub size_bytes: u64,
+    pub checksum: String,
+}
+
+/// Caching strategy
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct CachingStrategy {
+    pub enabled: bool,
+    pub cache_directory: PathBuf,
+    pub max_cache_size_mb: u64,
+    pub cache_expiry_days: u32,
+}
+
 // Additional supporting structures would continue...
 // This represents a comprehensive workspace management system

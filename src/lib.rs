@@ -2,6 +2,7 @@
 pub mod rcl;
 pub mod editor;
 pub mod ai_agent;
+pub mod ai_development_assistant;
 pub mod ide_app;
 pub mod shared;
 

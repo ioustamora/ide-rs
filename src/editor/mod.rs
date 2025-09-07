@@ -192,6 +192,7 @@ pub mod git_integration;
 /// Embedded terminal with multiple shell support, command history,
 /// and process management within the IDE.
 pub mod terminal;
+pub mod terminal_advanced;
 
 /// Plugin and extension system architecture
 /// 

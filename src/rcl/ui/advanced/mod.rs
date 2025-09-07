@@ -25,5 +25,11 @@ pub mod chart;
 pub mod badge;
 pub mod avatar;
 pub mod breadcrumb;
+pub mod virtual_list;
+pub mod toast_notification;
+pub mod data_grid;
 
 // Re-export commonly used components
+pub use virtual_list::VirtualList;
+pub use toast_notification::{ToastManager, Toast, ToastType};
+pub use data_grid::{DataGrid, ColumnDefinition, CellValue};
