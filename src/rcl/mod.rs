@@ -41,5 +41,11 @@ pub mod system;
 /// WebSocket connections, and network monitoring capabilities.
 pub mod network;
 
+/// Component registry and metadata system
+/// 
+/// Provides unified metadata registry & property typing with schemas and
+/// auto-generated property inspector functionality.
+pub mod component_registry;
+
 // Re-export UI components from correct paths
 // Components are re-exported at the crate level for convenient access

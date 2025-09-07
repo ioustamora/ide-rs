@@ -193,6 +193,16 @@ pub mod git_integration;
 /// and process management within the IDE.
 pub mod terminal;
 pub mod terminal_advanced;
+pub mod text_buffer;
+pub mod scene_store;
+pub mod terminal_ansi;
+pub mod buffer_manager;
+
+/// Code generation system with guarded sections
+/// 
+/// Provides code generation capabilities for the visual designer with guarded sections
+/// that preserve user modifications while allowing automated code updates.
+pub mod code_generator;
 
 /// Plugin and extension system architecture
 /// 
