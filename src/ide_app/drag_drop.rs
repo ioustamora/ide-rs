@@ -216,6 +216,7 @@ impl DragState {
                 end_position: self.current_drag_pos,
                 preview_position: self.preview_position,
                 component_index: self.dragging_component,
+                drop_valid: true,
             })
         } else {
             None
@@ -245,17 +246,20 @@ impl DragState {
             DragType::ComponentFromPalette(_) | DragType::ComponentMove => {
                 // For component placement/movement, preview position is the snap-adjusted position
                 self.preview_position = Some(self.current_drag_pos);
-                self.drop_valid = true; // TODO: Add actual validation logic
+                // Validate drop location for component from palette
+                self.drop_valid = self.validate_palette_drop(self.current_drag_pos);
             }
             DragType::ComponentResize { .. } => {
                 // For resize operations, preview shows the new size
                 self.preview_position = Some(self.current_drag_pos);
-                self.drop_valid = true; // TODO: Add size constraint validation
+                // Validate resize constraints
+                self.drop_valid = self.validate_resize_constraints();
             }
             DragType::MultiComponentMove { .. } => {
                 // For multi-selection, preview shows the group movement
                 self.preview_position = Some(self.current_drag_pos);
-                self.drop_valid = true; // TODO: Add group movement validation
+                // Validate group movement constraints
+                self.drop_valid = self.validate_group_movement();
             }
             DragType::None => {
                 self.preview_position = None;
@@ -290,6 +294,82 @@ impl DragState {
             }
         }
     }
+    
+    /// Validate whether a palette component can be dropped at the given position
+    fn validate_palette_drop(&self, position: egui::Pos2) -> bool {
+        // Basic bounds checking - ensure position is within valid canvas area
+        if position.x < 0.0 || position.y < 0.0 {
+            return false;
+        }
+        
+        // Ensure position is within reasonable canvas bounds
+        // (In a real implementation, this would use actual canvas dimensions)
+        if position.x > 2000.0 || position.y > 2000.0 {
+            return false;
+        }
+        
+        // TODO: Add additional validation:
+        // - Check for overlapping components
+        // - Validate container constraints
+        // - Check component-specific placement rules
+        
+        true
+    }
+    
+    /// Validate whether a resize operation meets constraints
+    fn validate_resize_constraints(&self) -> bool {
+        if let DragType::ComponentResize { original_size, .. } = self.drag_type {
+            // Calculate the delta from drag movement
+            let delta = self.current_drag_pos - self.drag_start_pos;
+            let new_size = original_size + egui::Vec2::new(delta.x, delta.y);
+            
+            // Enforce minimum size constraints
+            const MIN_SIZE: f32 = 20.0;
+            if new_size.x < MIN_SIZE || new_size.y < MIN_SIZE {
+                return false;
+            }
+            
+            // Enforce maximum size constraints
+            const MAX_SIZE: f32 = 1000.0;
+            if new_size.x > MAX_SIZE || new_size.y > MAX_SIZE {
+                return false;
+            }
+            
+            // TODO: Add component-specific size constraints
+            // TODO: Check aspect ratio constraints if needed
+            
+            true
+        } else {
+            false
+        }
+    }
+    
+    /// Validate whether a group movement operation is valid
+    fn validate_group_movement(&self) -> bool {
+        // Basic validation for multi-component movement
+        if let DragType::MultiComponentMove { selection_count } = self.drag_type {
+            // Ensure we have a valid selection
+            if selection_count == 0 {
+                return false;
+            }
+            
+            // Ensure movement delta is reasonable
+            let delta = self.current_drag_pos - self.drag_start_pos;
+            const MAX_MOVEMENT: f32 = 500.0;
+            if delta.length() > MAX_MOVEMENT {
+                return false;
+            }
+            
+            // TODO: Add validation for:
+            // - Ensuring all components stay within bounds
+            // - Checking for overlaps with other components
+            // - Validating container constraints for all components
+            
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// # Drag Completion Result
@@ -302,6 +382,7 @@ pub struct DragCompletionResult {
     pub end_position: egui::Pos2,
     pub preview_position: Option<egui::Pos2>,
     pub component_index: Option<usize>,
+    pub drop_valid: bool,
 }
 
 impl ComponentType {

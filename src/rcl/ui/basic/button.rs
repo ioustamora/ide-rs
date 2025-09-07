@@ -105,7 +105,7 @@ impl Component for Button {
             ui.text_edit_singleline(&mut self.label);
         } else {
             // Display mode - show button
-            ui.button(&self.label);
+            let _ = ui.button(&self.label);
         }
     }
     

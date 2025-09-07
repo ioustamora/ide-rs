@@ -333,7 +333,7 @@ pub static mut ACTIONS: ActionManager = ActionManager { recent_actions: Vec::new
 /// 
 /// Mutable reference to the global ActionManager instance
 pub fn get_actions() -> &'static mut ActionManager {
-    unsafe { &mut ACTIONS }
+    unsafe { (&raw mut ACTIONS).as_mut().unwrap() }
 }
 
 // ========================================================================================

@@ -20,7 +20,7 @@ impl Component for Toolbar {
         } else {
             ui.horizontal(|ui| {
                 for button in &self.buttons {
-                    ui.button(button);
+                    let _ = ui.button(button);
                 }
             });
         }

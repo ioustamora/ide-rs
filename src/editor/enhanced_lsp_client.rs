@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde_json::{json, Value};
 use egui::*;
 
-use crate::editor::lsp_integration::{LspClient, LspError};
+use crate::editor::lsp_integration::{LspClient, LspError, Position};
 
 /// Enhanced LSP features and capabilities
 pub struct EnhancedLspClient {
@@ -49,12 +49,6 @@ pub struct Range {
     pub end: Position,
 }
 
-/// LSP Position for cursor locations
-#[derive(Debug, Clone)]
-pub struct Position {
-    pub line: u32,
-    pub character: u32,
-}
 
 /// Code action for quick fixes and refactoring
 #[derive(Debug, Clone)]
@@ -237,7 +231,7 @@ impl EnhancedLspClient {
         let request_id = self.next_request_id;
         self.next_request_id += 1;
 
-        let params = json!({
+        let _params = json!({
             "textDocument": {
                 "uri": uri
             },
@@ -247,12 +241,55 @@ impl EnhancedLspClient {
             }
         });
 
+        // For now, store the callback and handle it later
+        // This avoids the complex ownership issues with closures
         self.goto_definition_requests.insert(request_id, Box::new(callback));
         
-        // For now, use a simplified approach without actual LSP communication
-        // This can be expanded when the full LSP integration is implemented
+        // TODO: Implement actual LSP communication
+        // For now, return empty result to avoid compilation errors
 
         Ok(())
+    }
+    
+    /// Parse LSP goto definition response into our Location format
+    fn parse_goto_definition_response(value: Value) -> Vec<Location> {
+        let mut locations = Vec::new();
+        
+        if let Some(array) = value.as_array() {
+            for item in array {
+                if let Some(location) = Self::parse_lsp_location(item) {
+                    locations.push(location);
+                }
+            }
+        } else if let Some(location) = Self::parse_lsp_location(&value) {
+            locations.push(location);
+        }
+        
+        locations
+    }
+    
+    /// Parse a single LSP location object
+    fn parse_lsp_location(value: &Value) -> Option<Location> {
+        let uri = value.get("uri")?.as_str()?.to_string();
+        let range_obj = value.get("range")?;
+        
+        let start_obj = range_obj.get("start")?;
+        let end_obj = range_obj.get("end")?;
+        
+        let start = Position {
+            line: start_obj.get("line")?.as_u64()?,
+            character: start_obj.get("character")?.as_u64()?,
+        };
+        
+        let end = Position {
+            line: end_obj.get("line")?.as_u64()?,
+            character: end_obj.get("character")?.as_u64()?,
+        };
+        
+        Some(Location {
+            uri,
+            range: Range { start, end },
+        })
     }
 
     /// Send find references request
@@ -263,7 +300,7 @@ impl EnhancedLspClient {
         let request_id = self.next_request_id;
         self.next_request_id += 1;
 
-        let params = json!({
+        let _params = json!({
             "textDocument": {
                 "uri": uri
             },
@@ -276,10 +313,10 @@ impl EnhancedLspClient {
             }
         });
 
+        // For now, store the callback and handle it later
         self.find_references_requests.insert(request_id, Box::new(callback));
         
-        // For now, use a simplified approach without actual LSP communication
-        // This can be expanded when the full LSP integration is implemented
+        // TODO: Implement actual LSP communication
 
         Ok(())
     }
@@ -292,7 +329,7 @@ impl EnhancedLspClient {
         let request_id = self.next_request_id;
         self.next_request_id += 1;
 
-        let params = json!({
+        let _params = json!({
             "textDocument": {
                 "uri": uri
             },
@@ -326,12 +363,43 @@ impl EnhancedLspClient {
             }
         });
 
+        // For now, store the callback and handle it later
         self.code_action_requests.insert(request_id, Box::new(callback));
         
-        // For now, use a simplified approach without actual LSP communication
-        // This can be expanded when the full LSP integration is implemented
+        // TODO: Implement actual LSP communication
 
         Ok(())
+    }
+    
+    /// Parse LSP code actions response
+    fn parse_code_actions_response(value: Value) -> Vec<CodeAction> {
+        let mut actions = Vec::new();
+        
+        if let Some(array) = value.as_array() {
+            for item in array {
+                if let Some(action) = Self::parse_code_action(item) {
+                    actions.push(action);
+                }
+            }
+        }
+        
+        actions
+    }
+    
+    /// Parse a single code action object
+    fn parse_code_action(value: &Value) -> Option<CodeAction> {
+        let title = value.get("title")?.as_str()?.to_string();
+        let kind = value.get("kind").and_then(|k| k.as_str()).map(|s| s.to_string());
+        
+        // For now, create a simple code action
+        // In a full implementation, we'd parse the edit details
+        Some(CodeAction {
+            title,
+            kind,
+            diagnostics: None,
+            edit: None, // TODO: Parse workspace edit
+            command: None, // TODO: Parse command
+        })
     }
 
     /// Send signature help request
@@ -342,7 +410,7 @@ impl EnhancedLspClient {
         let request_id = self.next_request_id;
         self.next_request_id += 1;
 
-        let params = json!({
+        let _params = json!({
             "textDocument": {
                 "uri": uri
             },
@@ -352,17 +420,52 @@ impl EnhancedLspClient {
             }
         });
 
+        // For now, store the callback and handle it later
         self.signature_help_requests.insert(request_id, Box::new(callback));
         
-        // For now, use a simplified approach without actual LSP communication
-        // This can be expanded when the full LSP integration is implemented
+        // TODO: Implement actual LSP communication
 
         Ok(())
+    }
+    
+    /// Parse LSP signature help response
+    fn parse_signature_help_response(value: Value) -> SignatureHelp {
+        let signatures = value.get("signatures")
+            .and_then(|s| s.as_array())
+            .map(|arr| {
+                arr.iter().filter_map(|sig| {
+                    let label = sig.get("label")?.as_str()?.to_string();
+                    let documentation = sig.get("documentation")
+                        .and_then(|d| d.as_str())
+                        .map(|s| s.to_string());
+                    
+                    Some(SignatureInformation {
+                        label,
+                        documentation,
+                        parameters: Some(Vec::new()), // TODO: Parse parameters
+                    })
+                }).collect()
+            })
+            .unwrap_or_default();
+            
+        let active_signature = value.get("activeSignature")
+            .and_then(|s| s.as_u64())
+            .map(|n| n as u32);
+            
+        let active_parameter = value.get("activeParameter")
+            .and_then(|p| p.as_u64())
+            .map(|n| n as u32);
+            
+        SignatureHelp {
+            signatures,
+            active_signature,
+            active_parameter,
+        }
     }
 
     /// Request document symbols for navigation
     pub fn document_symbols(&mut self, uri: &str) -> Result<(), LspError> {
-        let params = json!({
+        let _params = json!({
             "textDocument": {
                 "uri": uri
             }
@@ -376,7 +479,7 @@ impl EnhancedLspClient {
 
     /// Request workspace symbols for project-wide search
     pub fn workspace_symbols(&mut self, query: &str) -> Result<(), LspError> {
-        let params = json!({
+        let _params = json!({
             "query": query
         });
 
@@ -491,8 +594,8 @@ impl EnhancedLspClient {
     /// Convert egui position to LSP position
     pub fn egui_to_lsp_position(line: usize, column: usize) -> Position {
         Position {
-            line: line as u32,
-            character: column as u32,
+            line: line as u64,
+            character: column as u64,
         }
     }
 

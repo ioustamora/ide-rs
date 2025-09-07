@@ -263,12 +263,12 @@ impl ObjectInspector {
         ui: &mut Ui,
         node: &ComponentNode,
         is_selected: bool,
-        hierarchy: &HashMap<usize, ComponentNode>,
+        _hierarchy: &HashMap<usize, ComponentNode>,
     ) -> Option<usize> {
         let mut clicked_component = None;
         
         // Node background color
-        let bg_color = if is_selected {
+        let _bg_color = if is_selected {
             ui.style().visuals.selection.bg_fill
         } else {
             Color32::TRANSPARENT

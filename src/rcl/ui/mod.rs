@@ -120,7 +120,3 @@ pub mod basic;
 pub mod advanced;
 
 // Re-export the core types for convenience
-pub use component::Component;
-pub use properties::{PropertyInfo, PropertyValue, PropertyRegistry, PropertyCategory};
-pub use enhanced_component::{EnhancedComponent, StandardProperties};
-pub use theme::{Theme, ThemeManager, ColorPalette, Typography, Spacing};

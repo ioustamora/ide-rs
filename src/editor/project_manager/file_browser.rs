@@ -214,7 +214,7 @@ impl FileBrowser {
     }
 
     /// Render the file browser UI
-    pub fn render(&mut self, ui: &mut Ui, output_panel: &mut OutputPanel, current_project: &Option<IdeProject>) {
+    pub fn render(&mut self, ui: &mut Ui, output_panel: &mut OutputPanel, current_project: &Option<IdeProject>) -> Option<PathBuf> {
         ui.heading("📁 Project Explorer");
         ui.separator();
 
@@ -223,7 +223,7 @@ impl FileBrowser {
         ui.separator();
 
         // File listing
-        self.render_file_listing(ui, output_panel);
+        self.render_file_listing(ui, output_panel)
     }
 
     /// Render file browser toolbar
@@ -306,12 +306,16 @@ impl FileBrowser {
     }
 
     /// Render file listing
-    fn render_file_listing(&mut self, ui: &mut Ui, output_panel: &mut OutputPanel) {
+    fn render_file_listing(&mut self, ui: &mut Ui, output_panel: &mut OutputPanel) -> Option<PathBuf> {
+        let mut file_to_open = None;
+        
         ScrollArea::vertical().show(ui, |ui| {
             match self.get_entries() {
                 Ok(entries) => {
                     for entry in entries {
-                        self.render_file_entry(ui, &entry, output_panel);
+                        if let Some(path) = self.render_file_entry(ui, &entry, output_panel) {
+                            file_to_open = Some(path);
+                        }
                     }
                 }
                 Err(err) => {
@@ -319,12 +323,15 @@ impl FileBrowser {
                 }
             }
         });
+        
+        file_to_open
     }
 
     /// Render individual file entry
-    fn render_file_entry(&mut self, ui: &mut Ui, entry: &FileEntry, output_panel: &mut OutputPanel) {
+    fn render_file_entry(&mut self, ui: &mut Ui, entry: &FileEntry, output_panel: &mut OutputPanel) -> Option<PathBuf> {
         let icon = if entry.is_dir { "📁" } else { self.get_file_icon(&entry.path) };
         let display_name = format!("{} {}", icon, entry.name);
+        let mut file_to_open = None;
         
         ui.horizontal(|ui| {
             let response = ui.selectable_label(
@@ -348,7 +355,7 @@ impl FileBrowser {
             
             if response.double_clicked() && !entry.is_dir {
                 output_panel.log(&format!("📂 Opening file: {}", entry.path.display()));
-                // TODO: Integrate with code editor
+                file_to_open = Some(entry.path.clone());
             }
             
             // Show file info
@@ -358,6 +365,8 @@ impl FileBrowser {
                 });
             }
         });
+        
+        file_to_open
     }
 
     /// Get appropriate icon for file type

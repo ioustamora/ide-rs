@@ -399,8 +399,8 @@ impl MultiDevicePreview {
         self.render_grid_layout(ui, components);
     }
 
-    /// Render individual device preview
-    fn render_device_preview(&mut self, ui: &mut Ui, device_index: usize, _components: &[Box<dyn crate::rcl::ui::component::Component>]) {
+    /// Render individual device preview with enhanced features
+    fn render_device_preview(&mut self, ui: &mut Ui, device_index: usize, components: &[Box<dyn crate::rcl::ui::component::Component>]) {
         if device_index >= self.device_profiles.len() {
             return;
         }
@@ -460,7 +460,7 @@ impl MultiDevicePreview {
                 );
             }
 
-            // Draw screen content (placeholder)
+            // Draw screen content with actual components
             let screen_rect = rect.shrink(4.0);
             ui.painter().rect_filled(
                 screen_rect,
@@ -468,21 +468,88 @@ impl MultiDevicePreview {
                 Color32::from_rgb(245, 245, 245),
             );
 
-            // Add platform-specific styling hints
-            ui.painter().text(
-                screen_rect.center(),
-                Align2::CENTER_CENTER,
-                format!("{}\n{}×{}\n{:?}", 
-                    device.name, 
-                    device.resolution.x as i32, 
-                    device.resolution.y as i32,
-                    device.platform
-                ),
-                FontId::monospace(10.0),
-                Color32::DARK_GRAY,
-            );
+            // Render safe area if applicable
+            if device.safe_area.top > 0.0 || device.safe_area.bottom > 0.0 || 
+               device.safe_area.left > 0.0 || device.safe_area.right > 0.0 {
+                let safe_rect = Rect::from_min_size(
+                    screen_rect.min + Vec2::new(device.safe_area.left, device.safe_area.top) * zoom,
+                    screen_rect.size() - Vec2::new(
+                        device.safe_area.left + device.safe_area.right,
+                        device.safe_area.top + device.safe_area.bottom
+                    ) * zoom
+                );
+                
+                // Draw safe area outline
+                ui.painter().rect_stroke(
+                    safe_rect,
+                    Rounding::same(2.0),
+                    Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 165, 0, 100)),
+                );
+            }
 
-            // TODO: Render actual UI components scaled for this device
+            // Render components in device context
+            ui.allocate_ui_at_rect(screen_rect, |ui| {
+                ui.set_clip_rect(screen_rect);
+                
+                // Apply device-specific scaling
+                let original_spacing = ui.spacing().clone();
+                ui.spacing_mut().item_spacing *= zoom;
+                ui.spacing_mut().button_padding *= zoom;
+                ui.spacing_mut().menu_margin *= zoom;
+                
+                // Render components with device constraints
+                if !components.is_empty() {
+                    for component in components {
+                        // Apply platform-specific styling if needed
+                        match device.platform {
+                            Platform::IOS => {
+                                // iOS-specific styling adjustments
+                                ui.visuals_mut().widgets.noninteractive.rounding = Rounding::same(8.0);
+                                ui.visuals_mut().widgets.inactive.rounding = Rounding::same(8.0);
+                                ui.visuals_mut().widgets.hovered.rounding = Rounding::same(8.0);
+                                ui.visuals_mut().widgets.active.rounding = Rounding::same(8.0);
+                            },
+                            Platform::Android => {
+                                // Material Design styling
+                                ui.visuals_mut().widgets.noninteractive.rounding = Rounding::same(4.0);
+                                ui.visuals_mut().widgets.inactive.rounding = Rounding::same(4.0);
+                                ui.visuals_mut().widgets.hovered.rounding = Rounding::same(4.0);
+                                ui.visuals_mut().widgets.active.rounding = Rounding::same(4.0);
+                            },
+                            Platform::Windows => {
+                                // Fluent Design styling
+                                ui.visuals_mut().widgets.noninteractive.rounding = Rounding::same(2.0);
+                                ui.visuals_mut().widgets.inactive.rounding = Rounding::same(2.0);
+                                ui.visuals_mut().widgets.hovered.rounding = Rounding::same(2.0);
+                                ui.visuals_mut().widgets.active.rounding = Rounding::same(2.0);
+                            },
+                            _ => {}
+                        }
+                        
+                        // Render component (simplified - would need proper component rendering)
+                        ui.label(format!("Component: {}", component.name()));
+                    }
+                } else {
+                    // Show device info when no components
+                    ui.centered_and_justified(|ui| {
+                        ui.vertical_centered(|ui| {
+                            ui.label(format!("📱 {}", device.name));
+                            ui.label(format!("{}×{}", 
+                                device.resolution.x as i32, 
+                                device.resolution.y as i32
+                            ));
+                            ui.label(format!("{:?}", device.platform));
+                            ui.label(format!("DPI: {:.1}", device.dpi_scale));
+                            if device.safe_area.top > 0.0 {
+                                ui.label("🔒 Safe Area");
+                            }
+                        });
+                    });
+                }
+                
+                // Restore original spacing
+                *ui.spacing_mut() = original_spacing;
+            });
         });
     }
 

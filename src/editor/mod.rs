@@ -157,6 +157,18 @@ pub mod toolbar;
 /// feedback in an organized, searchable format.
 pub mod output_panel;
 
+/// Advanced code completion system with context awareness
+/// 
+/// Provides intelligent autocompletion, snippets, and AI-powered
+/// code suggestions with documentation and examples.
+pub mod code_completion;
+
+/// Integrated debugger with breakpoints and variable inspection
+/// 
+/// Full-featured debugging environment with call stack navigation,
+/// variable watching, and interactive debugging sessions.
+pub mod debugger;
+
 /// Component discovery and registration system
 /// 
 /// Manages available components, their metadata, and integration
@@ -288,3 +300,59 @@ pub mod file_manager;
 /// Provides bidirectional synchronization ensuring changes are reflected
 /// immediately in both visual designer and generated code.
 pub mod realtime_sync;
+
+// Enhanced keyboard shortcuts and hotkey system
+// 
+// Comprehensive keyboard shortcut system with customizable key bindings,
+// command palettes, and context-aware hotkeys inspired by modern IDEs.
+// TODO: Fix compilation errors before enabling
+// pub mod keyboard_shortcuts;
+
+// Intelligent code completion and suggestions
+// 
+// Advanced code completion with context-aware autocompletion, smart import
+// suggestions, code snippet expansion, and AI-powered suggestions.
+// TODO: Fix compilation errors before enabling
+// pub mod intelligent_completion;
+
+// Advanced project templates and scaffolding
+// 
+// Project template system with wizard-based creation, pre-built templates,
+// and comprehensive scaffolding tools for rapid application development.
+// TODO: Fix compilation errors before enabling
+// pub mod project_scaffolding;
+
+// Visual debugging and inspection tools
+// 
+// Advanced visual debugging capabilities with interactive variable inspection,
+// real-time value watches, memory visualization, and call stack visualization.
+// TODO: Fix compilation errors before enabling
+// pub mod visual_debugging;
+
+// Live reload and hot swapping system
+// 
+// Advanced live reload capabilities with real-time code compilation, hot swapping
+// of components and assets, state preservation, and development server integration.
+// TODO: Fix compilation errors before enabling
+// pub mod live_reload;
+
+// Advanced search and navigation features
+// 
+// Comprehensive search capabilities with full-text search, semantic code search,
+// symbol navigation, cross-references, and intelligent search suggestions.
+// TODO: Fix compilation errors before enabling
+// pub mod advanced_search;
+
+// Advanced refactoring and code transformation tools
+// 
+// Comprehensive refactoring capabilities with automated code transformations,
+// semantic-aware refactoring, batch operations, and safety checks.
+// TODO: Fix compilation errors before enabling
+// pub mod advanced_refactoring;
+
+// Collaborative development and team integration tools
+// 
+// Real-time collaboration features with shared editing, version control integration,
+// team communication, and synchronized development workflows.
+// TODO: Fix compilation errors before enabling
+// pub mod collaborative_development;

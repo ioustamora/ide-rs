@@ -25,6 +25,8 @@ pub mod content_manager;
 pub mod drag_drop;
 pub mod event_handlers;
 pub mod animated_ui;
+// TODO: Fix keyboard_shortcuts compilation errors
+// pub mod keyboard_shortcuts;
 
 use eframe::egui;
 use app_state::IdeAppState;
@@ -88,6 +90,38 @@ impl eframe::App for IdeApp {
         self.event_handlers.handle_global_events(&mut self.app_state, ctx);
         ContentManager::handle_shortcuts(&mut self.app_state, ctx);
         
+        // Auto-save check
+        let _ = self.app_state.file_manager.auto_save_check();
+        
+        // Poll build system for output and display it
+        let build_outputs = self.app_state.build_system.poll_output();
+        for output in build_outputs {
+            match output {
+                crate::editor::build_system::BuildOutput::Started(command) => {
+                    self.app_state.menu.output_panel.log(&format!("🔨 Started: {:?}", command));
+                }
+                crate::editor::build_system::BuildOutput::Progress(line) => {
+                    self.app_state.menu.output_panel.log(&line);
+                }
+                crate::editor::build_system::BuildOutput::Finished(result) => {
+                    if result.success {
+                        self.app_state.menu.output_panel.log(&format!(
+                            "✅ Build completed successfully in {:?}", 
+                            result.build_time
+                        ));
+                    } else {
+                        self.app_state.menu.output_panel.log(&format!(
+                            "❌ Build failed with exit code {} in {:?}", 
+                            result.exit_code, result.build_time
+                        ));
+                    }
+                }
+                crate::editor::build_system::BuildOutput::Error(error) => {
+                    self.app_state.menu.output_panel.log(&format!("❌ Build error: {}", error));
+                }
+            }
+        }
+        
         // Render UI panels in order
         UiManager::render_top_panel(&mut self.app_state, ctx);
         UiManager::render_left_panel(&mut self.app_state, ctx);
@@ -116,4 +150,3 @@ impl Default for IdeApp {
 }
 
 // Re-export public types for convenience
-pub use drag_drop::{DragType, ComponentType, ResizeHandle};

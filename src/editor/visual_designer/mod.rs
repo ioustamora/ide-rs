@@ -11,14 +11,12 @@ pub mod performance;
 pub mod accessibility;
 pub mod state;
 pub mod context_menu;
+pub mod component_hierarchy;
+pub mod advanced_layout;
 
 // Re-export key types for easier access
 pub use layout::{
-    LayoutManager, AlignmentTools, AlignmentOperation, ComponentBounds,
-    ConstraintSystem, AutoLayoutMode, ComponentId,
-    GridColumns, GridRows, GridTrack, Gap, EdgeInsets,
-    StackDirection, StackAlignment, WrapDirection, WrapAlignment,
-    GridAlignment, SizeConstraint, HorizontalConstraint, VerticalConstraint,
+    LayoutManager, AlignmentOperation,
 };
 use crate::ide_app::animated_ui::MovementManager;
 
@@ -34,24 +32,19 @@ enum ResizeDirection {
     BottomLeft,
     BottomRight,
 }
-pub use selection::{
-    ComponentSelection, DragOperation, DragOperationType, ResizeHandle,
-};
+pub use selection::ComponentSelection;
 pub use render::{
     GuideSystem, GridSettings,
 };
 pub use history::{
     DesignHistory, DesignOperation,
 };
-pub use performance::{
-    PerformanceMetrics, MemoryUsage, PerformanceReport,
-};
-pub use state::{
-    DesignerState, DesignTimeProperties,
-};
+pub use performance::PerformanceMetrics;
 pub use smart_editing::SmartEditingSystem;
-pub use accessibility::{AccessibilityValidator, AccessibilityReport};
+pub use accessibility::AccessibilityValidator;
 pub use context_menu::{ContextMenuManager, ContextMenuAction};
+pub use component_hierarchy::ComponentHierarchy;
+pub use advanced_layout::{AdvancedLayoutManager, LayoutType, LayoutConstraints};
 
 /// Main Visual Designer struct that orchestrates all subsystems
 #[derive(Default)]
@@ -78,6 +71,18 @@ pub struct VisualDesigner {
     pub movement_manager: MovementManager,
     /// Context menu manager for right-click operations
     pub context_menu: ContextMenuManager,
+    /// Component hierarchy manager
+    pub hierarchy: ComponentHierarchy,
+    /// Advanced layout manager
+    pub advanced_layout: AdvancedLayoutManager,
+    /// Snap-to-grid functionality
+    pub snap_to_grid: bool,
+    /// Grid size for snapping
+    pub grid_size: f32,
+    /// Show alignment guides
+    pub show_alignment_guides: bool,
+    /// Show component bounds
+    pub show_component_bounds: bool,
 }
 
 impl VisualDesigner {
@@ -85,6 +90,12 @@ impl VisualDesigner {
         let mut designer = Self::default();
         designer.movement_manager = MovementManager::new();
         designer.context_menu = ContextMenuManager::new();
+        designer.hierarchy = ComponentHierarchy::new();
+        designer.advanced_layout = AdvancedLayoutManager::new();
+        designer.snap_to_grid = true;
+        designer.grid_size = 10.0;
+        designer.show_alignment_guides = true;
+        designer.show_component_bounds = false;
         designer
     }
 
@@ -441,17 +452,48 @@ impl VisualDesigner {
             .unwrap_or(egui::Pos2::ZERO)
     }
     
-    /// Snap position to grid
+    /// Snap position to grid if snap is enabled
     pub fn snap_to_grid(&self, pos: egui::Pos2) -> egui::Pos2 {
-        if !self.grid.snap_enabled {
+        if !self.snap_to_grid {
             return pos;
         }
         
-        let grid_size = self.grid.size;
         egui::Pos2::new(
-            (pos.x / grid_size).round() * grid_size,
-            (pos.y / grid_size).round() * grid_size
+            (pos.x / self.grid_size).round() * self.grid_size,
+            (pos.y / self.grid_size).round() * self.grid_size
         )
+    }
+    
+    /// Snap size to grid if snap is enabled
+    pub fn snap_size_to_grid(&self, size: egui::Vec2) -> egui::Vec2 {
+        if !self.snap_to_grid {
+            return size;
+        }
+        
+        egui::Vec2::new(
+            ((size.x / self.grid_size).round() * self.grid_size).max(self.grid_size),
+            ((size.y / self.grid_size).round() * self.grid_size).max(self.grid_size)
+        )
+    }
+    
+    /// Toggle snap-to-grid functionality
+    pub fn toggle_snap_to_grid(&mut self) {
+        self.snap_to_grid = !self.snap_to_grid;
+    }
+    
+    /// Set grid size
+    pub fn set_grid_size(&mut self, size: f32) {
+        self.grid_size = size.max(5.0).min(50.0); // Clamp between 5 and 50 pixels
+    }
+    
+    /// Toggle alignment guides
+    pub fn toggle_alignment_guides(&mut self) {
+        self.show_alignment_guides = !self.show_alignment_guides;
+    }
+    
+    /// Toggle component bounds display
+    pub fn toggle_component_bounds(&mut self) {
+        self.show_component_bounds = !self.show_component_bounds;
     }
 
     /// Draw grid on the canvas
@@ -1072,7 +1114,6 @@ impl VisualDesigner {
     /// Clone a component (simplified implementation)
     fn clone_component(&self, component: &Box<dyn crate::rcl::ui::component::Component>) -> Box<dyn crate::rcl::ui::component::Component> {
         // This is a simplified approach - in a real implementation you'd need proper component cloning
-        use crate::rcl::ui::component::Component;
         
         match component.name() {
             "Button" => Box::new(crate::rcl::ui::basic::button::Button::new("Button Copy".to_string())),

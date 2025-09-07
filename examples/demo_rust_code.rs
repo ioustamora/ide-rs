@@ -5,8 +5,7 @@
 //! code actions, diagnostics, and autocomplete.
 
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self};
 
 /// A sample struct to demonstrate LSP features
 #[derive(Debug, Clone)]

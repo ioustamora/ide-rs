@@ -125,7 +125,7 @@ pub enum PropertyGroup {
 }
 
 impl PropertyGroup {
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         match self {
             PropertyGroup::Appearance => "Appearance",
             PropertyGroup::Layout => "Layout",
@@ -137,7 +137,7 @@ impl PropertyGroup {
         }
     }
     
-    fn icon(&self) -> &str {
+    pub fn icon(&self) -> &str {
         match self {
             PropertyGroup::Appearance => "🎨",
             PropertyGroup::Layout => "📐",
@@ -556,22 +556,45 @@ impl PropertyInspector {
     /// Render a single property group with collapsible header
     fn render_property_group(&mut self, ui: &mut Ui, component_id: usize, group_name: &str, properties: &[PropertyDefinition]) {
         let group = PropertyGroup::from_name(group_name);
-        let group_id = egui::Id::new(format!("prop_group_{}", group_name));
+        let group_id = egui::Id::new(format!("prop_group_{}_{}", component_id, group_name));
         
-        // Use basic egui collapsing header instead of animated version
-        egui::CollapsingHeader::new(format!("{} {}", group.icon(), group.name()))
-            .id_source(group_id)
-            .default_open(true)
-            .show(ui, |ui| {
-                ui.spacing_mut().item_spacing.y = 4.0; // Consistent spacing between properties
-                
-                for property in properties {
-                    self.render_property_editor(ui, component_id, property);
-                    ui.add_space(2.0); // Small space between properties
+        // Get or set the expanded state from our internal storage
+        let is_expanded = *self.expanded_groups.get(group_name).unwrap_or(&true);
+        
+        // Use a simple push_id scope for stability
+        ui.push_id(group_id, |ui| {
+            // Create a stable header button without animations
+            let header_text = format!("{} {}", group.icon(), group.name());
+            let arrow = if is_expanded { "▼" } else { "▶" };
+            let full_header = format!("{} {}", arrow, header_text);
+            
+            // Use a simple button for the header to avoid animation issues
+            let _header_response = ui.horizontal(|ui| {
+                if ui.selectable_value(&mut false, false, full_header).clicked() {
+                    self.expanded_groups.insert(group_name.to_string(), !is_expanded);
                 }
-            });
+            }).response;
+            
+            // Only render contents if expanded
+            if is_expanded {
+                // Add consistent spacing
+                ui.add_space(4.0);
+                
+                // Render properties in a stable frame
+                egui::Frame::none()
+                    .inner_margin(egui::Margin::symmetric(8.0, 4.0))
+                    .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 6.0;
+                        ui.spacing_mut().button_padding.y = 4.0;
+                        
+                        for property in properties {
+                            self.render_property_editor(ui, component_id, property);
+                        }
+                    });
+            }
+        });
         
-        ui.add_space(4.0); // Space between groups
+        ui.add_space(8.0); // Consistent space between groups
     }
     
     /// Render editor for a single property
@@ -584,56 +607,44 @@ impl PropertyInspector {
         let row_id = egui::Id::new(format!("prop_row_{}", property_key));
         
         ui.push_id(row_id, |ui| {
-            // Set fixed height for each property row to prevent vertical shifting
-            let row_height = ui.spacing().button_padding.y * 2.0 + ui.text_style_height(&egui::TextStyle::Body);
-            ui.allocate_ui_with_layout(
-                egui::Vec2::new(ui.available_width(), row_height),
-                Layout::left_to_right(Align::Center),
-                |ui| {
-                    // Property label with fixed width to prevent layout shifts
-                    ui.allocate_ui_with_layout(
-                        egui::Vec2::new(120.0, row_height),
-                        Layout::left_to_right(Align::Center),
-                        |ui| {
-                            ui.label(&property.label)
-                                .on_hover_text(&property.description);
-                        }
-                    );
+            // Use fixed height grid layout to prevent any shifting animations
+            egui::Grid::new(format!("prop_grid_{}", property_key))
+                .num_columns(2)
+                .min_col_width(120.0)
+                .max_col_width(300.0)
+                .spacing([10.0, 6.0])
+                .show(ui, |ui| {
+                    // Property label column
+                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                        ui.label(&property.label)
+                            .on_hover_text(&property.description);
+                    });
                     
-                    // Property editor with stable layout
-                    ui.allocate_ui_with_layout(
-                        egui::Vec2::new(ui.available_width().max(150.0), row_height),
-                        Layout::left_to_right(Align::Center),
-                        |ui| {
-                            // Property editor based on type with stable ID
-                            let editor_id = egui::Id::new(format!("prop_editor_{}", property_key));
-                            ui.push_id(editor_id, |ui| {
-                                let new_value = self.render_property_value_editor(ui, &property.property_type, &current_value, &property_key);
-                                
-                                // Only update value if it actually changed to avoid constant redraws
-                                if new_value != current_value {
-                                    self.set_property_value(component_id, &property.name, new_value);
-                                }
-                                
-                                // Show validation error if any with fixed layout
-                                if let Some(error) = self.validation_errors.get(&property_key) {
-                                    ui.allocate_ui_with_layout(
-                                        egui::Vec2::new(20.0, row_height),
-                                        Layout::right_to_left(Align::Center),
-                                        |ui| {
-                                            ui.label("⚠")
-                                                .on_hover_text(error)
-                                                .on_hover_ui(|ui| {
-                                                    ui.colored_label(egui::Color32::RED, error);
-                                                });
-                                        }
-                                    );
-                                }
-                            });
-                        }
-                    );
-                }
-            );
+                    // Property editor column
+                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                        // Property editor based on type with stable ID
+                        let editor_id = egui::Id::new(format!("prop_editor_{}", property_key));
+                        ui.push_id(editor_id, |ui| {
+                            let new_value = self.render_property_value_editor(ui, &property.property_type, &current_value, &property_key);
+                            
+                            // Only update value if it actually changed to avoid constant redraws
+                            if new_value != current_value {
+                                self.set_property_value(component_id, &property.name, new_value);
+                            }
+                            
+                            // Show validation error if any
+                            if let Some(error) = self.validation_errors.get(&property_key) {
+                                ui.label("⚠")
+                                    .on_hover_text(error)
+                                    .on_hover_ui(|ui| {
+                                        ui.colored_label(egui::Color32::RED, error);
+                                    });
+                            }
+                        });
+                    });
+                    
+                    ui.end_row();
+                });
         });
     }
     

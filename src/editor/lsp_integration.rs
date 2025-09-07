@@ -61,6 +61,16 @@ pub struct LspError {
     pub data: Option<Value>,
 }
 
+impl From<Box<dyn std::error::Error>> for LspError {
+    fn from(error: Box<dyn std::error::Error>) -> Self {
+        LspError {
+            code: -1,
+            message: error.to_string(),
+            data: None,
+        }
+    }
+}
+
 /// Pending LSP request
 pub struct PendingRequest {
     pub method: String,
@@ -337,7 +347,7 @@ impl LspClient {
     }
 
     /// Send LSP request
-    fn send_request<F>(&mut self, method: &str, params: Value, callback: F) -> Result<(), Box<dyn std::error::Error>>
+    pub fn send_request<F>(&mut self, method: &str, params: Value, callback: F) -> Result<(), Box<dyn std::error::Error>>
     where
         F: FnOnce(Result<Value, LspError>) + Send + 'static,
     {

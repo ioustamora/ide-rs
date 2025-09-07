@@ -13,13 +13,12 @@
 use egui::*;
 use std::collections::HashMap;
 use syntect::parsing::SyntaxSet;
-use syntect::highlighting::{ThemeSet, Style};
+use syntect::highlighting::ThemeSet;
 use syntect::easy::HighlightLines;
 
-use crate::editor::lsp_integration::{LspClient, Diagnostic, DiagnosticSeverity, CompletionItem};
+use crate::editor::lsp_integration::{LspClient, Diagnostic, DiagnosticSeverity, CompletionItem, Position};
 use crate::editor::enhanced_lsp_client::{
     EnhancedLspClient, 
-    Position as LspPosition, 
     Range as LspRange,
     SignatureHelp,
     DocumentSymbol,
@@ -370,12 +369,12 @@ impl AdvancedCodeEditor {
 
     /// Setup syntax highlighting for the current language
     fn setup_syntax_highlighting(&mut self) {
-        let syntax = self.syntax_highlighter.syntax_set
+        let _syntax = self.syntax_highlighter.syntax_set
             .find_syntax_by_extension(&self.language)
             .or_else(|| self.syntax_highlighter.syntax_set.find_syntax_by_name("Rust"))
             .unwrap_or_else(|| self.syntax_highlighter.syntax_set.find_syntax_plain_text());
 
-        let theme = &self.syntax_highlighter.theme_set.themes[&self.syntax_highlighter.current_theme];
+        let _theme = &self.syntax_highlighter.theme_set.themes[&self.syntax_highlighter.current_theme];
         
         // Note: We need to handle the lifetime issue here
         // For now, we'll set up the highlighter when rendering
@@ -456,7 +455,7 @@ impl AdvancedCodeEditor {
         let available_size = ui.available_size();
         
         // Calculate visible lines
-        let visible_lines = (available_size.y / row_height).ceil() as usize;
+        let _visible_lines = (available_size.y / row_height).ceil() as usize;
         let total_lines = self.content.lines().count().max(1);
         
         // Scroll area
@@ -530,7 +529,7 @@ impl AdvancedCodeEditor {
     }
 
     /// Render error squiggles under problematic text
-    fn render_error_squiggles(&self, ui: &mut Ui, line_rect: Rect, squiggles: &[(usize, usize, DiagnosticSeverity)], row_height: f32) {
+    fn render_error_squiggles(&self, ui: &mut Ui, line_rect: Rect, squiggles: &[(usize, usize, DiagnosticSeverity)], _row_height: f32) {
         let char_width = 8.0; // Approximate character width
         
         for (start_char, end_char, severity) in squiggles {
@@ -600,7 +599,7 @@ impl AdvancedCodeEditor {
     }
 
     /// Handle cursor interaction and keyboard input
-    fn handle_cursor_interaction(&mut self, ui: &mut Ui, row_height: f32) {
+    fn handle_cursor_interaction(&mut self, ui: &mut Ui, _row_height: f32) {
         ui.ctx().input(|i| {
             // Handle keyboard shortcuts
             if i.modifiers.ctrl {
@@ -639,9 +638,9 @@ impl AdvancedCodeEditor {
             return;
         }
         
-        let lsp_pos = LspPosition {
-            line: self.cursor_pos.0 as u32,
-            character: self.cursor_pos.1 as u32,
+        let lsp_pos = Position {
+            line: self.cursor_pos.0 as u64,
+            character: self.cursor_pos.1 as u64,
         };
         
         let _ = self.enhanced_lsp.goto_definition(
@@ -667,9 +666,9 @@ impl AdvancedCodeEditor {
 
     /// Trigger go-to-definition
     fn trigger_goto_definition(&mut self, line: usize) {
-        let lsp_pos = LspPosition {
-            line: line as u32,
-            character: self.cursor_pos.1 as u32,
+        let lsp_pos = Position {
+            line: line as u64,
+            character: self.cursor_pos.1 as u64,
         };
         
         self.goto_definition_state.pending_request = true;
@@ -697,9 +696,9 @@ impl AdvancedCodeEditor {
 
     /// Trigger find references
     fn trigger_find_references(&mut self) {
-        let lsp_pos = LspPosition {
-            line: self.cursor_pos.0 as u32,
-            character: self.cursor_pos.1 as u32,
+        let lsp_pos = Position {
+            line: self.cursor_pos.0 as u64,
+            character: self.cursor_pos.1 as u64,
         };
         
         let _ = self.enhanced_lsp.find_references(
@@ -725,13 +724,13 @@ impl AdvancedCodeEditor {
     /// Trigger code actions
     fn trigger_code_actions(&mut self) {
         let lsp_range = LspRange {
-            start: LspPosition {
-                line: self.cursor_pos.0 as u32,
-                character: self.cursor_pos.1 as u32,
+            start: Position {
+                line: self.cursor_pos.0 as u64,
+                character: self.cursor_pos.1 as u64,
             },
-            end: LspPosition {
-                line: self.cursor_pos.0 as u32,
-                character: self.cursor_pos.1 as u32,
+            end: Position {
+                line: self.cursor_pos.0 as u64,
+                character: self.cursor_pos.1 as u64,
             },
         };
         
@@ -743,13 +742,13 @@ impl AdvancedCodeEditor {
             .cloned()
             .map(|d| crate::editor::enhanced_lsp_client::Diagnostic {
                 range: crate::editor::enhanced_lsp_client::Range {
-                    start: crate::editor::enhanced_lsp_client::Position {
-                        line: d.range.start.line as u32,
-                        character: d.range.start.character as u32,
+                    start: Position {
+                        line: d.range.start.line,
+                        character: d.range.start.character,
                     },
-                    end: crate::editor::enhanced_lsp_client::Position {
-                        line: d.range.end.line as u32,
-                        character: d.range.end.character as u32,
+                    end: Position {
+                        line: d.range.end.line,
+                        character: d.range.end.character,
                     },
                 },
                 severity: d.severity.map(|s| match s {
@@ -790,9 +789,9 @@ impl AdvancedCodeEditor {
             return;
         }
         
-        let lsp_pos = LspPosition {
-            line: self.cursor_pos.0 as u32,
-            character: self.cursor_pos.1 as u32,
+        let lsp_pos = Position {
+            line: self.cursor_pos.0 as u64,
+            character: self.cursor_pos.1 as u64,
         };
         
         let _ = self.enhanced_lsp.signature_help(
@@ -800,7 +799,7 @@ impl AdvancedCodeEditor {
             lsp_pos,
             |result| {
                 match result {
-                    Ok(signature_help) => {
+                    Ok(_signature_help) => {
                         // Update signature help state
                         println!("Signature help available");
                     }
@@ -815,7 +814,7 @@ impl AdvancedCodeEditor {
     }
 
     /// Trigger hover tooltip
-    fn trigger_hover_tooltip(&mut self, line: usize, character: usize) {
+    fn trigger_hover_tooltip(&mut self, _line: usize, _character: usize) {
         if !self.settings.enable_hover {
             return;
         }
@@ -826,7 +825,7 @@ impl AdvancedCodeEditor {
     }
 
     /// Show context menu
-    fn show_context_menu(&mut self, line: usize, character: usize, position: Pos2) {
+    fn show_context_menu(&mut self, _line: usize, _character: usize, position: Pos2) {
         self.code_actions_state.visible = true;
         self.code_actions_state.position = position;
     }
@@ -877,7 +876,7 @@ impl AdvancedCodeEditor {
     }
 
     /// Calculate popup position
-    fn calculate_popup_position(&self, ui: &Ui) -> Pos2 {
+    fn calculate_popup_position(&self, _ui: &Ui) -> Pos2 {
         // TODO: Calculate proper position based on cursor
         Pos2::new(100.0, 100.0)
     }
@@ -909,14 +908,14 @@ impl AdvancedCodeEditor {
 
     /// Render signature help
     fn render_signature_help(&mut self, ui: &mut Ui) {
-        if let Some(signature_help) = self.enhanced_lsp.get_current_signature_help() {
+        if let Some(_signature_help) = self.enhanced_lsp.get_current_signature_help() {
             let cursor_screen_pos = self.calculate_cursor_screen_position(ui);
             self.enhanced_lsp.render_signature_help(ui, cursor_screen_pos);
         }
     }
 
     /// Calculate cursor screen position
-    fn calculate_cursor_screen_position(&self, ui: &Ui) -> Pos2 {
+    fn calculate_cursor_screen_position(&self, _ui: &Ui) -> Pos2 {
         // TODO: Calculate actual cursor screen position
         Pos2::new(200.0, 100.0)
     }

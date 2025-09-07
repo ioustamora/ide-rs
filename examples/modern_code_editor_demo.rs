@@ -34,7 +34,7 @@ struct ModernEditorApp {
     demo_mode: DemoMode,
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 enum DemoMode {
     #[default]
     SyntaxHighlighting,
@@ -58,6 +58,7 @@ impl Default for ModernEditorApp {
                 code: Some("E0308".to_string()),
                 source: Some("rustc".to_string()),
                 message: "mismatched types: expected `i32`, found `&str`".to_string(),
+                related_information: None,
             },
             ide_rs::editor::lsp_integration::Diagnostic {
                 range: ide_rs::editor::lsp_integration::Range {
@@ -68,6 +69,7 @@ impl Default for ModernEditorApp {
                 code: Some("unused_variable".to_string()),
                 source: Some("rustc".to_string()),
                 message: "unused variable: `unused_var`".to_string(),
+                related_information: None,
             },
         ];
         

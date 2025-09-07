@@ -707,3 +707,291 @@ macro_rules! measure_performance {
         }
     };
 }
+
+/// Performance cache for expensive operations
+pub struct PerformanceCache<K, V> {
+    /// Cached values
+    cache: HashMap<K, CachedValue<V>>,
+    /// Maximum cache size
+    max_size: usize,
+    /// Cache hit counter
+    hit_count: usize,
+    /// Cache miss counter
+    miss_count: usize,
+    /// Cache expiry duration
+    expiry_duration: Duration,
+}
+
+/// Cached value with timestamp
+#[derive(Clone, Debug)]
+struct CachedValue<V> {
+    value: V,
+    timestamp: Instant,
+    access_count: usize,
+}
+
+impl<K: std::hash::Hash + Eq + Clone, V: Clone> PerformanceCache<K, V> {
+    /// Create a new performance cache
+    pub fn new(max_size: usize, expiry_duration: Duration) -> Self {
+        Self {
+            cache: HashMap::new(),
+            max_size,
+            hit_count: 0,
+            miss_count: 0,
+            expiry_duration,
+        }
+    }
+
+    /// Get a value from cache or compute it
+    pub fn get_or_compute<F>(&mut self, key: K, compute_fn: F) -> V 
+    where 
+        F: FnOnce() -> V,
+    {
+        // Check if value exists and is not expired
+        if let Some(cached) = self.cache.get_mut(&key) {
+            if cached.timestamp.elapsed() < self.expiry_duration {
+                cached.access_count += 1;
+                self.hit_count += 1;
+                return cached.value.clone();
+            }
+        }
+
+        // Compute new value
+        self.miss_count += 1;
+        let value = compute_fn();
+        
+        // Store in cache
+        self.insert(key, value.clone());
+        value
+    }
+
+    /// Insert a value into cache
+    pub fn insert(&mut self, key: K, value: V) {
+        // Remove oldest entries if cache is full
+        if self.cache.len() >= self.max_size {
+            self.evict_oldest();
+        }
+
+        self.cache.insert(key, CachedValue {
+            value,
+            timestamp: Instant::now(),
+            access_count: 0,
+        });
+    }
+
+    /// Evict the oldest cache entry
+    fn evict_oldest(&mut self) {
+        if let Some(oldest_key) = self.cache.iter()
+            .min_by_key(|(_, v)| v.timestamp)
+            .map(|(k, _)| k.clone()) {
+            self.cache.remove(&oldest_key);
+        }
+    }
+
+    /// Get cache hit rate
+    pub fn hit_rate(&self) -> f32 {
+        let total = self.hit_count + self.miss_count;
+        if total == 0 {
+            0.0
+        } else {
+            self.hit_count as f32 / total as f32
+        }
+    }
+
+    /// Clear expired entries
+    pub fn clear_expired(&mut self) {
+        let now = Instant::now();
+        self.cache.retain(|_, v| now.duration_since(v.timestamp) < self.expiry_duration);
+    }
+
+    /// Get cache statistics
+    pub fn get_stats(&self) -> CacheStats {
+        CacheStats {
+            size: self.cache.len(),
+            max_size: self.max_size,
+            hit_count: self.hit_count,
+            miss_count: self.miss_count,
+            hit_rate: self.hit_rate(),
+        }
+    }
+}
+
+/// Cache statistics
+#[derive(Debug, Clone)]
+pub struct CacheStats {
+    pub size: usize,
+    pub max_size: usize,
+    pub hit_count: usize,
+    pub miss_count: usize,
+    pub hit_rate: f32,
+}
+
+/// Resource pool for expensive objects
+pub struct ResourcePool<T> {
+    /// Available resources
+    available: Vec<T>,
+    /// Resource factory function
+    factory: Box<dyn Fn() -> T>,
+    /// Maximum pool size
+    max_size: usize,
+    /// Pool statistics
+    stats: PoolStats,
+}
+
+/// Pool statistics
+#[derive(Debug, Clone)]
+pub struct PoolStats {
+    pub created_count: usize,
+    pub borrowed_count: usize,
+    pub returned_count: usize,
+    pub current_available: usize,
+    pub peak_usage: usize,
+}
+
+impl<T> ResourcePool<T> {
+    /// Create a new resource pool
+    pub fn new<F>(factory: F, max_size: usize) -> Self 
+    where 
+        F: Fn() -> T + 'static,
+    {
+        Self {
+            available: Vec::new(),
+            factory: Box::new(factory),
+            max_size,
+            stats: PoolStats {
+                created_count: 0,
+                borrowed_count: 0,
+                returned_count: 0,
+                current_available: 0,
+                peak_usage: 0,
+            },
+        }
+    }
+
+    /// Borrow a resource from the pool
+    pub fn borrow(&mut self) -> T {
+        if let Some(resource) = self.available.pop() {
+            self.stats.borrowed_count += 1;
+            self.stats.current_available = self.available.len();
+            resource
+        } else {
+            self.stats.created_count += 1;
+            self.stats.borrowed_count += 1;
+            (self.factory)()
+        }
+    }
+
+    /// Return a resource to the pool
+    pub fn return_resource(&mut self, resource: T) {
+        if self.available.len() < self.max_size {
+            self.available.push(resource);
+            self.stats.returned_count += 1;
+            self.stats.current_available = self.available.len();
+            self.stats.peak_usage = self.stats.peak_usage.max(self.available.len());
+        }
+        // If pool is full, resource is dropped
+    }
+
+    /// Get pool statistics
+    pub fn get_stats(&self) -> &PoolStats {
+        &self.stats
+    }
+}
+
+/// Lazy evaluation wrapper for expensive computations
+pub struct LazyValue<T> {
+    value: Option<T>,
+    compute_fn: Option<Box<dyn FnOnce() -> T>>,
+}
+
+impl<T> LazyValue<T> {
+    /// Create a new lazy value
+    pub fn new<F>(compute_fn: F) -> Self 
+    where 
+        F: FnOnce() -> T + 'static,
+    {
+        Self {
+            value: None,
+            compute_fn: Some(Box::new(compute_fn)),
+        }
+    }
+
+    /// Get the value, computing it if necessary
+    pub fn get(&mut self) -> &T {
+        if self.value.is_none() {
+            if let Some(compute_fn) = self.compute_fn.take() {
+                self.value = Some(compute_fn());
+            }
+        }
+        self.value.as_ref().expect("Value should be computed")
+    }
+
+    /// Check if value has been computed
+    pub fn is_computed(&self) -> bool {
+        self.value.is_some()
+    }
+}
+
+/// Batch processor for grouping similar operations
+pub struct BatchProcessor<T> {
+    /// Pending items to process
+    pending: Vec<T>,
+    /// Batch size threshold
+    batch_size: usize,
+    /// Time threshold for batch processing
+    time_threshold: Duration,
+    /// Last batch process time
+    last_process_time: Instant,
+}
+
+impl<T> BatchProcessor<T> {
+    /// Create a new batch processor
+    pub fn new(batch_size: usize, time_threshold: Duration) -> Self {
+        Self {
+            pending: Vec::new(),
+            batch_size,
+            time_threshold,
+            last_process_time: Instant::now(),
+        }
+    }
+
+    /// Add an item to the batch
+    pub fn add(&mut self, item: T) {
+        self.pending.push(item);
+    }
+
+    /// Process batch if conditions are met
+    pub fn process_if_ready<F>(&mut self, processor: F) -> bool 
+    where 
+        F: FnOnce(Vec<T>),
+    {
+        let should_process = self.pending.len() >= self.batch_size || 
+                           self.last_process_time.elapsed() >= self.time_threshold;
+
+        if should_process && !self.pending.is_empty() {
+            let items = std::mem::take(&mut self.pending);
+            processor(items);
+            self.last_process_time = Instant::now();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Force process all pending items
+    pub fn flush<F>(&mut self, processor: F) 
+    where 
+        F: FnOnce(Vec<T>),
+    {
+        if !self.pending.is_empty() {
+            let items = std::mem::take(&mut self.pending);
+            processor(items);
+            self.last_process_time = Instant::now();
+        }
+    }
+
+    /// Get pending item count
+    pub fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+}

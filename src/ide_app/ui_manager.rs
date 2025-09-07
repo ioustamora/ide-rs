@@ -6,6 +6,17 @@
 use eframe::egui;
 use super::app_state::IdeAppState;
 
+/// Alignment types for component alignment
+#[derive(Debug, Clone, Copy)]
+enum AlignmentType {
+    Left,
+    Right,
+    Top,
+    Bottom,
+    CenterHorizontal,
+    CenterVertical,
+}
+
 /// # UI Manager
 /// 
 /// Handles the overall UI layout and panel management for the IDE.
@@ -65,25 +76,106 @@ impl UiManager {
     
     /// Render mode switch buttons
     fn render_mode_switches(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
-        if ui.selectable_label(app_state.design_mode, "🎨 Design").on_hover_text("Visual Designer Mode").clicked() {
-            app_state.design_mode = true;
-        }
-        if ui.selectable_label(!app_state.design_mode, "💻 Code").on_hover_text("Code Editor Mode").clicked() {
-            app_state.design_mode = false;
+        // Check if we have an active file tab to determine mode switching availability
+        let can_switch_modes = app_state.file_manager.get_active_tab().is_some();
+        
+        // Determine current mode based on active file type or fallback to design mode
+        let current_mode = if let Some(active_tab) = app_state.file_manager.get_active_tab() {
+            match active_tab.file_type {
+                crate::editor::file_manager::FileType::UIDesign => true,  // Design mode
+                crate::editor::file_manager::FileType::Code(_) | 
+                crate::editor::file_manager::FileType::Unknown => false, // Code mode
+            }
+        } else {
+            app_state.design_mode // Fallback to current state when no file is open
+        };
+        
+        ui.add_enabled_ui(can_switch_modes, |ui| {
+            if ui.selectable_label(current_mode, "🎨 Design").on_hover_text("Visual Designer Mode").clicked() {
+                if let Some(active_tab) = app_state.file_manager.get_active_tab() {
+                    match active_tab.file_type {
+                        crate::editor::file_manager::FileType::UIDesign => {
+                            app_state.design_mode = true;
+                        }
+                        crate::editor::file_manager::FileType::Code(_) | 
+                        crate::editor::file_manager::FileType::Unknown => {
+                            // For code files, create a new UI design file
+                            let _ = app_state.file_manager.open_file(
+                                std::path::PathBuf::from("Untitled.ui"), 
+                                String::new()
+                            );
+                            app_state.design_mode = true;
+                        }
+                    }
+                } else {
+                    // No file open, create new UI design
+                    let _ = app_state.file_manager.open_file(
+                        std::path::PathBuf::from("Untitled.ui"), 
+                        String::new()
+                    );
+                    app_state.design_mode = true;
+                }
+            }
+            
+            if ui.selectable_label(!current_mode, "💻 Code").on_hover_text("Code Editor Mode").clicked() {
+                if let Some(active_tab) = app_state.file_manager.get_active_tab() {
+                    match active_tab.file_type {
+                        crate::editor::file_manager::FileType::Code(_) | 
+                        crate::editor::file_manager::FileType::Unknown => {
+                            app_state.design_mode = false;
+                        }
+                        crate::editor::file_manager::FileType::UIDesign => {
+                            // For UI files, create a new code file
+                            let _ = app_state.file_manager.open_file(
+                                std::path::PathBuf::from("Untitled.rs"), 
+                                IdeAppState::default_rust_code()
+                            );
+                            app_state.design_mode = false;
+                        }
+                    }
+                } else {
+                    // No file open, create new code file
+                    let _ = app_state.file_manager.open_file(
+                        std::path::PathBuf::from("Untitled.rs"), 
+                        IdeAppState::default_rust_code()
+                    );
+                    app_state.design_mode = false;
+                }
+            }
+        });
+        
+        // Show hint when no file is open
+        if !can_switch_modes {
+            ui.label("Open a file to switch modes");
         }
     }
     
     /// Render design mode specific controls
     fn render_design_controls(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
-        if ui.button("📐").on_hover_text("Toggle Grid").clicked() {
+        // Grid and snap controls
+        if ui.selectable_label(app_state.visual_designer.grid.visible, "📐").on_hover_text("Toggle Grid").clicked() {
             app_state.visual_designer.grid.visible = !app_state.visual_designer.grid.visible;
         }
-        if ui.button("📏").on_hover_text("Toggle Rulers").clicked() {
+        if ui.selectable_label(app_state.visual_designer.snap_to_grid, "🔗").on_hover_text("Snap to Grid").clicked() {
+            app_state.visual_designer.toggle_snap_to_grid();
+        }
+        if ui.selectable_label(app_state.visual_designer.guides.rulers_visible, "📏").on_hover_text("Toggle Rulers").clicked() {
             app_state.visual_designer.guides.rulers_visible = !app_state.visual_designer.guides.rulers_visible;
         }
-        if ui.button("🔗").on_hover_text("Snap to Grid").clicked() {
-            app_state.visual_designer.grid.snap_enabled = !app_state.visual_designer.grid.snap_enabled;
+        if ui.selectable_label(app_state.visual_designer.show_alignment_guides, "📐").on_hover_text("Alignment Guides").clicked() {
+            app_state.visual_designer.toggle_alignment_guides();
         }
+        
+        ui.separator();
+        
+        // Layout tools
+        if ui.button("🎯").on_hover_text("Align Selected").clicked() {
+            Self::show_alignment_options(app_state, ui);
+        }
+        if ui.button("🔄").on_hover_text("Auto Distribute").clicked() {
+            Self::auto_distribute_components(app_state);
+        }
+        
         ui.separator();
         if ui.selectable_label(app_state.multi_device_preview.enabled, "📱").on_hover_text("Multi-Device Preview").clicked() {
             app_state.multi_device_preview.toggle_preview();
@@ -155,7 +247,10 @@ impl UiManager {
         
         ui.separator();
         
-        app_state.project_manager.render_project_ui(ui, &mut app_state.menu.output_panel);
+        // Handle file opening from project explorer
+        if let Some(file_path) = app_state.project_manager.render_project_ui(ui, &mut app_state.menu.output_panel) {
+            Self::open_file_in_editor(app_state, file_path);
+        }
     }
     
     /// Show new GUI project creation dialog
@@ -192,7 +287,6 @@ impl UiManager {
     
     /// Create new GUI project with cargo integration
     fn create_new_gui_project(app_state: &mut IdeAppState) {
-        use std::path::Path;
         
         let project_name = app_state.new_project_name.clone();
         let location = if app_state.new_project_location.is_empty() {
@@ -616,5 +710,162 @@ impl UiManager {
         
         // Set the layout position using the visual designer
         app_state.visual_designer.layout.positions.insert(component_idx, position);
+    }
+    
+    /// Show alignment options for selected components
+    fn show_alignment_options(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
+        if app_state.visual_designer.selection.selected.is_empty() {
+            return;
+        }
+        
+        let button_response = ui.button("🎯");
+        egui::popup::popup_below_widget(ui, egui::Id::new("alignment_popup"), &button_response, |ui| {
+            ui.set_min_width(150.0);
+            ui.label("Align Selected Components:");
+            ui.separator();
+            
+            if ui.button("⬅️ Align Left").clicked() {
+                Self::align_components(app_state, AlignmentType::Left);
+                ui.close_menu();
+            }
+            if ui.button("➡️ Align Right").clicked() {
+                Self::align_components(app_state, AlignmentType::Right);
+                ui.close_menu();
+            }
+            if ui.button("⬆️ Align Top").clicked() {
+                Self::align_components(app_state, AlignmentType::Top);
+                ui.close_menu();
+            }
+            if ui.button("⬇️ Align Bottom").clicked() {
+                Self::align_components(app_state, AlignmentType::Bottom);
+                ui.close_menu();
+            }
+            if ui.button("↔️ Center Horizontal").clicked() {
+                Self::align_components(app_state, AlignmentType::CenterHorizontal);
+                ui.close_menu();
+            }
+            if ui.button("↕️ Center Vertical").clicked() {
+                Self::align_components(app_state, AlignmentType::CenterVertical);
+                ui.close_menu();
+            }
+        });
+    }
+    
+    /// Auto-distribute components evenly
+    fn auto_distribute_components(app_state: &mut IdeAppState) {
+        let selected = &app_state.visual_designer.selection.selected;
+        if selected.len() < 3 {
+            return; // Need at least 3 components to distribute
+        }
+        
+        // Get positions of selected components
+        let mut positions: Vec<(usize, egui::Pos2)> = selected.iter()
+            .filter_map(|&idx| {
+                app_state.visual_designer.layout.positions.get(&idx)
+                    .map(|&pos| (idx, pos))
+            })
+            .collect();
+        
+        // Sort by X position for horizontal distribution
+        positions.sort_by(|a, b| a.1.x.partial_cmp(&b.1.x).unwrap());
+        
+        if positions.len() >= 3 {
+            let first_x = positions[0].1.x;
+            let last_x = positions[positions.len() - 1].1.x;
+            let spacing = (last_x - first_x) / (positions.len() - 1) as f32;
+            
+            for (i, (idx, pos)) in positions.iter().enumerate() {
+                if i > 0 && i < positions.len() - 1 {
+                    let new_x = first_x + i as f32 * spacing;
+                    let new_pos = egui::Pos2::new(new_x, pos.y);
+                    app_state.visual_designer.layout.positions.insert(*idx, new_pos);
+                }
+            }
+        }
+    }
+    
+    
+    /// Align selected components
+    fn align_components(app_state: &mut IdeAppState, alignment: AlignmentType) {
+        let selected = &app_state.visual_designer.selection.selected;
+        if selected.len() < 2 {
+            return;
+        }
+        
+        // Get positions of selected components
+        let positions: Vec<(usize, egui::Pos2)> = selected.iter()
+            .filter_map(|&idx| {
+                app_state.visual_designer.layout.positions.get(&idx)
+                    .map(|&pos| (idx, pos))
+            })
+            .collect();
+        
+        if positions.is_empty() {
+            return;
+        }
+        
+        // Calculate alignment reference
+        let reference = match alignment {
+            AlignmentType::Left => positions.iter().map(|(_, pos)| pos.x).fold(f32::INFINITY, f32::min),
+            AlignmentType::Right => positions.iter().map(|(_, pos)| pos.x).fold(f32::NEG_INFINITY, f32::max),
+            AlignmentType::Top => positions.iter().map(|(_, pos)| pos.y).fold(f32::INFINITY, f32::min),
+            AlignmentType::Bottom => positions.iter().map(|(_, pos)| pos.y).fold(f32::NEG_INFINITY, f32::max),
+            AlignmentType::CenterHorizontal => {
+                let sum: f32 = positions.iter().map(|(_, pos)| pos.x).sum();
+                sum / positions.len() as f32
+            }
+            AlignmentType::CenterVertical => {
+                let sum: f32 = positions.iter().map(|(_, pos)| pos.y).sum();
+                sum / positions.len() as f32
+            }
+        };
+        
+        // Apply alignment
+        for (idx, pos) in positions {
+            let new_pos = match alignment {
+                AlignmentType::Left | AlignmentType::Right | AlignmentType::CenterHorizontal => {
+                    egui::Pos2::new(reference, pos.y)
+                }
+                AlignmentType::Top | AlignmentType::Bottom | AlignmentType::CenterVertical => {
+                    egui::Pos2::new(pos.x, reference)
+                }
+            };
+            
+            // Apply snap-to-grid if enabled
+            let snapped_pos = app_state.visual_designer.snap_to_grid(new_pos);
+            app_state.visual_designer.layout.positions.insert(idx, snapped_pos);
+        }
+    }
+    
+    /// Open a file in the appropriate editor
+    fn open_file_in_editor(app_state: &mut IdeAppState, file_path: std::path::PathBuf) {
+        // Try to read the file content
+        match std::fs::read_to_string(&file_path) {
+            Ok(content) => {
+                // Open the file in the file manager
+                if let Err(e) = app_state.file_manager.open_file(file_path.clone(), content) {
+                    app_state.menu.output_panel.log(&format!("❌ Failed to open file: {}", e));
+                    return;
+                }
+                
+                // Switch to appropriate mode based on file type
+                if let Some(active_tab) = app_state.file_manager.get_active_tab() {
+                    match active_tab.file_type {
+                        crate::editor::file_manager::FileType::UIDesign => {
+                            app_state.design_mode = true;
+                            app_state.menu.output_panel.log(&format!("🎨 Opened UI design file: {}", file_path.display()));
+                        }
+                        crate::editor::file_manager::FileType::Code(_) | 
+                        crate::editor::file_manager::FileType::Unknown => {
+                            app_state.design_mode = false;
+                            app_state.menu.output_panel.log(&format!("💻 Opened code file: {}", file_path.display()));
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                app_state.menu.output_panel.log(&format!("❌ Failed to read file {}: {}", file_path.display(), e));
+            }
+        }
     }
 }

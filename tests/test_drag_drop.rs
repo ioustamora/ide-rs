@@ -96,8 +96,8 @@ mod drag_drop_tests {
         let drag_state = DragState::new();
         
         assert!(!drag_state.is_dragging);
-        assert!(drag_state.start_position.is_none());
-        assert!(drag_state.current_position.is_none());
+        assert_eq!(drag_state.drag_start_pos, egui::Pos2::ZERO);
+        assert_eq!(drag_state.current_drag_pos, egui::Pos2::ZERO);
         assert!(drag_state.preview_position.is_none());
         assert!(!drag_state.drop_valid);
     }
@@ -106,7 +106,10 @@ mod drag_drop_tests {
     fn test_drag_types() {
         let component_drag = DragType::ComponentFromPalette(ComponentType::Button);
         let move_drag = DragType::ComponentMove;
-        let resize_drag = DragType::ComponentResize(ResizeHandle::BottomRight);
+        let resize_drag = DragType::ComponentResize { 
+            handle: ResizeHandle::BottomRight, 
+            original_size: egui::Vec2::new(100.0, 100.0) 
+        };
         
         // Test that drag types can be created and pattern matched
         match component_drag {
@@ -124,7 +127,7 @@ mod drag_drop_tests {
         }
         
         match resize_drag {
-            DragType::ComponentResize(ResizeHandle::BottomRight) => {
+            DragType::ComponentResize { handle: ResizeHandle::BottomRight, .. } => {
                 // Expected
             }
             _ => panic!("Unexpected drag type"),
@@ -167,8 +170,8 @@ mod drag_drop_tests {
         drag_state.start_drag(DragType::ComponentFromPalette(ComponentType::Button), start_pos);
         
         assert!(drag_state.is_dragging);
-        assert_eq!(drag_state.start_position, Some(start_pos));
-        assert_eq!(drag_state.current_position, Some(start_pos));
+        assert_eq!(drag_state.drag_start_pos, start_pos);
+        assert_eq!(drag_state.current_drag_pos, start_pos);
         assert_eq!(drag_state.preview_position, Some(start_pos));
         
         // Test drag type
@@ -193,8 +196,8 @@ mod drag_drop_tests {
         drag_state.update_drag_position(new_pos);
         
         assert!(drag_state.is_dragging);
-        assert_eq!(drag_state.start_position, Some(start_pos));
-        assert_eq!(drag_state.current_position, Some(new_pos));
+        assert_eq!(drag_state.drag_start_pos, start_pos);
+        assert_eq!(drag_state.current_drag_pos, new_pos);
         assert_eq!(drag_state.preview_position, Some(new_pos));
     }
 
@@ -211,14 +214,14 @@ mod drag_drop_tests {
         let completion = drag_state.end_drag();
         
         assert!(!drag_state.is_dragging);
-        assert!(drag_state.start_position.is_none());
-        assert!(drag_state.current_position.is_none());
+        assert_eq!(drag_state.drag_start_pos, egui::Pos2::ZERO);
+        assert_eq!(drag_state.current_drag_pos, egui::Pos2::ZERO);
         assert!(drag_state.preview_position.is_none());
         
         // Check completion result
         assert!(completion.is_some());
         let result = completion.unwrap();
-        assert_eq!(result.start_position, Some(start_pos));
+        assert_eq!(result.start_position, start_pos);
         
         match result.drag_type {
             DragType::ComponentMove => {
@@ -241,8 +244,8 @@ mod drag_drop_tests {
         drag_state.cancel_drag();
         
         assert!(!drag_state.is_dragging);
-        assert!(drag_state.start_position.is_none());
-        assert!(drag_state.current_position.is_none());
+        assert_eq!(drag_state.drag_start_pos, egui::Pos2::ZERO);
+        assert_eq!(drag_state.current_drag_pos, egui::Pos2::ZERO);
         assert!(drag_state.preview_position.is_none());
     }
 
@@ -290,14 +293,15 @@ mod drag_drop_tests {
         
         let completion = DragCompletionResult {
             drag_type: drag_type.clone(),
-            start_position: Some(start_pos),
-            end_position: Some(end_pos),
+            start_position: start_pos,
+            end_position: end_pos,
             preview_position: Some(end_pos),
+            component_index: None,
             drop_valid: true,
         };
         
-        assert_eq!(completion.start_position, Some(start_pos));
-        assert_eq!(completion.end_position, Some(end_pos));
+        assert_eq!(completion.start_position, start_pos);
+        assert_eq!(completion.end_position, end_pos);
         assert_eq!(completion.preview_position, Some(end_pos));
         assert!(completion.drop_valid);
         

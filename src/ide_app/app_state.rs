@@ -3,7 +3,17 @@
 //! Core application state structures and management for the RAD IDE.
 //! This module contains the main application state and basic UI management functionality.
 
+use std::collections::HashMap;
 use crate::rcl::ui::component::Component;
+
+/// Component data for clipboard operations
+#[derive(Clone, Debug)]
+pub struct ComponentClipboardData {
+    pub component_type: String,
+    pub properties: HashMap<String, String>,
+    pub position: egui::Pos2,
+    pub size: egui::Vec2,
+}
 use crate::ai_agent::AiAgent;
 use crate::editor::menu::IdeMenu;
 use crate::editor::visual_designer::VisualDesigner;
@@ -22,6 +32,7 @@ use crate::editor::multi_device_preview::MultiDevicePreview;
 use crate::editor::template_system_simple::ComponentTemplate;
 use crate::editor::file_manager::FileManager;
 use crate::editor::realtime_sync::RealtimeSync;
+use crate::editor::build_system::BuildSystem;
 
 /// # Main IDE Application State
 /// 
@@ -205,6 +216,15 @@ pub struct IdeAppState {
     /// Manages project structure, file operations, and build coordination.
     /// Handles project templates, serialization, and workspace management.
     pub project_manager: ProjectManager,
+    
+    /// Build system for compilation, testing, and project execution.
+    /// 
+    /// Provides comprehensive build capabilities:
+    /// - Real-time cargo command execution
+    /// - Background build process management  
+    /// - Build output streaming and error parsing
+    /// - Multiple build profiles (debug, release, test)
+    pub build_system: BuildSystem,
 
     // ========================================================================================  
     // SPECIALIZED IDE FEATURES - Advanced IDE capabilities and tooling
@@ -322,6 +342,12 @@ pub struct IdeAppState {
     /// Stores the selected directory path where the new project will be created.
     /// Defaults to current working directory if not specified.
     pub new_project_location: String,
+    
+    /// Clipboard data for component copy/paste operations
+    /// 
+    /// Stores component data when copying/cutting components for later pasting.
+    /// None when clipboard is empty.
+    pub clipboard_data: Option<ComponentClipboardData>,
 }
 
 impl IdeAppState {
@@ -353,6 +379,14 @@ impl IdeAppState {
             design_mode: true,
             code_editor: CodeEditor::with_content("rust", Self::default_rust_code()),
             project_manager: ProjectManager::new(),
+            build_system: {
+                let mut build_system = BuildSystem::new();
+                // Initialize the build system for immediate use
+                if let Err(e) = build_system.initialize() {
+                    eprintln!("Warning: Failed to initialize build system: {}", e);
+                }
+                build_system
+            },
             show_project_panel: true,
             show_modern_ide_panel: false,
             active_left_tab: "project".to_string(),
@@ -370,6 +404,7 @@ impl IdeAppState {
             realtime_sync: RealtimeSync::new(),
             new_project_name: String::new(),
             new_project_location: String::new(),
+            clipboard_data: None,
         }
     }
 
@@ -454,7 +489,7 @@ impl IdeAppState {
     }
 
     /// Default Rust code template for new projects
-    fn default_rust_code() -> String {
+    pub fn default_rust_code() -> String {
         r#"fn main() {
     println!("Hello, RAD IDE!");
 }

@@ -22,24 +22,8 @@ pub mod split;
 pub mod status_bar;
 pub mod toolbar;
 pub mod chart;
+pub mod badge;
+pub mod avatar;
+pub mod breadcrumb;
 
 // Re-export commonly used components
-pub use layout_manager::{LayoutManager, LayoutType};
-pub use rich_text_editor::RichTextEditor;
-pub use code_editor::CodeEditor;
-pub use floating_panel::FloatingPanel;
-pub use progress_bar::ProgressBar;
-pub use tabs::Tabs;
-pub use table::Table;
-pub use tree::{Tree, TreeNode};
-pub use modal::Modal;
-pub use notification::{Notification, NotificationKind};
-pub use calendar::Calendar;
-pub use color_picker::ColorPicker;
-pub use file_picker::FilePicker;
-pub use image::Image;
-pub use menu::Menu;
-pub use split::Split;
-pub use status_bar::StatusBar;
-pub use toolbar::Toolbar;
-pub use chart::{Chart, ChartType, ChartConfig, ChartData, DataSeries, SeriesStyle, PointShape, ChartAnimation};

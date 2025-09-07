@@ -21,14 +21,18 @@ impl ContentManager {
             Self::render_file_tabs(app_state, ui);
             ui.separator();
             
-            // Render content based on current mode and active file
+            // Render content based on active file type (overrides design_mode)
             if let Some(active_tab) = app_state.file_manager.get_active_tab() {
                 match &active_tab.file_type {
                     crate::editor::file_manager::FileType::UIDesign => {
+                        // Force design mode for UI files
+                        app_state.design_mode = true;
                         Self::render_design_mode(app_state, drag_state, ui);
                     }
                     crate::editor::file_manager::FileType::Code(_) | 
                     crate::editor::file_manager::FileType::Unknown => {
+                        // Force code mode for code files
+                        app_state.design_mode = false;
                         Self::render_code_mode(app_state, ui);
                     }
                 }
@@ -63,11 +67,18 @@ impl ContentManager {
             ui.add_space(10.0);
             
             if ui.button("📁 Open Project").clicked() {
-                // TODO: Implement project opening
+                app_state.project_manager.open_project_dialog();
             }
             
-            if ui.button("📄 New File").clicked() {
-                // TODO: Implement new file creation
+            if ui.button("📂 Open File from Filesystem").clicked() {
+                Self::open_file_dialog(app_state);
+            }
+            
+            if ui.button("📄 New Rust File").clicked() {
+                let _ = app_state.file_manager.open_file(
+                    std::path::PathBuf::from("Untitled.rs"), 
+                    IdeAppState::default_rust_code()
+                );
             }
             
             if ui.button("🎨 New UI Design").clicked() {
@@ -310,52 +321,81 @@ impl ContentManager {
     
     /// Render the code editor mode
     fn render_code_mode(app_state: &mut IdeAppState, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
+        // Synchronize active file content to code editor
+        Self::sync_file_content_to_editor(app_state);
+        
+        ui.vertical(|ui| {
             // Code editor toolbar
-            if ui.button("💾").on_hover_text("Save File").clicked() {
-                // TODO: Save current file
-            }
-            if ui.button("🔍").on_hover_text("Find/Replace").clicked() {
-                // TODO: Open find/replace dialog
-            }
-            if ui.button("🚀").on_hover_text("Run Code").clicked() {
-                // TODO: Run/compile code
-            }
+            ui.horizontal(|ui| {
+                if ui.button("💾").on_hover_text("Save File").clicked() {
+                    Self::save_current_file(app_state);
+                }
+                if ui.button("💾📁").on_hover_text("Save All Files").clicked() {
+                    Self::save_all_files(app_state);
+                }
+                if ui.button("🔍").on_hover_text("Find/Replace").clicked() {
+                    // TODO: Open find/replace dialog
+                }
+                if ui.button("🚀").on_hover_text("Run Code").clicked() {
+                    // Execute cargo run using the build system
+                    if let Err(e) = app_state.build_system.run() {
+                        app_state.menu.output_panel.log(&format!("❌ Failed to start run: {}", e));
+                    } else {
+                        app_state.menu.output_panel.log("🚀 Starting cargo run...");
+                    }
+                }
+                
+                ui.separator();
+                
+                // LSP status
+                let lsp_status = if app_state.lsp_client.is_connected() {
+                    "🟢 LSP Connected"
+                } else if app_state.enhanced_lsp_client.is_connected() {
+                    "🟢 Enhanced LSP Connected"
+                } else {
+                    "🔴 LSP Disconnected"
+                };
+                ui.label(lsp_status);
+                
+                // Enhanced LSP features toggle
+                if ui.button("⚡").on_hover_text("Enable Enhanced LSP Features").clicked() {
+                    Self::enable_enhanced_code_editor(app_state);
+                }
+            });
             
             ui.separator();
             
-            // LSP status
-            let lsp_status = if app_state.lsp_client.is_connected() {
-                "🟢 LSP Connected"
-            } else if app_state.enhanced_lsp_client.is_connected() {
-                "🟢 Enhanced LSP Connected"
-            } else {
-                "🔴 LSP Disconnected"
-            };
-            ui.label(lsp_status);
+            // Code editor area with proper constraints
+            let available_rect = ui.available_rect_before_wrap();
+            let code_editor_rect = egui::Rect::from_min_size(
+                available_rect.min,
+                egui::Vec2::new(
+                    available_rect.width().min(1200.0), // Max width constraint
+                    available_rect.height()
+                )
+            );
             
-            // Enhanced LSP features toggle
-            if ui.button("⚡").on_hover_text("Enable Enhanced LSP Features").clicked() {
-                Self::enable_enhanced_code_editor(app_state);
-            }
+            ui.allocate_ui_at_rect(code_editor_rect, |ui| {
+                // Use advanced code editor if available, otherwise fallback to basic editor
+                if let Some(ref mut advanced_editor) = app_state.advanced_code_editor {
+                    advanced_editor.render(ui, &mut app_state.lsp_client);
+                } else {
+                    // Main code editor area with scroll area for overflow
+                    egui::ScrollArea::both()
+                        .auto_shrink([false, false]) // Don't shrink the scroll area
+                        .show(ui, |ui| {
+                            app_state.code_editor.render(ui);
+                        });
+                    
+                    // Render LSP diagnostics if available
+                    if app_state.lsp_client.has_diagnostics() {
+                        ui.separator();
+                        ui.label("Diagnostics:");
+                        app_state.lsp_client.render_diagnostics(ui);
+                    }
+                }
+            });
         });
-        
-        ui.separator();
-        
-        // Use advanced code editor if available, otherwise fallback to basic editor
-        if let Some(ref mut advanced_editor) = app_state.advanced_code_editor {
-            advanced_editor.render(ui, &mut app_state.lsp_client);
-        } else {
-            // Main code editor area
-            app_state.code_editor.render(ui);
-            
-            // Render LSP diagnostics if available
-            if app_state.lsp_client.has_diagnostics() {
-                ui.separator();
-                ui.label("Diagnostics:");
-                app_state.lsp_client.render_diagnostics(ui);
-            }
-        }
     }
     
     /// Enable enhanced code editor with advanced LSP features
@@ -392,6 +432,24 @@ impl ContentManager {
             if i.key_pressed(egui::Key::F6) {
                 // Switch to code mode  
                 app_state.design_mode = false;
+            }
+            
+            // File operations
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::S) {
+                // Save current file
+                Self::save_current_file(app_state);
+            }
+            if i.modifiers.ctrl && i.modifiers.shift && i.key_pressed(egui::Key::S) {
+                // Save all files
+                Self::save_all_files(app_state);
+            }
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::N) {
+                // New file
+                let _ = app_state.file_manager.create_new_file();
+            }
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::O) {
+                // Open file dialog
+                Self::open_file_dialog(app_state);
             }
             
             // Design mode shortcuts
@@ -475,6 +533,152 @@ impl ContentManager {
             )),
             _ => Box::new(crate::rcl::ui::basic::label::Label::new("Copy of Component".to_string())),
         }
+    }
+    
+    /// Open file dialog to select files from filesystem
+    fn open_file_dialog(app_state: &mut IdeAppState) {
+        if let Some(file_path) = rfd::FileDialog::new()
+            .set_title("Open File")
+            .add_filter("Rust Files", &["rs"])
+            .add_filter("UI Design Files", &["ui", "form", "designer"])
+            .add_filter("All Files", &["*"])
+            .pick_file() {
+            
+            // Try to read the file
+            match std::fs::read_to_string(&file_path) {
+                Ok(content) => {
+                    if let Err(e) = app_state.file_manager.open_file(file_path.clone(), content) {
+                        app_state.menu.output_panel.log(&format!("❌ Failed to open file: {}", e));
+                    } else {
+                        app_state.menu.output_panel.log(&format!("✅ Opened file: {}", file_path.display()));
+                    }
+                }
+                Err(e) => {
+                    app_state.menu.output_panel.log(&format!("❌ Failed to read file {}: {}", file_path.display(), e));
+                }
+            }
+        }
+    }
+    
+    /// Save the currently active file
+    fn save_current_file(app_state: &mut IdeAppState) {
+        if let Some(active_tab) = app_state.file_manager.get_active_tab() {
+            let path = active_tab.path.clone();
+            
+            // Update file content from editor
+            Self::sync_editor_content_to_file_manager(app_state);
+            
+            match app_state.file_manager.save_tab(&path) {
+                Ok(()) => {
+                    app_state.menu.output_panel.log(&format!("✅ Saved: {}", path.display()));
+                }
+                Err(e) => {
+                    app_state.menu.output_panel.log(&format!("❌ Failed to save {}: {}", path.display(), e));
+                }
+            }
+        } else {
+            app_state.menu.output_panel.log("❌ No active file to save");
+        }
+    }
+    
+    /// Save all open files
+    fn save_all_files(app_state: &mut IdeAppState) {
+        // Update content from editors
+        Self::sync_editor_content_to_file_manager(app_state);
+        
+        let results = app_state.file_manager.save_all_tabs();
+        let mut saved_count = 0;
+        let mut error_count = 0;
+        
+        for result in results {
+            match result {
+                Ok(()) => saved_count += 1,
+                Err(_) => error_count += 1,
+            }
+        }
+        
+        if error_count == 0 {
+            app_state.menu.output_panel.log(&format!("✅ Saved {} files", saved_count));
+        } else {
+            app_state.menu.output_panel.log(&format!("⚠️ Saved {} files, {} errors", saved_count, error_count));
+        }
+    }
+    
+    /// Sync file content to code editor when switching files or opening new ones
+    fn sync_file_content_to_editor(app_state: &mut IdeAppState) {
+        if let Some(active_tab) = app_state.file_manager.get_active_tab() {
+            // Only sync if the content is different to avoid unnecessary updates
+            if app_state.code_editor.code != active_tab.content {
+                app_state.code_editor.code = active_tab.content.clone();
+                app_state.code_editor.language = match &active_tab.file_type {
+                    crate::editor::file_manager::FileType::Code(lang) => lang.clone(),
+                    crate::editor::file_manager::FileType::UIDesign => "json".to_string(),
+                    crate::editor::file_manager::FileType::Unknown => "text".to_string(),
+                };
+                // Mark as clean since we're loading from file
+                app_state.code_editor.mark_clean();
+            }
+        }
+    }
+    
+    /// Sync editor content back to file manager
+    fn sync_editor_content_to_file_manager(app_state: &mut IdeAppState) {
+        if let Some(active_tab) = app_state.file_manager.get_active_tab() {
+            let path = active_tab.path.clone();
+            
+            // Get content from appropriate editor
+            let new_content = match active_tab.file_type {
+                crate::editor::file_manager::FileType::Code(_) => {
+                    // Get content from code editor
+                    app_state.code_editor.code.clone()
+                }
+                crate::editor::file_manager::FileType::UIDesign => {
+                    // For UI files, generate content from visual designer
+                    Self::generate_ui_file_content(app_state)
+                }
+                crate::editor::file_manager::FileType::Unknown => {
+                    // Use code editor as fallback
+                    app_state.code_editor.code.clone()
+                }
+            };
+            
+            // Update file manager with new content
+            if let Some(tab) = app_state.file_manager.open_tabs.get_mut(&path) {
+                if tab.content != new_content {
+                    tab.content = new_content;
+                    tab.mark_dirty();
+                }
+            }
+        }
+    }
+    
+    /// Generate UI file content from visual designer state
+    fn generate_ui_file_content(app_state: &IdeAppState) -> String {
+        // Simple JSON-like format for UI files
+        let mut content = String::new();
+        content.push_str("// RAD IDE UI Design File\n");
+        content.push_str("{\n");
+        content.push_str(&format!("  \"form\": {{\n"));
+        content.push_str(&format!("    \"title\": \"{}\",\n", app_state.root_form.title));
+        content.push_str(&format!("    \"width\": {},\n", app_state.root_form.size.x));
+        content.push_str(&format!("    \"height\": {},\n", app_state.root_form.size.y));
+        content.push_str(&format!("    \"components\": [\n"));
+        
+        for (i, component) in app_state.components.iter().enumerate() {
+            content.push_str(&format!("      {{\n"));
+            content.push_str(&format!("        \"type\": \"{}\",\n", component.name()));
+            content.push_str(&format!("        \"id\": {}\n", i));
+            content.push_str(&format!("      }}"));
+            if i < app_state.components.len() - 1 {
+                content.push_str(",");
+            }
+            content.push_str("\n");
+        }
+        
+        content.push_str("    ]\n");
+        content.push_str("  }\n");
+        content.push_str("}\n");
+        content
     }
 
     /// Render design status bar showing current form information

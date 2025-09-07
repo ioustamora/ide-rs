@@ -4,11 +4,11 @@
 use std::collections::HashMap;
 
 fn main() {
-    let name = "World"; // This will cause a type error for demo
-    let number: i32 = name; // Error: mismatched types
+    let name = "World"; // Previously used to intentionally cause a type error; now fixed to compile
+    let number: i32 = 42; // Example numeric variable (was a mismatched type demo)
     
-    println!("Hello, {}!", name);
-    let unused_var = 42; // Warning: unused variable
+    println!("Hello, {}! (#{} )", name, number);
+    let unused_var = 42; // Warning: unused variable (kept for diagnostics demo)
     
     // Function definition with various Rust features
     let result = calculate_fibonacci(10);

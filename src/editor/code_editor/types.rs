@@ -232,27 +232,15 @@ pub struct CodeEditor {
 }
 
 impl CodeEditor {
-    pub fn new() -> Self {
-        Self {
-            code: String::new(),
-            language: "rust".to_string(),
-            cursor_pos: (0, 0),
-            selection: None,
-            settings: EditorSettings::default(),
-            history: EditHistory::default(),
-            find_replace: FindReplaceState::default(),
-            folded_regions: HashMap::new(),
-            autocomplete: AutocompleteState::default(),
-            diagnostics: InlineDiagnostics::default(),
-            code_folding: CodeFolding::default(),
-            last_modified: None,
-            is_dirty: false,
-            scroll_offset: (0.0, 0.0),
-        }
+    /// Create a new editor for a given language
+    pub fn new(language: &str) -> Self {
+        let mut editor = Self::default();
+        editor.language = language.to_string();
+        editor
     }
 
     pub fn with_content(language: &str, content: String) -> Self {
-        let mut editor = Self::new();
+        let mut editor = Self::default();
         editor.language = language.to_string();
         editor.code = content;
         editor
@@ -284,7 +272,7 @@ impl CodeEditor {
                 ui.separator();
                 
                 // LSP connection status
-                let lsp_status = if lsp_client.is_connected() {
+                if lsp_client.is_connected() {
                     ui.colored_label(eframe::egui::Color32::GREEN, "🟢 LSP Connected");
                 } else {
                     ui.colored_label(eframe::egui::Color32::RED, "🔴 LSP Disconnected");
@@ -302,7 +290,8 @@ impl CodeEditor {
                 }
                 
                 if ui.button("🎯 Format").on_hover_text("Format Code").clicked() {
-                    // TODO: Implement code formatting
+                    // Format the code (basic indentation)
+                    self.format_code();
                     self.mark_dirty();
                 }
             });
@@ -323,8 +312,8 @@ impl CodeEditor {
 
     /// Trigger autocomplete request from LSP
     fn trigger_autocomplete(&mut self, lsp_client: &mut crate::editor::lsp_integration::LspClient) {
-        let (line, character) = self.cursor_pos;
-        let uri = format!("file://current_file.{}", self.language);
+        let (_line, _character) = self.cursor_pos;
+        let _uri = format!("file://current_file.{}", self.language);
         
         // For now, show a simple placeholder autocomplete
         // In a real implementation, we would handle the LSP callback properly
@@ -729,10 +718,10 @@ impl CodeEditor {
                 ui.text_edit_singleline(&mut self.find_replace.replace_text);
                 
                 if ui.button("Find Next").clicked() {
-                    // TODO: Implement find functionality
+                    self.find_next();
                 }
                 if ui.button("Replace").clicked() {
-                    // TODO: Implement replace functionality
+                    self.replace_current();
                 }
                 ui.checkbox(&mut self.find_replace.case_sensitive, "Case Sensitive");
             });
@@ -760,55 +749,136 @@ impl CodeEditor {
     
     /// Render minimap
     fn render_minimap(&self, ui: &mut eframe::egui::Ui) {
-        let minimap_width = self.settings.minimap_width;
+        let minimap_width = self.settings.minimap_width.max(80.0).min(200.0); // Ensure reasonable bounds
         let available_height = ui.available_height();
         
         ui.allocate_ui_with_layout(
             eframe::egui::Vec2::new(minimap_width, available_height),
             eframe::egui::Layout::top_down(eframe::egui::Align::LEFT),
             |ui| {
-                ui.style_mut().visuals.extreme_bg_color = self.settings.current_theme.background;
-                
-                ui.heading("📍 Minimap");
-                ui.separator();
-                
-                let lines: Vec<&str> = self.code.lines().collect();
-                let total_lines = lines.len();
-                
-                if total_lines > 0 {
-                    let visible_lines = (available_height / 3.0) as usize; // Simplified minimap with smaller line height
-                    let lines_to_show = visible_lines.min(total_lines);
-                    
-                    eframe::egui::ScrollArea::vertical()
-                        .max_height(available_height - 40.0)
-                        .show(ui, |ui| {
-                            for (_i, line) in lines.iter().enumerate().take(lines_to_show) {
-                                let preview = if line.len() > 20 {
-                                    format!("{}...", &line[..17])
+                // Frame for minimap with theme background
+                eframe::egui::Frame::none()
+                    .fill(self.settings.current_theme.line_number_bg)
+                    .stroke(eframe::egui::Stroke::new(1.0, self.settings.current_theme.line_number))
+                    .inner_margin(eframe::egui::Margin::same(4.0))
+                    .show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            // Minimap header
+                            ui.horizontal(|ui| {
+                                ui.small("📍");
+                                ui.small("Minimap");
+                            });
+                            ui.separator();
+                            
+                            let lines: Vec<&str> = self.code.lines().collect();
+                            let total_lines = lines.len();
+                            
+                            if total_lines > 0 {
+                                // Calculate how many lines we can show
+                                let line_height = 10.0; // Smaller line height for minimap
+                                let header_height = 30.0;
+                                let minimap_content_height = available_height - header_height;
+                                let max_visible_lines = (minimap_content_height / line_height) as usize;
+                                
+                                // Show a representative sample of the file
+                                let lines_to_show = max_visible_lines.min(total_lines);
+                                let step = if total_lines > lines_to_show {
+                                    total_lines / lines_to_show
                                 } else {
-                                    line.to_string()
+                                    1
                                 };
                                 
-                                if !preview.trim().is_empty() {
-                                    ui.small(preview);
-                                } else {
-                                    ui.small(" ");
-                                }
-                            }
-                            
-                            if total_lines > lines_to_show {
-                                ui.small(format!("... {} more lines", total_lines - lines_to_show));
+                                eframe::egui::ScrollArea::vertical()
+                                    .max_height(minimap_content_height)
+                                    .auto_shrink([false, false])
+                                    .show(ui, |ui| {
+                                        for i in (0..total_lines).step_by(step.max(1)) {
+                                            if let Some(line) = lines.get(i) {
+                                                let line_preview = if line.len() > 15 {
+                                                    format!("{}…", &line[..12])
+                                                } else {
+                                                    line.to_string()
+                                                };
+                                                
+                                                // Color-code based on content type
+                                                let color = if line.trim().starts_with("//") {
+                                                    self.settings.current_theme.comment
+                                                } else if line.trim().starts_with("fn ") || line.trim().starts_with("pub ") {
+                                                    self.settings.current_theme.keyword
+                                                } else if line.trim().contains('{') || line.trim().contains('}') {
+                                                    self.settings.current_theme.text
+                                                } else {
+                                                    self.settings.current_theme.line_number
+                                                };
+                                                
+                                                if !line_preview.trim().is_empty() {
+                                                    ui.colored_label(color, line_preview);
+                                                } else {
+                                                    ui.colored_label(self.settings.current_theme.line_number, "∅");
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Show file statistics
+                                        if total_lines > lines_to_show {
+                                            ui.separator();
+                                            ui.colored_label(
+                                                self.settings.current_theme.line_number,
+                                                format!("…{} total lines", total_lines)
+                                            );
+                                        }
+                                    });
+                            } else {
+                                ui.colored_label(self.settings.current_theme.line_number, "Empty file");
                             }
                         });
-                } else {
-                    ui.small("Empty file");
-                }
+                    });
             },
         );
     }
     
-    /// Render code with enhanced syntect-based syntax highlighting
+    /// Render code with enhanced syntect-based syntax highlighting and interactive editing
     fn render_enhanced_syntax_highlighted(&mut self, ui: &mut eframe::egui::Ui) {
+        // Create a proper text editor with syntax highlighting
+        let mut text_edit = eframe::egui::TextEdit::multiline(&mut self.code)
+            .font(eframe::egui::FontId::monospace(self.settings.font_size))
+            .desired_width(f32::INFINITY)
+            .desired_rows(50)
+            .lock_focus(true);
+        
+        // Apply theme colors
+        text_edit = text_edit.text_color(self.settings.current_theme.text);
+        
+        // Create the text editor response
+        let response = ui.add(text_edit);
+        
+        // Mark as dirty if text was changed
+        if response.changed() {
+            self.mark_dirty();
+        }
+        
+        // Handle cursor position updates (simplified - egui TextEdit handles most cursor logic internally)
+        if response.changed() {
+            // Update cursor position based on text changes
+            let lines_count = self.code.lines().count();
+            if lines_count > 0 {
+                self.cursor_pos.0 = (lines_count - 1).max(0);
+                let last_line = self.code.lines().last().unwrap_or("");
+                self.cursor_pos.1 = last_line.len();
+            }
+        }
+        
+        // Overlay syntax highlighting on top of the text editor
+        if !self.code.is_empty() {
+            self.render_syntax_highlighting_overlay(ui, response.rect);
+        }
+        
+        // Handle keyboard shortcuts for code editing
+        self.handle_editor_shortcuts(ui, &response);
+    }
+    
+    /// Render syntax highlighting overlay on top of the text editor
+    fn render_syntax_highlighting_overlay(&self, ui: &mut eframe::egui::Ui, text_rect: eframe::egui::Rect) {
         use crate::editor::syntax_highlighter::SyntaxHighlighter;
         
         // Create syntax highlighter based on current theme
@@ -820,71 +890,156 @@ impl CodeEditor {
         };
         
         let highlighter = SyntaxHighlighter::new(theme_name);
+        let font_id = eframe::egui::FontId::monospace(self.settings.font_size);
+        let line_height = ui.fonts(|fonts| fonts.row_height(&font_id));
         
-        eframe::egui::ScrollArea::both()
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                let available_rect = ui.available_rect_before_wrap();
-                let font_id = eframe::egui::FontId::monospace(self.settings.font_size);
-                let line_height = ui.fonts(|fonts| fonts.row_height(&font_id));
-                
-                let lines: Vec<&str> = self.code.lines().collect();
-                let visible_lines = (available_rect.height() / line_height).ceil() as usize + 2;
-                let start_line = (self.scroll_offset.1 / line_height) as usize;
-                let end_line = (start_line + visible_lines).min(lines.len());
-                
-                for (line_index, line) in lines.iter().enumerate().skip(start_line).take(end_line - start_line) {
-                    let highlighted = highlighter.highlight_line(line, &self.language);
-                    
-                    ui.horizontal(|ui| {
-                        // Current line highlighting
-                        if self.settings.highlight_current_line && line_index == self.cursor_pos.0 {
-                            let line_rect = ui.available_rect_before_wrap();
-                            ui.painter().rect_filled(
-                                line_rect,
-                                0.0,
-                                self.settings.current_theme.current_line,
-                            );
-                        }
-                        
-                        // Render highlighted text
-                        let mut pos = 0.0;
-                        for (text, color) in highlighted {
-                            let text_galley = ui.fonts(|fonts| {
-                                fonts.layout_no_wrap(text, font_id.clone(), color)
-                            });
-                            
-                            let text_rect = eframe::egui::Rect::from_min_size(
-                                ui.next_widget_position() + eframe::egui::Vec2::new(pos, 0.0),
-                                text_galley.size(),
-                            );
-                            
-                            ui.painter().galley(text_rect.min, text_galley.clone(), eframe::egui::Color32::TRANSPARENT);
-                            pos += text_galley.size().x;
-                        }
-                        
-                        // Add diagnostic indicators
-                        if let Some(diagnostics) = self.diagnostics.error_positions.get(&line_index) {
-                            for diagnostic in diagnostics {
-                                let icon = match diagnostic.severity {
-                                    Some(crate::editor::lsp_integration::DiagnosticSeverity::Error) => "❌",
-                                    Some(crate::editor::lsp_integration::DiagnosticSeverity::Warning) => "⚠️",
-                                    _ => "💡",
-                                };
-                                
-                                let icon_pos = ui.next_widget_position() + eframe::egui::Vec2::new(pos + 10.0, 0.0);
-                                ui.painter().text(
-                                    icon_pos,
-                                    eframe::egui::Align2::LEFT_TOP,
-                                    icon,
-                                    eframe::egui::FontId::default(),
-                                    eframe::egui::Color32::RED,
-                                );
-                            }
-                        }
+        let lines: Vec<&str> = self.code.lines().collect();
+        
+        for (line_index, line) in lines.iter().enumerate() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            
+            let line_y = text_rect.min.y + (line_index as f32 * line_height) + 4.0;
+            let line_rect = eframe::egui::Rect::from_min_size(
+                eframe::egui::Pos2::new(text_rect.min.x + 4.0, line_y),
+                eframe::egui::Vec2::new(text_rect.width() - 8.0, line_height),
+            );
+            
+            // Skip if line is not visible
+            if line_rect.max.y < ui.clip_rect().min.y || line_rect.min.y > ui.clip_rect().max.y {
+                continue;
+            }
+            
+            // Highlight current line background
+            if self.settings.highlight_current_line && line_index == self.cursor_pos.0 {
+                ui.painter().rect_filled(
+                    line_rect,
+                    2.0,
+                    self.settings.current_theme.current_line,
+                );
+            }
+            
+            // Render syntax highlighted text as overlay (transparent background)
+            let highlighted = highlighter.highlight_line(line, &self.language);
+            let mut x_offset = 0.0;
+            
+            for (text, color) in highlighted {
+                if !text.trim().is_empty() {
+                    let text_pos = line_rect.min + eframe::egui::Vec2::new(x_offset, 0.0);
+                    let text_galley = ui.fonts(|fonts| {
+                        fonts.layout_no_wrap(text.clone(), font_id.clone(), color)
                     });
+                    
+                    // Draw the colored text overlay with slight transparency to blend with editor
+                    ui.painter().galley_with_override_text_color(
+                        text_pos,
+                        text_galley.clone(),
+                        eframe::egui::Color32::from_rgba_premultiplied(
+                            color.r(),
+                            color.g(), 
+                            color.b(),
+                            180 // Slight transparency for overlay effect
+                        )
+                    );
+                    
+                    x_offset += text_galley.size().x;
                 }
-            });
+            }
+            
+            // Add diagnostic indicators
+            if let Some(diagnostics) = self.diagnostics.error_positions.get(&line_index) {
+                for diagnostic in diagnostics {
+                    let icon = match diagnostic.severity {
+                        Some(crate::editor::lsp_integration::DiagnosticSeverity::Error) => "❌",
+                        Some(crate::editor::lsp_integration::DiagnosticSeverity::Warning) => "⚠️",
+                        _ => "💡",
+                    };
+                    
+                    let icon_pos = line_rect.max + eframe::egui::Vec2::new(-20.0, -line_height);
+                    ui.painter().text(
+                        icon_pos,
+                        eframe::egui::Align2::RIGHT_TOP,
+                        icon,
+                        eframe::egui::FontId::default(),
+                        eframe::egui::Color32::RED,
+                    );
+                }
+            }
+        }
+    }
+    
+    /// Handle keyboard shortcuts specific to code editing
+    fn handle_editor_shortcuts(&mut self, ui: &mut eframe::egui::Ui, response: &eframe::egui::Response) {
+        if !response.has_focus() {
+            return;
+        }
+        
+        ui.input(|i| {
+            // Autocomplete trigger
+            if i.modifiers.ctrl && i.key_pressed(eframe::egui::Key::Space) {
+                // Trigger autocomplete - would normally call LSP
+                self.show_autocomplete(vec![]); // Empty for now
+            }
+            
+            // Tab handling for indentation
+            if i.key_pressed(eframe::egui::Key::Tab) && !i.modifiers.shift {
+                // Insert tab/spaces at cursor
+                let tab_string = if self.settings.tab_size == 0 { "\t" } else { &" ".repeat(self.settings.tab_size) };
+                self.insert_text_at_cursor(tab_string);
+                self.mark_dirty();
+            }
+            
+            // Shift+Tab for unindent
+            if i.key_pressed(eframe::egui::Key::Tab) && i.modifiers.shift {
+                // Remove indentation - simplified implementation
+                self.remove_indentation_at_cursor();
+                self.mark_dirty();
+            }
+            
+            // Enter key for auto-indentation
+            if i.key_pressed(eframe::egui::Key::Enter) {
+                if self.settings.auto_indent {
+                    let current_line_indent = self.get_current_line_indentation();
+                    let newline_with_indent = format!("\n{}", current_line_indent);
+                    self.insert_text_at_cursor(&newline_with_indent);
+                    self.mark_dirty();
+                }
+            }
+        });
+    }
+    
+    /// Get the indentation of the current line
+    fn get_current_line_indentation(&self) -> String {
+        let lines: Vec<&str> = self.code.lines().collect();
+        if let Some(current_line) = lines.get(self.cursor_pos.0) {
+            let indent_count = current_line.len() - current_line.trim_start().len();
+            current_line[..indent_count].to_string()
+        } else {
+            String::new()
+        }
+    }
+    
+    /// Remove indentation at cursor position
+    fn remove_indentation_at_cursor(&mut self) {
+        let lines: Vec<&str> = self.code.lines().collect();
+        if let Some(current_line) = lines.get(self.cursor_pos.0) {
+            let trimmed_start = current_line.trim_start();
+            let indent_to_remove = current_line.len() - trimmed_start.len();
+            
+            if indent_to_remove > 0 {
+                let spaces_to_remove = if self.settings.tab_size > 0 {
+                    self.settings.tab_size.min(indent_to_remove)
+                } else {
+                    1.min(indent_to_remove)
+                };
+                
+                let new_line = &current_line[spaces_to_remove..];
+                let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
+                new_lines[self.cursor_pos.0] = new_line.to_string();
+                self.code = new_lines.join("\n");
+            }
+        }
     }
     
     /// Render syntax highlighting overlay
@@ -1186,6 +1341,129 @@ impl CodeEditor {
                         });
                 });
         }
+    }
+    
+    /// Find next occurrence of the search text
+    pub fn find_next(&mut self) {
+        if self.find_replace.find_text.is_empty() {
+            return;
+        }
+        
+        let search_text = if self.find_replace.case_sensitive {
+            self.find_replace.find_text.clone()
+        } else {
+            self.find_replace.find_text.to_lowercase()
+        };
+        
+        let content = if self.find_replace.case_sensitive {
+            self.code.clone()
+        } else {
+            self.code.to_lowercase()
+        };
+        
+        // Find starting position for search
+        let current_pos = self.cursor_pos.1; // character position
+        let lines: Vec<&str> = content.lines().collect();
+        
+        // Search from current position
+        for (line_idx, line) in lines.iter().enumerate().skip(self.cursor_pos.0) {
+            let start_pos = if line_idx == self.cursor_pos.0 { current_pos } else { 0 };
+            
+            if let Some(found_pos) = line[start_pos..].find(&search_text) {
+                // Found it! Update cursor position
+                self.cursor_pos = (line_idx, start_pos + found_pos);
+                return;
+            }
+        }
+        
+        // If not found from current position, search from beginning
+        for (line_idx, line) in lines.iter().enumerate() {
+            if line_idx >= self.cursor_pos.0 {
+                break;
+            }
+            
+            if let Some(found_pos) = line.find(&search_text) {
+                self.cursor_pos = (line_idx, found_pos);
+                return;
+            }
+        }
+    }
+    
+    /// Replace current selection or find next and replace
+    pub fn replace_current(&mut self) {
+        if self.find_replace.find_text.is_empty() || self.find_replace.replace_text.is_empty() {
+            return;
+        }
+        
+        // For simplicity, just find next and replace at cursor position
+        self.find_next();
+        
+        let search_text = self.find_replace.find_text.clone();
+        let replace_text = self.find_replace.replace_text.clone();
+        
+        // Get the current line
+        let lines: Vec<&str> = self.code.lines().collect();
+        if let Some(current_line) = lines.get(self.cursor_pos.0) {
+            let start_pos = self.cursor_pos.1;
+            let end_pos = start_pos + search_text.len();
+            
+            if end_pos <= current_line.len() && 
+               &current_line[start_pos..end_pos] == &search_text {
+                // Replace the text
+                let mut new_line = current_line.to_string();
+                new_line.replace_range(start_pos..end_pos, &replace_text);
+                
+                // Rebuild the code with the replaced line
+                let mut new_lines: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
+                new_lines[self.cursor_pos.0] = new_line;
+                self.code = new_lines.join("\n");
+                self.mark_dirty();
+                
+                // Move cursor to end of replacement
+                self.cursor_pos.1 = start_pos + replace_text.len();
+            }
+        }
+    }
+    
+    /// Basic code formatting (indentation)
+    pub fn format_code(&mut self) {
+        if self.language != "rust" {
+            return; // Only support Rust formatting for now
+        }
+        
+        let lines: Vec<&str> = self.code.lines().collect();
+        let mut formatted_lines = Vec::new();
+        let mut indent_level: usize = 0;
+        
+        for line in lines {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                formatted_lines.push(String::new());
+                continue;
+            }
+            
+            // Decrease indent for closing braces
+            if trimmed.starts_with('}') || trimmed.starts_with(']') || trimmed.starts_with(')') {
+                indent_level = indent_level.saturating_sub(1);
+            }
+            
+            // Apply indentation
+            let indented = "    ".repeat(indent_level) + trimmed;
+            formatted_lines.push(indented);
+            
+            // Increase indent for opening braces and certain keywords
+            if trimmed.ends_with('{') || trimmed.ends_with('[') || trimmed.ends_with('(') ||
+               trimmed.starts_with("if ") || trimmed.starts_with("for ") || 
+               trimmed.starts_with("while ") || trimmed.starts_with("loop") ||
+               trimmed.starts_with("match ") || trimmed.starts_with("impl ") ||
+               trimmed.starts_with("fn ") {
+                if !trimmed.contains('}') { // Don't indent for single-line blocks
+                    indent_level += 1;
+                }
+            }
+        }
+        
+        self.code = formatted_lines.join("\n");
     }
 }
 

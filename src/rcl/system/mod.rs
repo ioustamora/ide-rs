@@ -86,8 +86,3 @@ pub mod process_manager;
 pub mod system_info;
 
 // Re-export main types for convenience
-pub use clipboard::Clipboard;
-pub use file_system::FileSystem;
-pub use power_manager::PowerManager;
-pub use process_manager::ProcessManager;
-pub use system_info::SystemInfo;

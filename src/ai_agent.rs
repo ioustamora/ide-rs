@@ -66,6 +66,11 @@ pub enum AiTaskType {
     Refactoring,
     Performance,
     Security,
+    PropertySuggestion,
+    ComponentDesign,
+    ProjectStructure,
+    DeploymentGuidance,
+    LearningAssistance,
 }
 
 /// Context information for better AI responses
@@ -77,6 +82,11 @@ pub struct AiContext {
     pub error_messages: Vec<String>,
     pub project_dependencies: Vec<String>,
     pub component_context: Vec<String>,
+    pub project_structure: Vec<String>,
+    pub recent_actions: Vec<String>,
+    pub target_platform: String,
+    pub build_configuration: String,
+    pub ui_theme: String,
 }
 
 impl Default for AiContext {
@@ -91,8 +101,15 @@ impl Default for AiContext {
                 "eframe".to_string(),
                 "serde".to_string(),
                 "anyhow".to_string(),
+                "syntect".to_string(),
+                "ollama-rs".to_string(),
             ],
             component_context: Vec::new(),
+            project_structure: Vec::new(),
+            recent_actions: Vec::new(),
+            target_platform: "desktop".to_string(),
+            build_configuration: "debug".to_string(),
+            ui_theme: "dark".to_string(),
         }
     }
 }
@@ -140,6 +157,31 @@ impl AiAgent {
         self.specialized_prompts.insert(
             AiTaskType::Testing,
             "You are a Rust testing expert. Create comprehensive test cases including unit tests, integration tests, and property-based tests using appropriate testing frameworks.".to_string()
+        );
+
+        self.specialized_prompts.insert(
+            AiTaskType::PropertySuggestion,
+            "You are an expert in UI component properties and design systems. Analyze the component context and suggest optimal property values based on design patterns, accessibility, and user experience best practices.".to_string()
+        );
+
+        self.specialized_prompts.insert(
+            AiTaskType::ComponentDesign,
+            "You are a component library architect. Design reusable, flexible components that follow established patterns like those in Material Design, Ant Design, or similar systems. Focus on composability and accessibility.".to_string()
+        );
+
+        self.specialized_prompts.insert(
+            AiTaskType::ProjectStructure,
+            "You are a Rust project architecture expert. Analyze project requirements and suggest optimal file organization, module structure, and dependency management following Rust conventions and best practices.".to_string()
+        );
+
+        self.specialized_prompts.insert(
+            AiTaskType::DeploymentGuidance,
+            "You are a DevOps expert specializing in Rust application deployment. Provide guidance on build optimization, cross-platform deployment, CI/CD setup, and production considerations.".to_string()
+        );
+
+        self.specialized_prompts.insert(
+            AiTaskType::LearningAssistance,
+            "You are a patient programming mentor specializing in Rust and software development. Explain concepts clearly, provide step-by-step guidance, and offer educational examples with learning objectives.".to_string()
         );
     }
 
@@ -365,6 +407,87 @@ impl AiAgent {
                          self.context.component_context.len() +
                          if self.context.current_file.is_some() { 1 } else { 0 },
         }
+    }
+
+    /// Suggest optimal property values for a component
+    pub async fn suggest_properties(&mut self, component_name: &str, current_properties: &[String]) -> anyhow::Result<String> {
+        let prompt = format!(
+            "Suggest optimal property values for a {} component.\n\nCurrent properties: {}\n\nConsider accessibility, UX best practices, and design patterns.",
+            component_name, current_properties.join(", ")
+        );
+
+        self.ask_with_context(&prompt, AiTaskType::PropertySuggestion).await
+    }
+
+    /// Design a new custom component
+    pub async fn design_component(&mut self, description: &str, features: &[String]) -> anyhow::Result<String> {
+        let mut prompt = format!("Design a custom {} component with these features:\n", description);
+        for feature in features {
+            prompt.push_str(&format!("- {}\n", feature));
+        }
+        prompt.push_str("\nProvide Rust code using egui with proper structure and documentation.");
+
+        self.ask_with_context(&prompt, AiTaskType::ComponentDesign).await
+    }
+
+    /// Analyze and suggest project structure improvements
+    pub async fn analyze_project_structure(&mut self, current_structure: &[String]) -> anyhow::Result<String> {
+        let prompt = format!(
+            "Analyze this Rust project structure and suggest improvements:\n\n{}\n\nFocus on modularity, maintainability, and Rust best practices.",
+            current_structure.join("\n")
+        );
+
+        self.ask_with_context(&prompt, AiTaskType::ProjectStructure).await
+    }
+
+    /// Provide deployment guidance
+    pub async fn deployment_guidance(&mut self, target_platforms: &[String], requirements: &[String]) -> anyhow::Result<String> {
+        let mut prompt = format!("Provide deployment guidance for these platforms: {}\n\nRequirements:\n", target_platforms.join(", "));
+        for req in requirements {
+            prompt.push_str(&format!("- {}\n", req));
+        }
+        prompt.push_str("\nInclude build optimization, CI/CD setup, and production considerations.");
+
+        self.ask_with_context(&prompt, AiTaskType::DeploymentGuidance).await
+    }
+
+    /// Provide learning assistance and explanations
+    pub async fn learning_assistance(&mut self, topic: &str, experience_level: &str) -> anyhow::Result<String> {
+        let prompt = format!(
+            "Explain {} for a {} developer.\n\nProvide clear explanations, examples, and learning steps.",
+            topic, experience_level
+        );
+
+        self.ask_with_context(&prompt, AiTaskType::LearningAssistance).await
+    }
+
+    /// Update project structure context
+    pub fn update_project_structure(&mut self, structure: Vec<String>) {
+        self.context.project_structure = structure;
+    }
+
+    /// Add recent action to context
+    pub fn add_recent_action(&mut self, action: String) {
+        self.context.recent_actions.push(action);
+        // Keep only the last 10 actions
+        if self.context.recent_actions.len() > 10 {
+            self.context.recent_actions.remove(0);
+        }
+    }
+
+    /// Update target platform
+    pub fn set_target_platform(&mut self, platform: String) {
+        self.context.target_platform = platform;
+    }
+
+    /// Update build configuration
+    pub fn set_build_configuration(&mut self, config: String) {
+        self.context.build_configuration = config;
+    }
+
+    /// Update UI theme
+    pub fn set_ui_theme(&mut self, theme: String) {
+        self.context.ui_theme = theme;
     }
 }
 

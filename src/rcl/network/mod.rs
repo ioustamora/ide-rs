@@ -114,10 +114,3 @@ pub mod network_monitor;
 pub mod dns_client;
 
 // Re-export main client types for convenience
-pub use dns_client::DnsClient;
-pub use ftp_client::FtpClient;
-pub use http_client::HttpClient;
-pub use network_monitor::NetworkMonitor;
-pub use tcp_client::TcpClient;
-pub use udp_client::UdpClient;
-pub use websocket::WebSocketClient;

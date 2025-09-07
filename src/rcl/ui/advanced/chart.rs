@@ -3,6 +3,8 @@
 //! This module provides comprehensive charting capabilities including
 //! line charts, bar charts, pie charts, and real-time data visualization.
 
+pub mod types;
+
 use egui::{Ui, Vec2, Pos2, Color32, Stroke, Rect};
 use crate::rcl::ui::component::Component;
 // use std::collections::HashMap;

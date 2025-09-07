@@ -18,18 +18,19 @@ pub mod templates;
 pub mod file_browser;
 pub mod serialization;
 pub mod operations;
+pub mod workspace;
 
 use std::path::{Path, PathBuf};
 use crate::editor::output_panel::OutputPanel;
 use crate::rcl::ui::component::Component;
 
 // Re-export main types
-pub use project::{IdeProject, ProjectMetadata, DesignerData, ComponentData, 
-                 ProjectFileStructure, BuildConfiguration, ProjectType};
-pub use templates::{ProjectTemplate, TemplateFile, TemplateConfig};
-pub use file_browser::{FileBrowser, FileFilters, FileViewSettings};
+pub use project::IdeProject;
+pub use templates::ProjectTemplate;
+pub use file_browser::FileBrowser;
 pub use serialization::ProjectSerializer;
 pub use operations::ProjectOperations;
+pub use workspace::{Workspace, WorkspaceManager, WorkspaceTask};
 
 /// Main project manager handling all project operations
 /// 
@@ -49,6 +50,8 @@ pub struct ProjectManager {
     pub operations: ProjectOperations,
     /// Project serializer
     pub serializer: ProjectSerializer,
+    /// Workspace manager for multi-project support
+    pub workspace_manager: WorkspaceManager,
     /// UI state for new project dialog
     pub show_new_project_dialog: bool,
     pub new_project_name: String,
@@ -117,6 +120,7 @@ impl ProjectManager {
             },
             operations: ProjectOperations::new(),
             serializer: ProjectSerializer::new(),
+            workspace_manager: WorkspaceManager::new(),
             show_new_project_dialog: false,
             new_project_name: String::new(),
             new_project_location: String::new(),
@@ -209,12 +213,14 @@ impl ProjectManager {
     }
 
     /// Create a new file browser panel
-    pub fn render_file_browser(&mut self, ui: &mut egui::Ui, output_panel: &mut OutputPanel) {
-        self.file_browser.render(ui, output_panel, &self.current_project);
+    pub fn render_file_browser(&mut self, ui: &mut egui::Ui, output_panel: &mut OutputPanel) -> Option<PathBuf> {
+        self.file_browser.render(ui, output_panel, &self.current_project)
     }
 
     /// Render project management UI
-    pub fn render_project_ui(&mut self, ui: &mut egui::Ui, output_panel: &mut OutputPanel) {
+    pub fn render_project_ui(&mut self, ui: &mut egui::Ui, output_panel: &mut OutputPanel) -> Option<PathBuf> {
+        let mut file_to_open = None;
+        
         ui.vertical(|ui| {
             // Project actions
             ui.horizontal(|ui| {
@@ -245,13 +251,17 @@ impl ProjectManager {
             }
             
             // File browser
-            self.render_file_browser(ui, output_panel);
+            if let Some(path) = self.render_file_browser(ui, output_panel) {
+                file_to_open = Some(path);
+            }
             
             // New project dialog
             if self.show_new_project_dialog {
                 self.render_new_project_dialog(ui, output_panel);
             }
         });
+        
+        file_to_open
     }
     
     /// Render new project creation dialog

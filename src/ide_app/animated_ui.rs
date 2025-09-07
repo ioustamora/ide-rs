@@ -24,7 +24,7 @@ impl CollapseAnimation {
         Self {
             progress: if expanded { 1.0 } else { 0.0 },
             target_expanded: expanded,
-            speed: 8.0, // Fast but smooth animation
+            speed: 5.0, // Slower, more stable animation
             animating: false,
         }
     }
@@ -32,13 +32,13 @@ impl CollapseAnimation {
     /// Update the animation state
     pub fn update(&mut self, ctx: &Context) {
         if self.animating {
-            let delta_time = ctx.input(|i| i.stable_dt);
+            let delta_time = ctx.input(|i| i.stable_dt).min(0.016); // Cap at 60fps for stability
             let target = if self.target_expanded { 1.0 } else { 0.0 };
             
-            if (self.progress - target).abs() > 0.001 {
-                // Move towards target
-                let direction = if target > self.progress { 1.0 } else { -1.0 };
-                self.progress += direction * self.speed * delta_time;
+            if (self.progress - target).abs() > 0.01 {  // Increased threshold for stability
+                // Move towards target with easing
+                let diff = target - self.progress;
+                self.progress += diff * self.speed * delta_time;
                 self.progress = self.progress.clamp(0.0, 1.0);
                 
                 // Request repaint for next frame
@@ -134,8 +134,7 @@ impl<'a> AnimatedCollapsing<'a> {
         let header_response = ui.horizontal(|ui| {
             let progress = animation.eased_progress();
             
-            // Animated arrow
-            let arrow_rotation = progress * std::f32::consts::PI / 2.0;
+            // Animated arrow (simplified)
             ui.scope(|ui| {
                 let (rect, response) = ui.allocate_exact_size(
                     Vec2::splat(ui.spacing().icon_width), 
@@ -183,7 +182,7 @@ impl<'a> AnimatedCollapsing<'a> {
         let body_response = if progress > 0.0 {
             // Calculate content size
             let available_rect = ui.available_rect_before_wrap();
-            let content_ui_id = self.id.with("content");
+            let _content_ui_id = self.id.with("content");
             
             // Create a temporary UI to measure content size
             let mut content_size = Vec2::ZERO;
