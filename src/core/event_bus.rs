@@ -28,6 +28,15 @@ pub enum IdeEvent {
     FileClosed { path: std::path::PathBuf, buffer_id: Option<Uuid> },
     FileModified { path: std::path::PathBuf, external: bool },
     
+    /// File system watch events
+    FileCreated { path: std::path::PathBuf },
+    FileDeleted { path: std::path::PathBuf },
+    FileRenamed { old_path: std::path::PathBuf, new_path: std::path::PathBuf },
+    DirectoryCreated { path: std::path::PathBuf },
+    DirectoryDeleted { path: std::path::PathBuf },
+    FileWatchStarted { path: std::path::PathBuf, recursive: bool },
+    FileWatchStopped { path: std::path::PathBuf },
+    
     /// Buffer and editor events
     BufferChanged { buffer_id: Uuid, version: u64 },
     BufferCreated { buffer_id: Uuid, path: Option<std::path::PathBuf> },
@@ -143,6 +152,13 @@ impl EventType {
             (EventType::File, IdeEvent::FileSaved { .. }) => true,
             (EventType::File, IdeEvent::FileClosed { .. }) => true,
             (EventType::File, IdeEvent::FileModified { .. }) => true,
+            (EventType::File, IdeEvent::FileCreated { .. }) => true,
+            (EventType::File, IdeEvent::FileDeleted { .. }) => true,
+            (EventType::File, IdeEvent::FileRenamed { .. }) => true,
+            (EventType::File, IdeEvent::DirectoryCreated { .. }) => true,
+            (EventType::File, IdeEvent::DirectoryDeleted { .. }) => true,
+            (EventType::File, IdeEvent::FileWatchStarted { .. }) => true,
+            (EventType::File, IdeEvent::FileWatchStopped { .. }) => true,
             
             (EventType::Buffer, IdeEvent::BufferChanged { .. }) => true,
             (EventType::Buffer, IdeEvent::BufferCreated { .. }) => true,

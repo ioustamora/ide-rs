@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use crate::editor::code_editor::CodeEditor;
 use crate::editor::visual_designer::VisualDesigner;
+use crate::editor::file_watcher::{AdvancedFileWatcher, FileWatchEvent, FileWatcherConfig};
+use crate::core::event_bus::{IdeEvent, global_event_bus};
 
 /// File type classification for editor mode selection
 #[derive(Debug, Clone, PartialEq)]
@@ -61,8 +63,8 @@ pub struct FileManager {
     pub file_associations: HashMap<String, FileType>,
     /// File search index for fast searching
     pub search_index: FileSearchIndex,
-    /// File watchers for auto-reload
-    pub file_watchers: HashMap<PathBuf, FileWatcher>,
+    /// Advanced file watcher for detecting external changes
+    pub file_watcher: Option<AdvancedFileWatcher>,
 }
 
 impl FileTab {
@@ -149,10 +151,16 @@ impl FileManager {
             last_auto_save: std::time::Instant::now(),
             file_associations: HashMap::new(),
             search_index: FileSearchIndex::new(),
-            file_watchers: HashMap::new(),
+            file_watcher: None,
         };
         
         manager.initialize_file_associations();
+        
+        // Initialize file watcher
+        if let Err(e) = manager.initialize_file_watcher() {
+            eprintln!("Failed to initialize file watcher: {}", e);
+        }
+        
         manager
     }
     
@@ -191,6 +199,162 @@ impl FileManager {
         for (ext, file_type) in associations.iter() {
             self.file_associations.insert(ext.to_string(), file_type.clone());
         }
+    }
+    
+    /// Initialize file watcher with default configuration
+    fn initialize_file_watcher(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let config = FileWatcherConfig::default();
+        self.initialize_file_watcher_with_config(config)
+    }
+    
+    /// Initialize file watcher with custom configuration
+    fn initialize_file_watcher_with_config(&mut self, config: FileWatcherConfig) -> Result<(), Box<dyn std::error::Error>> {
+        if !config.enabled {
+            return Ok(());
+        }
+        
+        // Create the advanced file watcher (it manages its own background threads)
+        let watcher = AdvancedFileWatcher::with_config(config)?;
+        
+        // Store the watcher - no need for additional threading as it's self-contained
+        self.file_watcher = Some(watcher);
+        
+        Ok(())
+    }
+    
+    /// Handle file watch events
+    fn handle_file_watch_event(event: FileWatchEvent) {
+        // Send events to the global event bus for other components to handle
+        match event {
+            FileWatchEvent::Created(path) => {
+                global_event_bus().emit(IdeEvent::FileCreated { path });
+            }
+            FileWatchEvent::Modified(path) => {
+                global_event_bus().emit(IdeEvent::FileModified { path, external: true });
+            }
+            FileWatchEvent::Deleted(path) => {
+                global_event_bus().emit(IdeEvent::FileDeleted { path });
+            }
+            FileWatchEvent::Renamed(old_path, new_path) => {
+                global_event_bus().emit(IdeEvent::FileRenamed { old_path, new_path });
+            }
+            FileWatchEvent::DirectoryCreated(path) => {
+                global_event_bus().emit(IdeEvent::DirectoryCreated { path });
+            }
+            FileWatchEvent::DirectoryDeleted(path) => {
+                global_event_bus().emit(IdeEvent::DirectoryDeleted { path });
+            }
+            FileWatchEvent::Batch(events) => {
+                // Process each event in the batch
+                for event in events {
+                    Self::handle_file_watch_event(event);
+                }
+            }
+        }
+    }
+    
+    /// Watch a file or directory for changes
+    pub fn watch_path(&mut self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref mut watcher) = self.file_watcher {
+            watcher.watch(path)?;
+            
+            #[cfg(feature = "logging")]
+            tracing::info!("Started watching path: {}", path.display());
+        }
+        Ok(())
+    }
+    
+    /// Stop watching a path
+    pub fn unwatch_path(&mut self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref mut watcher) = self.file_watcher {
+            watcher.unwatch(path)?;
+            
+            #[cfg(feature = "logging")]
+            tracing::info!("Stopped watching path: {}", path.display());
+        }
+        Ok(())
+    }
+    
+    /// Get file watcher statistics
+    pub fn watcher_stats(&self) -> Option<crate::editor::file_watcher::WatcherStats> {
+        self.file_watcher.as_ref().map(|w| w.stats())
+    }
+    
+    /// Process pending file watch events
+    pub fn process_file_watch_events(&mut self) {
+        if let Some(watcher) = self.file_watcher.take() {
+            // Process all pending events non-blocking
+            let mut events = Vec::new();
+            while let Ok(event) = watcher.try_recv_event() {
+                events.push(event);
+            }
+            
+            // Put watcher back
+            self.file_watcher = Some(watcher);
+            
+            // Process events
+            for event in events {
+                self.handle_file_watch_event_locally(event.clone());
+                Self::handle_file_watch_event(event);
+            }
+        }
+    }
+    
+    /// Handle file watch events locally (update FileManager state)
+    fn handle_file_watch_event_locally(&mut self, event: FileWatchEvent) {
+        match event {
+            FileWatchEvent::Modified(ref path) => {
+                // Mark file as externally modified if it's open
+                if let Some(_tab) = self.open_tabs.get_mut(path) {
+                    // We might want to check if the file content has actually changed
+                    // and potentially offer to reload the file
+                    #[cfg(feature = "logging")]
+                    tracing::info!("File {} was modified externally", path.display());
+                }
+            }
+            FileWatchEvent::Deleted(ref path) => {
+                // Handle file deletion - might want to close the tab or mark as deleted
+                if self.open_tabs.contains_key(path) {
+                    #[cfg(feature = "logging")]
+                    tracing::warn!("Open file {} was deleted externally", path.display());
+                }
+            }
+            FileWatchEvent::Renamed(ref old_path, ref new_path) => {
+                // Handle file rename - update the tab with new path
+                if let Some(mut tab) = self.open_tabs.remove(old_path) {
+                    tab.path = new_path.clone();
+                    tab.name = new_path.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("Renamed File")
+                        .to_string();
+                    
+                    self.open_tabs.insert(new_path.clone(), tab);
+                    
+                    // Update tab order
+                    if let Some(pos) = self.tab_order.iter().position(|p| p == old_path) {
+                        self.tab_order[pos] = new_path.clone();
+                    }
+                    
+                    // Update active tab if needed
+                    if self.active_tab.as_ref() == Some(old_path) {
+                        self.active_tab = Some(new_path.clone());
+                    }
+                }
+            }
+            _ => {
+                // Handle other events as needed
+            }
+        }
+    }
+    
+    /// Shutdown file watcher
+    fn shutdown_file_watcher(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Shutdown the watcher (it handles its own cleanup)
+        if let Some(mut watcher) = self.file_watcher.take() {
+            watcher.shutdown()?;
+        }
+        
+        Ok(())
     }
     
     /// Classify file type based on extension
@@ -235,6 +399,18 @@ impl FileManager {
         // Add to recent files
         self.add_to_recent(&path);
         
+        // Start watching the file for external changes
+        if let Err(e) = self.watch_path(&path) {
+            #[cfg(feature = "logging")]
+            tracing::warn!("Failed to watch file {}: {}", path.display(), e);
+        }
+        
+        // Emit file opened event
+        global_event_bus().emit(IdeEvent::FileOpened { 
+            path: path.clone(), 
+            buffer_id: None // We could add buffer IDs later if needed
+        });
+        
         Ok(())
     }
     
@@ -247,6 +423,12 @@ impl FileManager {
             }
         }
         
+        // Stop watching the file
+        if let Err(e) = self.unwatch_path(path) {
+            #[cfg(feature = "logging")]
+            tracing::warn!("Failed to stop watching file {}: {}", path.display(), e);
+        }
+        
         // Remove from open tabs
         self.open_tabs.remove(path);
         self.tab_order.retain(|p| p != path);
@@ -255,6 +437,12 @@ impl FileManager {
         if self.active_tab.as_ref() == Some(path) {
             self.active_tab = self.tab_order.last().cloned();
         }
+        
+        // Emit file closed event
+        global_event_bus().emit(IdeEvent::FileClosed { 
+            path: path.clone(), 
+            buffer_id: None 
+        });
         
         Ok(())
     }
@@ -792,40 +980,12 @@ pub enum SearchResultType {
     Content,
 }
 
-/// File watcher for detecting changes
-pub struct FileWatcher {
-    /// File path being watched
-    pub path: PathBuf,
-    /// Last known modification time
-    pub last_modified: Option<std::time::SystemTime>,
-    /// Whether to auto-reload when changed
-    pub auto_reload: bool,
-}
-
-impl FileWatcher {
-    /// Create a new file watcher
-    pub fn new(path: PathBuf, auto_reload: bool) -> Self {
-        let last_modified = std::fs::metadata(&path)
-            .and_then(|m| m.modified())
-            .ok();
-
-        Self {
-            path,
-            last_modified,
-            auto_reload,
+/// Drop implementation for FileManager to ensure proper cleanup
+impl Drop for FileManager {
+    fn drop(&mut self) {
+        // Shutdown file watcher when FileManager is dropped
+        if let Err(e) = self.shutdown_file_watcher() {
+            eprintln!("Error shutting down file watcher: {}", e);
         }
-    }
-
-    /// Check if the file has been modified
-    pub fn check_for_changes(&mut self) -> bool {
-        if let Ok(metadata) = std::fs::metadata(&self.path) {
-            if let Ok(modified) = metadata.modified() {
-                if self.last_modified != Some(modified) {
-                    self.last_modified = Some(modified);
-                    return true;
-                }
-            }
-        }
-        false
     }
 }

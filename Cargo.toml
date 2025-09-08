@@ -41,3 +41,4 @@ logging = ["tracing", "tracing-subscriber"]
 
 [dev-dependencies]
 tokio = { version = "1.37", features = ["macros", "rt", "net"] }
+tempfile = "3.8"

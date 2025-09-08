@@ -2169,6 +2169,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syntect",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tokio-util",

@@ -187,12 +187,12 @@ pub mod minimap;
 /// commit history, and file status tracking.
 pub mod git_integration;
 
-/// Integrated terminal and console system
+/// Unified terminal system with core and advanced features
 /// 
 /// Embedded terminal with multiple shell support, command history,
-/// and process management within the IDE.
+/// process management, and advanced features like auto-completion,
+/// environment management, and Git integration within the IDE.
 pub mod terminal;
-pub mod terminal_advanced;
 pub mod text_buffer;
 pub mod scene_store;
 pub mod terminal_ansi;
@@ -335,6 +335,12 @@ pub mod modern_ide_integration_modules;
 /// VS Code-inspired file management with tabs, file type recognition,
 /// and automatic mode switching between code editor and visual designer.
 pub mod file_manager;
+
+/// Advanced file watcher integration
+/// 
+/// Efficient file system watching using the notify crate for detecting
+/// external file changes and updating the FileManager accordingly.
+pub mod file_watcher;
 
 /// Real-time synchronization between visual designer and code
 /// 
