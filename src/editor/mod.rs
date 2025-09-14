@@ -204,6 +204,25 @@ pub mod buffer_manager;
 /// that preserve user modifications while allowing automated code updates.
 pub mod code_generator;
 
+/// Enhanced code generation markers and rewrite system
+/// 
+/// Advanced marker-based code generation with typed markers, conditional
+/// generation, and intelligent merging capabilities.
+pub mod codegen_markers;
+
+/// Enhanced code generation integration
+/// 
+/// Integrates enhanced markers with the existing code generator to provide
+/// a complete solution for marker-based code generation and rewriting.
+pub mod enhanced_codegen;
+
+#[cfg(test)]
+/// Comprehensive example of enhanced code generation system
+/// 
+/// Demonstrates the complete codegen markers and rewrite prototype with
+/// real-world examples of component generation and user code preservation.
+pub mod codegen_example;
+
 /// Plugin and extension system architecture
 /// 
 /// Flexible plugin framework for extending IDE functionality with
@@ -257,6 +276,12 @@ pub mod smart_ai_assistant;
 /// Generic LSP support for multiple programming languages with
 /// standardized interfaces for code intelligence features.
 pub mod lsp_integration;
+
+/// Unified Language Service Abstraction
+/// 
+/// Provides a consistent interface for language services that abstracts
+/// over different implementations (rust-analyzer, LSP clients, etc.)
+pub mod language_service;
 
 /// Enhanced LSP client with advanced IDE features
 /// 

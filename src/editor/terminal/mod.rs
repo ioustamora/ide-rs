@@ -13,6 +13,7 @@ pub mod core;
 pub mod features;
 pub mod themes;
 pub mod session;
+pub mod pty;
 
 // Re-export core types
 pub use core::{
@@ -28,3 +29,9 @@ pub use features::{
 
 pub use themes::{TerminalTheme, TerminalColorScheme};
 pub use session::{SessionManager, TerminalSession, BookmarkManager};
+
+// Re-export PTY types
+pub use pty::{
+    PtyInterface, PtySession, PtyManager, PtyConfig, PtyError, 
+    PtyCapabilities, ShellInfo, PtyFactory
+};

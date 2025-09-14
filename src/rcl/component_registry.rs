@@ -445,6 +445,20 @@ impl ComponentRegistry {
             self.events.insert(event.name.clone(), event);
         }
     }
+    
+    /// Register a component with direct metadata (used by derive macro)
+    pub fn register_component_metadata(&mut self, metadata: ComponentMetadata) {
+        let component_type = metadata.component_type.clone();
+        let schema = metadata.schema.clone();
+        
+        // Store metadata
+        self.components.insert(component_type.clone(), metadata);
+        self.schemas.insert(component_type.clone(), schema.clone());
+        
+        // Generate inspector
+        let inspector = self.generate_inspector(&schema);
+        self.inspectors.insert(component_type, Box::new(move |_| inspector.clone()));
+    }
 
     /// Get component metadata by type
     pub fn get_metadata(&self, component_type: &str) -> Option<&ComponentMetadata> {
@@ -880,6 +894,28 @@ macro_rules! impl_component_meta {
             }
         }
     };
+}
+
+// Default implementations for derive macro support
+
+impl Default for PropertyUIHints {
+    fn default() -> Self {
+        Self {
+            control_type: ControlType::TextInput,
+            placeholder: None,
+            help_text: None,
+            unit: None,
+            step: None,
+            options: None,
+            custom_renderer: None,
+        }
+    }
+}
+
+impl Default for ComponentCategory {
+    fn default() -> Self {
+        ComponentCategory::Custom("Default".to_string())
+    }
 }
 
 #[cfg(test)]

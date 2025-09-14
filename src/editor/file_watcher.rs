@@ -433,7 +433,7 @@ impl AdvancedFileWatcher {
         }
 
         // Send IDE event
-        global_event_bus().emit(IdeEvent::FileWatchStarted {
+        global_event_bus().publish(IdeEvent::FileWatchStarted {
             path: path.to_path_buf(),
             recursive,
         });
@@ -456,7 +456,7 @@ impl AdvancedFileWatcher {
             }
 
             // Send IDE event
-            global_event_bus().emit(IdeEvent::FileWatchStopped {
+            global_event_bus().publish(IdeEvent::FileWatchStopped {
                 path: path.to_path_buf(),
             });
         }

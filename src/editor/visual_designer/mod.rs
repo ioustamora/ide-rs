@@ -15,6 +15,8 @@ pub mod state;
 pub mod context_menu;
 pub mod component_hierarchy;
 pub mod advanced_layout;
+pub mod command_system;
+pub mod commands;
 
 // Re-export key types for easier access
 pub use layout::{
@@ -47,6 +49,8 @@ pub use accessibility::AccessibilityValidator;
 pub use context_menu::{ContextMenuManager, ContextMenuAction};
 pub use component_hierarchy::ComponentHierarchy;
 pub use advanced_layout::{AdvancedLayoutManager, LayoutType, LayoutConstraints};
+pub use command_system::{Command, CommandHistory, CommandContext, CommandResult, CommandMetadata};
+pub use commands::{MoveComponentCommand, ResizeComponentCommand, AddComponentCommand, DeleteComponentCommand, PropertyChangeCommand};
 
 /// Main Visual Designer struct that orchestrates all subsystems
 #[derive(Default)]
@@ -55,8 +59,10 @@ pub struct VisualDesigner {
     pub layout: LayoutManager,
     /// Component selection system
     pub selection: ComponentSelection,
-    /// Design history for undo/redo
+    /// Design history for undo/redo (legacy)
     pub history: DesignHistory,
+    /// Enhanced command history system
+    pub command_history: CommandHistory,
     /// Performance metrics
     pub performance: PerformanceMetrics,
     /// Grid settings for display
@@ -94,6 +100,7 @@ impl VisualDesigner {
         designer.context_menu = ContextMenuManager::new();
         designer.hierarchy = ComponentHierarchy::new();
         designer.advanced_layout = AdvancedLayoutManager::new();
+        designer.command_history = CommandHistory::new();
         designer.snap_to_grid = true;
         designer.grid_size = 10.0;
         designer.show_alignment_guides = true;
@@ -144,6 +151,86 @@ impl VisualDesigner {
             self.history.redo_count(),
             self.history.next_undo_description(),
             self.history.next_redo_description(),
+        )
+    }
+
+    /// Enhanced undo using command system
+    pub fn undo_enhanced(&mut self, components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) -> bool {
+        let mut context = CommandContext::new(
+            self.layout.clone(),
+            std::mem::take(components),
+            self.selection.selected.clone(),
+            self.selection.primary,
+        );
+        
+        let result = self.command_history.undo(&mut context);
+        
+        // Update state from context
+        self.layout = context.layout;
+        *components = context.components;
+        self.selection.selected = context.selection;
+        self.selection.primary = context.primary_selection;
+        
+        matches!(result, CommandResult::Success)
+    }
+
+    /// Enhanced redo using command system
+    pub fn redo_enhanced(&mut self, components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) -> bool {
+        let mut context = CommandContext::new(
+            self.layout.clone(),
+            std::mem::take(components),
+            self.selection.selected.clone(),
+            self.selection.primary,
+        );
+        
+        let result = self.command_history.redo(&mut context);
+        
+        // Update state from context
+        self.layout = context.layout;
+        *components = context.components;
+        self.selection.selected = context.selection;
+        self.selection.primary = context.primary_selection;
+        
+        matches!(result, CommandResult::Success)
+    }
+
+    /// Execute a command using the enhanced command system
+    pub fn execute_command(&mut self, command: Box<dyn Command>, components: &mut Vec<Box<dyn crate::rcl::ui::component::Component>>) -> CommandResult {
+        let mut context = CommandContext::new(
+            self.layout.clone(),
+            std::mem::take(components),
+            self.selection.selected.clone(),
+            self.selection.primary,
+        );
+        
+        let result = self.command_history.execute_command(command, &mut context);
+        
+        // Update state from context
+        self.layout = context.layout;
+        *components = context.components;
+        self.selection.selected = context.selection;
+        self.selection.primary = context.primary_selection;
+        
+        result
+    }
+
+    /// Start a command batch for grouping operations
+    pub fn begin_command_batch(&mut self, description: String) {
+        self.command_history.begin_batch(description);
+    }
+
+    /// End the current command batch
+    pub fn end_command_batch(&mut self) {
+        self.command_history.end_batch();
+    }
+
+    /// Get enhanced history information
+    pub fn get_enhanced_history_info(&self) -> (usize, usize, Option<String>, Option<String>) {
+        (
+            self.command_history.undo_count(),
+            self.command_history.redo_count(),
+            self.command_history.next_undo_description(),
+            self.command_history.next_redo_description(),
         )
     }
 

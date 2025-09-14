@@ -77,6 +77,14 @@ pub enum IdeEvent {
     ThemeChanged { theme_name: String },
     SettingsChanged { category: String, key: String },
     
+    /// Command system events
+    CommandExecuted { command_id: Uuid, description: String },
+    CommandUndone { command_id: Uuid, description: String },
+    CommandRedone { command_id: Uuid, description: String },
+    CommandMerged { description: String },
+    CommandBatchStarted { batch_id: Uuid, description: String },
+    CommandBatchEnded { batch_id: Uuid, description: String },
+    
     /// General application events
     ApplicationStarted,
     ApplicationShutdown,

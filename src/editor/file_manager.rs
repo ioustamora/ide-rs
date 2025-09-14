@@ -227,22 +227,22 @@ impl FileManager {
         // Send events to the global event bus for other components to handle
         match event {
             FileWatchEvent::Created(path) => {
-                global_event_bus().emit(IdeEvent::FileCreated { path });
+                global_event_bus().publish(IdeEvent::FileCreated { path });
             }
             FileWatchEvent::Modified(path) => {
-                global_event_bus().emit(IdeEvent::FileModified { path, external: true });
+                global_event_bus().publish(IdeEvent::FileModified { path, external: true });
             }
             FileWatchEvent::Deleted(path) => {
-                global_event_bus().emit(IdeEvent::FileDeleted { path });
+                global_event_bus().publish(IdeEvent::FileDeleted { path });
             }
             FileWatchEvent::Renamed(old_path, new_path) => {
-                global_event_bus().emit(IdeEvent::FileRenamed { old_path, new_path });
+                global_event_bus().publish(IdeEvent::FileRenamed { old_path, new_path });
             }
             FileWatchEvent::DirectoryCreated(path) => {
-                global_event_bus().emit(IdeEvent::DirectoryCreated { path });
+                global_event_bus().publish(IdeEvent::DirectoryCreated { path });
             }
             FileWatchEvent::DirectoryDeleted(path) => {
-                global_event_bus().emit(IdeEvent::DirectoryDeleted { path });
+                global_event_bus().publish(IdeEvent::DirectoryDeleted { path });
             }
             FileWatchEvent::Batch(events) => {
                 // Process each event in the batch

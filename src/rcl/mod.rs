@@ -47,5 +47,20 @@ pub mod network;
 /// auto-generated property inspector functionality.
 pub mod component_registry;
 
+/// Derive macros for component metadata generation
+/// 
+/// Provides procedural macros for automatically generating ComponentMetadata
+/// and PropertySchema from struct definitions with attribute annotations.
+pub mod derive_macros;
+
+/// Examples of component metadata derive macro usage
+/// 
+/// Contains example components that demonstrate how to use the derive macros
+/// for automatic metadata generation.
+pub mod examples;
+
+#[cfg(test)]
+mod derive_macros_test;
+
 // Re-export UI components from correct paths
 // Components are re-exported at the crate level for convenient access

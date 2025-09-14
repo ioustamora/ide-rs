@@ -41,6 +41,17 @@ pub struct Cursor {
     pub affinity: CursorAffinity,
 }
 
+impl Cursor {
+    /// Create new cursor at position
+    pub fn new(position: TextPosition) -> Self {
+        Self {
+            position,
+            anchor: None,
+            affinity: CursorAffinity::Downstream,
+        }
+    }
+}
+
 /// Text position with line and column
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct TextPosition {
@@ -186,6 +197,8 @@ pub struct BufferMetadata {
     pub created_at: std::time::Instant,
     /// Last modified timestamp
     pub modified_at: std::time::Instant,
+    /// Last modified timestamp (for compatibility)
+    pub last_modified: Option<std::time::Instant>,
     /// File permissions (if applicable)
     pub readonly: bool,
 }
@@ -194,12 +207,14 @@ impl TextBuffer {
     /// Create new empty text buffer
     pub fn new() -> Self {
         let rope = Rope::new();
+        let now = std::time::Instant::now();
         let metadata = BufferMetadata {
             file_size: 0,
             line_count: 1,
             char_count: 0,
-            created_at: std::time::Instant::now(),
-            modified_at: std::time::Instant::now(),
+            created_at: now,
+            modified_at: now,
+            last_modified: Some(now),
             readonly: false,
         };
 
@@ -219,12 +234,14 @@ impl TextBuffer {
     /// Create text buffer from string content
     pub fn from_string(content: String) -> Self {
         let rope = Rope::from_str(&content);
+        let now = std::time::Instant::now();
         let metadata = BufferMetadata {
             file_size: content.len(),
             line_count: rope.len_lines(),
             char_count: rope.len_chars(),
-            created_at: std::time::Instant::now(),
-            modified_at: std::time::Instant::now(),
+            created_at: now,
+            modified_at: now,
+            last_modified: Some(now),
             readonly: false,
         };
 
@@ -554,6 +571,66 @@ impl TextBuffer {
         self.change_tracker.last_synced_version = self.version;
     }
 
+    /// Get lines in range (inclusive start, exclusive end)
+    pub fn lines_in_range(&self, start_line: usize, end_line: usize) -> Result<Vec<String>, TextBufferError> {
+        if start_line >= self.metadata.line_count || end_line > self.metadata.line_count {
+            return Err(TextBufferError::LineOutOfBounds(
+                if start_line >= self.metadata.line_count { start_line } else { end_line }
+            ));
+        }
+
+        let mut lines = Vec::new();
+        for line_idx in start_line..end_line {
+            lines.push(self.rope.line(line_idx).to_string());
+        }
+        Ok(lines)
+    }
+
+    /// Find all occurrences of a pattern
+    pub fn find_all(&self, pattern: &str) -> Vec<TextRange> {
+        let text = self.to_string();
+        let mut matches = Vec::new();
+        let mut start = 0;
+
+        while let Some(pos) = text[start..].find(pattern) {
+            let absolute_pos = start + pos;
+            let start_pos = self.offset_to_position(absolute_pos).unwrap();
+            let end_pos = self.offset_to_position(absolute_pos + pattern.len()).unwrap();
+            
+            matches.push(TextRange {
+                start: start_pos,
+                end: end_pos,
+            });
+            
+            start = absolute_pos + pattern.len();
+        }
+
+        matches
+    }
+
+    /// Replace all occurrences of a pattern
+    pub fn replace_all(&mut self, pattern: &str, replacement: &str, selection: SelectionSet) -> Result<usize, TextBufferError> {
+        let matches = self.find_all(pattern);
+        let count = matches.len();
+
+        // Process matches in reverse order to maintain position validity
+        for range in matches.into_iter().rev() {
+            self.replace(range, replacement, selection.clone())?;
+        }
+
+        Ok(count)
+    }
+
+    /// Get text in a specific range
+    pub fn text_in_range(&self, range: &TextRange) -> Result<String, TextBufferError> {
+        self.slice(range.clone())
+    }
+
+    /// Get all changes for LSP synchronization
+    pub fn get_lsp_changes(&self) -> Vec<TextChange> {
+        self.change_tracker.changes.iter().cloned().collect()
+    }
+
     /// Validate position is within buffer bounds
     fn is_valid_position(&self, position: &TextPosition) -> bool {
         if position.line >= self.metadata.line_count {
@@ -573,10 +650,12 @@ impl TextBuffer {
 
     /// Update buffer metadata after changes
     fn update_metadata(&mut self) {
+        let now = std::time::Instant::now();
         self.metadata.file_size = self.rope.len_bytes();
         self.metadata.line_count = self.rope.len_lines();
         self.metadata.char_count = self.rope.len_chars();
-        self.metadata.modified_at = std::time::Instant::now();
+        self.metadata.modified_at = now;
+        self.metadata.last_modified = Some(now);
     }
 
     /// Detect line ending style from content
@@ -778,6 +857,14 @@ impl ChangeTracker {
 }
 
 impl SelectionSet {
+    /// Create new empty selection set
+    pub fn new() -> Self {
+        Self {
+            cursors: Vec::new(),
+            primary: 0,
+        }
+    }
+
     /// Create new selection set with single cursor
     pub fn single(position: TextPosition) -> Self {
         Self {
@@ -800,6 +887,11 @@ impl SelectionSet {
             }],
             primary: 0,
         }
+    }
+
+    /// Add a cursor to the selection set
+    pub fn add_cursor(&mut self, cursor: Cursor) {
+        self.cursors.push(cursor);
     }
 
     /// Get primary cursor
