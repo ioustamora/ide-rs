@@ -7,10 +7,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod rcl;      // Rust Component Library - UI, system, and network components
-mod ai_agent; // AI integration for code assistance and automation  
+mod ai_agent; // AI integration for code assistance and automation
+mod ai_development_assistant; // AI development assistance features
 mod ide_app;  // Main IDE application logic and UI
 mod editor;   // IDE editor features: panels, actions, project management
 mod core;     // Core infrastructure: logging, events, services
+mod shared;   // Shared utilities and serialization helpers
 
 /// Main entry point for the Rust RAD IDE application
 /// 
