@@ -39,6 +39,7 @@ syn = { version = "2.0", features = ["full"] }
 proc-macro2 = "1.0"
 which = "6.0"
 async-trait = "0.1"
+lru = "0.12"
 
 [features]
 default = []

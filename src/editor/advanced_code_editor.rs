@@ -18,15 +18,20 @@ use syntect::easy::HighlightLines;
 
 use crate::editor::lsp_integration::{LspClient, Diagnostic, DiagnosticSeverity, CompletionItem, Position};
 use crate::editor::enhanced_lsp_client::{
-    EnhancedLspClient, 
+    EnhancedLspClient,
     Range as LspRange,
     SignatureHelp,
     DocumentSymbol,
     WorkspaceSymbol,
     CodeAction
 };
+use crate::editor::performance::{
+    VirtualCodeEditor,
+    PerformanceMetrics,
+    MemoryOptimizer,
+};
 
-/// Advanced code editor with professional IDE features
+/// Advanced code editor with professional IDE features and performance optimization
 pub struct AdvancedCodeEditor {
     /// Editor content
     pub content: String,
@@ -66,6 +71,14 @@ pub struct AdvancedCodeEditor {
     pub enhanced_lsp: EnhancedLspClient,
     /// Document version for LSP synchronization
     pub document_version: u64,
+    /// Virtual editor for performance optimization
+    pub virtual_editor: VirtualCodeEditor,
+    /// Performance metrics
+    pub performance_metrics: PerformanceMetrics,
+    /// Memory optimizer
+    pub memory_optimizer: MemoryOptimizer,
+    /// Enable performance mode for large files
+    pub use_virtual_rendering: bool,
 }
 
 /// Editor settings and preferences
@@ -91,6 +104,12 @@ pub struct EditorSettings {
     pub enable_signature_help: bool,
     /// Enable hover tooltips
     pub enable_hover: bool,
+    /// Show performance information overlay
+    pub show_performance_info: bool,
+    /// Enable virtual rendering for large files
+    pub enable_virtual_rendering: bool,
+    /// Enable background syntax highlighting
+    pub enable_background_highlighting: bool,
 }
 
 /// Editor themes
@@ -196,6 +215,9 @@ impl Default for EditorSettings {
             enable_autocomplete: true,
             enable_signature_help: true,
             enable_hover: true,
+            show_performance_info: false, // Disabled by default
+            enable_virtual_rendering: true, // Enabled by default
+            enable_background_highlighting: true, // Enabled by default
         }
     }
 }
@@ -339,6 +361,10 @@ impl Default for MultiCursorState {
 impl AdvancedCodeEditor {
     /// Create a new advanced code editor
     pub fn new(file_uri: String, language: String, content: String) -> Self {
+        // Determine if we should use virtual rendering for large files
+        let line_count = content.lines().count();
+        let use_virtual_rendering = line_count > 1000; // Enable for files > 1000 lines
+
         let mut editor = Self {
             content,
             language: language.clone(),
@@ -359,11 +385,15 @@ impl AdvancedCodeEditor {
             multi_cursor: MultiCursorState::default(),
             enhanced_lsp: EnhancedLspClient::new(),
             document_version: 0,
+            virtual_editor: VirtualCodeEditor::new(),
+            performance_metrics: PerformanceMetrics::new(),
+            memory_optimizer: MemoryOptimizer::new(),
+            use_virtual_rendering,
         };
 
         // Initialize syntax highlighter for the language
         editor.setup_syntax_highlighting();
-        
+
         editor
     }
 
@@ -428,24 +458,143 @@ impl AdvancedCodeEditor {
         }
     }
 
-    /// Render the advanced code editor
+    /// Render the advanced code editor with performance optimization
     pub fn render(&mut self, ui: &mut Ui, lsp_client: &mut LspClient) {
+        // Start performance monitoring
+        self.performance_metrics.frame_start();
+
         let available_rect = ui.available_rect_before_wrap();
-        
+
         // Process LSP messages
         self.enhanced_lsp.process_responses();
-        
-        // Main editor area
-        ui.allocate_ui(available_rect.size(), |ui| {
-            self.render_editor_content(ui, lsp_client);
-        });
-        
+
+        // Update memory tracking
+        let estimated_memory = self.estimate_memory_usage();
+        self.performance_metrics.update_memory_usage(estimated_memory);
+
+        // Choose rendering method based on file size and settings
+        if self.use_virtual_rendering {
+            // Use virtual rendering for large files
+            ui.allocate_ui(available_rect.size(), |ui| {
+                self.render_virtual_editor_content(ui, lsp_client);
+            });
+        } else {
+            // Use traditional rendering for smaller files
+            ui.allocate_ui(available_rect.size(), |ui| {
+                self.render_editor_content(ui, lsp_client);
+            });
+        }
+
+        // Process background highlighting results
+        self.virtual_editor.highlight_cache.process_background_results();
+
         // Render overlays
         self.render_autocomplete_popup(ui);
         self.render_hover_tooltip(ui);
         self.render_signature_help(ui);
         self.render_code_actions_menu(ui);
         self.render_find_references_panel(ui);
+
+        // Render performance info if enabled
+        if self.settings.show_performance_info {
+            self.render_performance_overlay(ui);
+        }
+
+        // End performance monitoring
+        self.performance_metrics.frame_end();
+    }
+
+    /// Render editor content using virtual scrolling for performance
+    fn render_virtual_editor_content(&mut self, ui: &mut Ui, _lsp_client: &mut LspClient) {
+        // Use the virtual editor for optimized rendering
+        let _response = self.virtual_editor.render_virtual(
+            ui,
+            &self.content,
+            &self.language,
+            self.cursor_pos,
+        );
+
+        // Handle virtual editor responses and update cursor position
+        // TODO: Handle virtual editor interactions
+    }
+
+    /// Estimate current memory usage
+    fn estimate_memory_usage(&self) -> usize {
+        let mut total = 0;
+
+        // Content memory
+        total += self.content.capacity();
+
+        // Cache memory estimates
+        total += self.virtual_editor.highlight_cache.get_stats().cache_size * 100; // Rough estimate
+
+        // Other state memory
+        total += std::mem::size_of::<Self>();
+
+        total
+    }
+
+    /// Render performance overlay
+    fn render_performance_overlay(&self, ui: &mut Ui) {
+        let summary = self.performance_metrics.get_summary();
+
+        // Position in top-right corner
+        let available_rect = ui.available_rect_before_wrap();
+        let overlay_size = Vec2::new(200.0, 100.0);
+        let overlay_pos = Pos2::new(
+            available_rect.max.x - overlay_size.x - 10.0,
+            available_rect.min.y + 10.0,
+        );
+
+        Area::new("performance_overlay".into())
+            .fixed_pos(overlay_pos)
+            .order(Order::Foreground)
+            .show(ui.ctx(), |ui| {
+                Frame::popup(ui.style())
+                    .fill(Color32::from_rgba_unmultiplied(0, 0, 0, 200))
+                    .show(ui, |ui| {
+                        ui.set_max_width(overlay_size.x);
+
+                        ui.colored_label(Color32::WHITE, "Performance");
+                        ui.separator();
+
+                        ui.horizontal(|ui| {
+                            ui.colored_label(Color32::LIGHT_GRAY, "FPS:");
+                            ui.colored_label(
+                                if summary.average_fps > 45.0 { Color32::GREEN } else { Color32::YELLOW },
+                                format!("{:.1}", summary.average_fps)
+                            );
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.colored_label(Color32::LIGHT_GRAY, "Frame:");
+                            ui.colored_label(
+                                Color32::LIGHT_BLUE,
+                                format!("{:.1}ms", summary.average_frame_time_ms)
+                            );
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.colored_label(Color32::LIGHT_GRAY, "Memory:");
+                            ui.colored_label(
+                                if summary.memory_usage_mb < 500 { Color32::GREEN } else { Color32::YELLOW },
+                                format!("{}MB", summary.memory_usage_mb)
+                            );
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.colored_label(Color32::LIGHT_GRAY, "Cache:");
+                            ui.colored_label(
+                                if summary.cache_hit_rate > 0.8 { Color32::GREEN } else { Color32::YELLOW },
+                                format!("{:.1}%", summary.cache_hit_rate * 100.0)
+                            );
+                        });
+
+                        if self.use_virtual_rendering {
+                            ui.colored_label(Color32::LIGHT_GREEN, "Virtual Mode");
+                        }
+                    });
+            });
     }
 
     /// Render the main editor content

@@ -335,7 +335,7 @@ impl VirtualCodeEditor {
                 });
 
                 // Render text
-                ui.painter().galley(text_pos, galley.clone());
+                ui.painter().galley(text_pos, galley.clone(), *color);
 
                 x_offset += galley.size().x;
             }

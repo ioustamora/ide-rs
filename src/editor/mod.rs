@@ -428,3 +428,9 @@ pub mod realtime_sync;
 // team communication, and synchronized development workflows.
 // TODO: Fix compilation errors before enabling
 // pub mod collaborative_development;
+
+/// Performance optimization and monitoring system
+///
+/// Advanced performance optimization including virtual scrolling, intelligent caching,
+/// background processing, memory optimization, and real-time performance monitoring.
+pub mod performance;

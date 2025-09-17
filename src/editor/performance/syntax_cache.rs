@@ -241,8 +241,8 @@ impl SyntaxHighlightCache {
 impl BackgroundHighlighter {
     /// Create a new background highlighter
     pub fn new() -> Self {
-        let (request_sender, request_receiver) = channel();
-        let (result_sender, result_receiver) = channel();
+        let (request_sender, request_receiver) = channel::<HighlightRequest>();
+        let (result_sender, result_receiver) = channel::<HighlightResult>();
         let is_running = Arc::new(Mutex::new(true));
         let is_running_clone = is_running.clone();
 
