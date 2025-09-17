@@ -60,6 +60,7 @@ pub enum IdeEvent {
     LanguageServerStarted { language: String, server_id: String },
     LanguageServerStopped { language: String, server_id: String },
     LanguageServerError { language: String, error: String },
+    LanguageServiceRegistered { language: String, service_name: String },
     
     /// Terminal events
     TerminalCreated { terminal_id: Uuid, name: String },
@@ -188,6 +189,7 @@ impl EventType {
             (EventType::LanguageServer, IdeEvent::LanguageServerStarted { .. }) => true,
             (EventType::LanguageServer, IdeEvent::LanguageServerStopped { .. }) => true,
             (EventType::LanguageServer, IdeEvent::LanguageServerError { .. }) => true,
+            (EventType::LanguageServer, IdeEvent::LanguageServiceRegistered { .. }) => true,
             
             (EventType::Terminal, IdeEvent::TerminalCreated { .. }) => true,
             (EventType::Terminal, IdeEvent::TerminalClosed { .. }) => true,

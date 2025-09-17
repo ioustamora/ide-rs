@@ -50,8 +50,10 @@ pub struct SceneComponent {
     /// Component locked state
     pub locked: bool,
     /// Creation timestamp
+    #[serde(with = "crate::shared::serde_instant")]
     pub created_at: Instant,
     /// Last modified timestamp
+    #[serde(with = "crate::shared::serde_instant")]
     pub modified_at: Instant,
 }
 
@@ -259,6 +261,10 @@ pub trait Command: Send + Sync {
     fn can_merge(&self, other: &dyn Command) -> bool;
     /// Merge with another command
     fn merge(&self, other: Box<dyn Command>) -> Box<dyn Command>;
+    /// For downcasting
+    fn as_any(&self) -> &dyn std::any::Any;
+    /// For downcasting owned values
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
 }
 
 /// Command group for atomic operations
@@ -379,6 +385,38 @@ pub struct MoveComponentCommand {
     pub new_parent: Option<ComponentId>,
     pub old_index: usize,
     pub new_index: usize,
+}
+
+impl Command for MoveComponentCommand {
+    fn execute(&self, store: &mut SceneStore) -> Result<(), CommandError> {
+        // Simple implementation - in a real scenario this would do the actual move
+        Ok(())
+    }
+
+    fn undo(&self, store: &mut SceneStore) -> Result<(), CommandError> {
+        // Simple implementation - in a real scenario this would undo the move
+        Ok(())
+    }
+
+    fn description(&self) -> String {
+        format!("Move component {}", self.component_id)
+    }
+
+    fn can_merge(&self, _other: &dyn Command) -> bool {
+        false
+    }
+
+    fn merge(&self, other: Box<dyn Command>) -> Box<dyn Command> {
+        other
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
 }
 
 /// Command errors
@@ -552,6 +590,7 @@ impl SceneStore {
         self.update_selection_bounds();
         
         // Record change
+        let version = self.change_tracker.next_version();
         self.change_tracker.record_change(SceneChange {
             change_type: ChangeType::SelectionChanged,
             component_id: self.selection.primary.unwrap_or_default(),
@@ -559,7 +598,7 @@ impl SceneStore {
             old_value: None,
             new_value: None,
             timestamp: Instant::now(),
-            version: self.change_tracker.next_version(),
+            version,
         });
     }
 
@@ -896,13 +935,21 @@ impl Command for AddComponentCommand {
     fn description(&self) -> String {
         format!("Add {}", self.component.component_type)
     }
-    
+
     fn can_merge(&self, _other: &dyn Command) -> bool {
         false
     }
-    
+
     fn merge(&self, _other: Box<dyn Command>) -> Box<dyn Command> {
         unimplemented!()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
     }
 }
 
@@ -948,13 +995,21 @@ impl Command for RemoveComponentCommand {
     fn description(&self) -> String {
         "Remove component".to_string()
     }
-    
+
     fn can_merge(&self, _other: &dyn Command) -> bool {
         false
     }
-    
+
     fn merge(&self, _other: Box<dyn Command>) -> Box<dyn Command> {
         unimplemented!()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
     }
 }
 
@@ -1017,6 +1072,14 @@ impl Command for UpdatePropertyCommand {
             panic!("Cannot merge incompatible commands");
         }
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
 }
 
 impl Command for GroupCommand {
@@ -1045,6 +1108,14 @@ impl Command for GroupCommand {
     
     fn merge(&self, _other: Box<dyn Command>) -> Box<dyn Command> {
         unimplemented!()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
     }
 }
 

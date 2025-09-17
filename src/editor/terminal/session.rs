@@ -345,8 +345,9 @@ impl SessionManager {
     /// Create session from template
     pub fn create_session_from_template(&mut self, template_name: &str, terminal_id: TerminalId) -> Result<SessionId, String> {
         let template = self.templates.get(template_name)
-            .ok_or_else(|| format!("Template '{}' not found", template_name))?;
-        
+            .ok_or_else(|| format!("Template '{}' not found", template_name))?
+            .clone();
+
         let session_id = self.create_session(template.name.clone(), terminal_id);
         
         if let Some(session) = self.sessions.get_mut(&session_id) {

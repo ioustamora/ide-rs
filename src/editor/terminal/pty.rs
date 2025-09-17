@@ -452,7 +452,9 @@ mod windows_pty {
         
         fn is_alive(&self) -> bool {
             if let Some(ref process) = self.process {
-                matches!(process.try_wait(), Ok(None))
+                // Since we can't call try_wait() in an immutable context,
+                // we check if we still have a process reference and no exit status
+                self.exit_status.is_none()
             } else {
                 false
             }
@@ -725,7 +727,9 @@ mod unix_pty {
         
         fn is_alive(&self) -> bool {
             if let Some(ref process) = self.process {
-                matches!(process.try_wait(), Ok(None))
+                // Since we can't call try_wait() in an immutable context,
+                // we check if we still have a process reference and no exit status
+                self.exit_status.is_none()
             } else {
                 false
             }

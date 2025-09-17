@@ -248,7 +248,6 @@ impl CodeSnapshot {
 }
 
 /// Live preview panel for real-time code generation
-#[derive(Debug)]
 pub struct LivePreviewPanel {
     /// Currently displayed code
     pub current_code: String,
@@ -260,6 +259,18 @@ pub struct LivePreviewPanel {
     pub is_enabled: bool,
     /// Preview update callback
     pub update_callback: Option<Box<dyn Fn(&str) + Send + Sync>>,
+}
+
+impl std::fmt::Debug for LivePreviewPanel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LivePreviewPanel")
+            .field("current_code", &format!("[{} chars]", self.current_code.len()))
+            .field("template_id", &self.template_id)
+            .field("template_variables", &self.template_variables)
+            .field("is_enabled", &self.is_enabled)
+            .field("update_callback", &if self.update_callback.is_some() { "Some(callback)" } else { "None" })
+            .finish()
+    }
 }
 
 impl LivePreviewPanel {

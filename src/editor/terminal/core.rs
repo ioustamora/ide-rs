@@ -13,6 +13,32 @@ use std::time::{Duration, Instant};
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 
+// Serializable color wrapper
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializableColor {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+impl From<Color32> for SerializableColor {
+    fn from(color: Color32) -> Self {
+        Self {
+            r: color.r(),
+            g: color.g(),
+            b: color.b(),
+            a: color.a(),
+        }
+    }
+}
+
+impl From<SerializableColor> for Color32 {
+    fn from(color: SerializableColor) -> Self {
+        Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a)
+    }
+}
+
 /// Unique identifier for terminal instances
 pub type TerminalId = Uuid;
 
@@ -86,6 +112,8 @@ pub struct TerminalBuffer {
     pub total_lines_added: u64,
     /// Buffer memory usage estimate
     pub estimated_memory_bytes: usize,
+    /// Maximum memory bytes to keep
+    pub max_memory_bytes: usize,
 }
 
 /// Input history management
@@ -108,6 +136,7 @@ pub struct TerminalLine {
     /// Line type (normal, error, etc.)
     pub line_type: LineType,
     /// Timestamp when line was added
+    #[serde(with = "crate::shared::serde_instant")]
     pub timestamp: Instant,
     /// Whether line ends with newline
     pub ends_with_newline: bool,
@@ -119,9 +148,9 @@ pub struct TerminalLine {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnsiMetadata {
     /// Foreground color
-    pub fg_color: Option<Color32>,
-    /// Background color  
-    pub bg_color: Option<Color32>,
+    pub fg_color: Option<SerializableColor>,
+    /// Background color
+    pub bg_color: Option<SerializableColor>,
     /// Text styling flags
     pub bold: bool,
     pub italic: bool,
@@ -567,86 +596,106 @@ impl Terminal {
     
     /// Update terminal (read output, check process status)
     pub fn update(&mut self, event_sender: &Option<Sender<TerminalEvent>>) {
+        // Collect outputs first to avoid borrowing conflicts
+        let mut outputs = Vec::new();
+        let mut errors = Vec::new();
+        let mut process_exit_status = None;
+
         if let Some(process) = &mut self.process {
             // Read stdout
             while let Ok(output) = process.output_receiver.try_recv() {
-                self.add_output_line(output, LineType::Normal);
-                self.last_activity = Instant::now();
-                
-                if let Some(sender) = event_sender {
-                    let _ = sender.send(TerminalEvent::OutputReceived {
-                        terminal_id: self.id,
-                        content: output,
-                        line_type: LineType::Normal,
-                    });
-                }
+                outputs.push(output);
             }
-            
+
             // Read stderr
             while let Ok(error) = process.error_receiver.try_recv() {
-                self.add_output_line(error, LineType::Error);
-                self.last_activity = Instant::now();
-                
-                if let Some(sender) = event_sender {
-                    let _ = sender.send(TerminalEvent::OutputReceived {
-                        terminal_id: self.id,
-                        content: error,
-                        line_type: LineType::Error,
-                    });
-                }
+                errors.push(error);
             }
-            
+
             // Check process status
             match process.child.try_wait() {
                 Ok(Some(exit_status)) => {
-                    let exit_code = exit_status.code().unwrap_or(-1);
-                    let old_state = self.state;
-                    self.state = TerminalState::Exited(exit_code);
-                    
-                    self.add_system_message(&format!("Process exited with code: {}", exit_code));
-                    
-                    if let Some(sender) = event_sender {
-                        let _ = sender.send(TerminalEvent::StateChanged {
-                            terminal_id: self.id,
-                            old_state,
-                            new_state: self.state,
-                        });
-                        let _ = sender.send(TerminalEvent::ProcessExited {
-                            terminal_id: self.id,
-                            exit_code,
-                        });
-                    }
+                    process_exit_status = Some(exit_status.code().unwrap_or(-1));
                 }
                 Ok(None) => {
-                    // Process still running
-                    if self.state == TerminalState::Initializing {
-                        self.state = TerminalState::Ready;
-                    }
+                    // Process is still running
                 }
-                Err(e) => {
-                    crate::log_error!("Error checking process status: {}", e);
-                    self.state = TerminalState::Error;
+                Err(_) => {
+                    // Error checking process status
                 }
             }
+        }
+
+        // Process outputs
+        for output in outputs {
+            self.add_output_line(output.clone(), LineType::Normal);
+            self.last_activity = Instant::now();
+
+            if let Some(sender) = event_sender {
+                let _ = sender.send(TerminalEvent::OutputReceived {
+                    terminal_id: self.id,
+                    content: output,
+                    line_type: LineType::Normal,
+                });
+            }
+        }
+
+        // Process errors
+        for error in errors {
+            self.add_output_line(error.clone(), LineType::Error);
+            self.last_activity = Instant::now();
+
+            if let Some(sender) = event_sender {
+                let _ = sender.send(TerminalEvent::OutputReceived {
+                    terminal_id: self.id,
+                    content: error,
+                    line_type: LineType::Error,
+                });
+            }
+        }
+
+        // Handle process exit status
+        if let Some(exit_code) = process_exit_status {
+            let old_state = self.state;
+            self.state = TerminalState::Exited(exit_code);
+
+            self.add_system_message(&format!("Process exited with code: {}", exit_code));
+
+            if let Some(sender) = event_sender {
+                let _ = sender.send(TerminalEvent::StateChanged {
+                    terminal_id: self.id,
+                    old_state,
+                    new_state: self.state,
+                });
+                let _ = sender.send(TerminalEvent::ProcessExited {
+                    terminal_id: self.id,
+                    exit_code,
+                });
+            }
+
+            // Mark process as finished
+            self.process = None;
+        } else if self.process.is_some() && self.state == TerminalState::Initializing {
+            self.state = TerminalState::Ready;
         }
     }
     
     /// Send input to terminal
     pub fn send_input(&mut self, input: &str) -> Result<(), String> {
-        if let Some(process) = &self.process {
-            // Add to history if it's a complete command (ends with newline)
-            if input.ends_with('\n') {
-                let command = input.trim_end().to_string();
-                if !command.is_empty() {
-                    self.input_history.add_command(command.clone());
-                    self.add_input_line(command);
-                }
+        // Handle command history and display first
+        if input.ends_with('\n') {
+            let command = input.trim_end().to_string();
+            if !command.is_empty() {
+                self.input_history.add_command(command.clone());
+                self.add_input_line(command);
             }
-            
-            // Send to process
+        }
+
+        // Then send to process
+        if let Some(process) = &mut self.process {
             process.input_sender.send(input.to_string())
                 .map_err(|e| format!("Failed to send input: {}", e))?;
-            
+
             self.last_activity = Instant::now();
             Ok(())
         } else {
@@ -700,6 +749,7 @@ impl TerminalBuffer {
             scroll_offset: 0,
             total_lines_added: 0,
             estimated_memory_bytes: 0,
+            max_memory_bytes,
         }
     }
     

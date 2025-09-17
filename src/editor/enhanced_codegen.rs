@@ -220,15 +220,16 @@ impl EnhancedCodeGenerator {
         }
         
         // Generate final code with markers
-        let mut new_rewriter = CodeRewriter::new(rewriter.language.clone(), String::new());
+        let rewriter_language = rewriter.language.clone();
+        let mut new_rewriter = CodeRewriter::new(rewriter_language.clone(), String::new());
         let final_code = new_rewriter.rewrite_with_markers(updated_markers)
             .map_err(|e| CodeGenError::TemplateError(e))?;
-        
+
         // Store rewriter for future use
         self.rewriters.insert(output_file.clone(), new_rewriter);
-        
+
         // Apply post-processing
-        let processed_code = self.post_process_code(&final_code, &language)?;
+        let processed_code = self.post_process_code(&final_code, &rewriter_language)?;
         
         Ok(processed_code)
     }
@@ -334,7 +335,7 @@ impl EnhancedCodeGenerator {
         // This is a simplified formatter - real implementation would use language-specific formatters
         let lines: Vec<&str> = code.lines().collect();
         let mut formatted_lines = Vec::new();
-        let mut indent_level = 0;
+        let mut indent_level: usize = 0;
         
         for line in lines {
             let trimmed = line.trim();
@@ -452,7 +453,7 @@ impl EnhancedTemplateBuilder {
             marker_type: MarkerType::Guard {
                 id,
                 preserve_indent: true,
-                default_content,
+                default_content: default_content.clone(),
             },
             template_line,
             content_rules: ContentRules {

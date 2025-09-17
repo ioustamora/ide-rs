@@ -496,7 +496,6 @@ pub struct DeleteComponentCommand {
     metadata: CommandMetadata,
 }
 
-#[derive(Debug)]
 struct DeletedComponentData {
     index: usize,
     position: egui::Pos2,
@@ -504,6 +503,18 @@ struct DeletedComponentData {
     component_data: ComponentData,
     // Store the actual component for restoration
     component: Option<Box<dyn Component>>,
+}
+
+impl std::fmt::Debug for DeletedComponentData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DeletedComponentData")
+            .field("index", &self.index)
+            .field("position", &self.position)
+            .field("size", &self.size)
+            .field("component_data", &self.component_data)
+            .field("component", &if self.component.is_some() { "Some(component)" } else { "None" })
+            .finish()
+    }
 }
 
 impl DeleteComponentCommand {

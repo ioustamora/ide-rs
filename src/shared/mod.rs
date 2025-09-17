@@ -8,6 +8,8 @@ pub mod color_utils;
 pub mod validation;
 pub mod serialization;
 pub mod performance;
+pub mod serde_system_time;
+pub mod serde_instant;
 
 // Re-export commonly used types
 pub use geometry::{Bounds, Transform2D, SpatialIndex};

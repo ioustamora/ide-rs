@@ -2,7 +2,7 @@ use egui;
 use std::collections::HashMap;
 
 /// Layout management for components
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct LayoutManager {
     /// Component positions
     pub positions: HashMap<usize, egui::Pos2>,
@@ -203,7 +203,7 @@ impl LayoutManager {
 }
 
 /// Alignment and distribution tools
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct AlignmentTools {
     /// Last alignment operation
     pub last_operation: Option<AlignmentOperation>,

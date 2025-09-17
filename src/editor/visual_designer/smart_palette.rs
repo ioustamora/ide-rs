@@ -177,7 +177,7 @@ pub struct CollaborativePalette {
 }
 
 // Enums for various systems
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PreviewMode {
     Thumbnail,
     Detailed,
@@ -209,7 +209,7 @@ pub enum ComponentIcon {
     Generated(IconGenerator),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum FilterType {
     Category,
     Tag,
@@ -543,18 +543,24 @@ impl SmartPalette {
     fn render_smart_suggestions(&mut self, ui: &mut Ui) {
         ui.collapsing("💡 Smart Suggestions", |ui| {
             ui.horizontal_wrapped(|ui| {
+                let mut selected_component_id = None;
+
                 for suggestion in &self.smart_suggestions {
                     if let Some(component) = self.components.get(&suggestion.component_id) {
-                        if ui.small_button(&component.name).clicked() {
-                            self.select_component(&suggestion.component_id);
+                        let button_response = ui.small_button(&component.name);
+                        if button_response.clicked() {
+                            selected_component_id = Some(suggestion.component_id.clone());
                         }
-                        
-                        if ui.response().hovered() {
-                            ui.ctx().show_tooltip_text(
-                                &format!("{}\nConfidence: {:.1}%", suggestion.reason, suggestion.confidence * 100.0)
-                            );
-                        }
+
+                        button_response.on_hover_text(
+                            format!("{}\nConfidence: {:.1}%", suggestion.reason, suggestion.confidence * 100.0)
+                        );
                     }
+                }
+
+                // Handle selection after the loop to avoid borrow conflict
+                if let Some(component_id) = selected_component_id {
+                    self.select_component(&component_id);
                 }
             });
         });
@@ -596,68 +602,79 @@ impl SmartPalette {
     
     fn render_list_view(&mut self, ui: &mut Ui) {
         let components_to_show = self.get_filtered_components();
-        
-        for component_id in components_to_show {
-            if let Some(component) = self.components.get(&component_id) {
-                ui.horizontal(|ui| {
-                    // Component icon
-                    self.render_component_icon(ui, &component.icon, Vec2::new(32.0, 32.0));
-                    
-                    ui.vertical(|ui| {
-                        // Component name
-                        ui.heading(&component.name);
-                        
-                        // Component description
-                        ui.label(&component.description);
-                        
-                        // Tags
-                        ui.horizontal_wrapped(|ui| {
-                            for tag in &component.tags {
-                                ui.small_button(tag);
-                            }
-                        });
-                        
-                        // Usage info
-                        if component.usage_count > 0 {
-                            ui.label(format!("Used {} times", component.usage_count));
+
+        // Collect component data first to avoid borrowing issues
+        let component_data: Vec<_> = components_to_show.iter()
+            .filter_map(|component_id| {
+                self.components.get(component_id).map(|component| {
+                    (component_id.clone(), component.clone())
+                })
+            })
+            .collect();
+
+        for (component_id, component) in component_data {
+            ui.horizontal(|ui| {
+                // Component icon
+                self.render_component_icon(ui, &component.icon, Vec2::new(32.0, 32.0));
+
+                ui.vertical(|ui| {
+                    // Component name
+                    ui.heading(&component.name);
+
+                    // Component description
+                    ui.label(&component.description);
+
+                    // Tags
+                    ui.horizontal_wrapped(|ui| {
+                        for tag in &component.tags {
+                            ui.small_button(tag);
                         }
                     });
-                    
-                    // Actions
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.button("Add").clicked() {
-                            self.add_component_to_canvas(component_id);
-                        }
-                        
-                        if ui.small_button("⭐").clicked() {
-                            self.toggle_favorite(component_id);
-                        }
-                        
-                        if ui.small_button("ℹ").clicked() {
-                            self.show_component_details(component_id);
-                        }
-                    });
+
+                    // Usage info
+                    if component.usage_count > 0 {
+                        ui.label(format!("Used {} times", component.usage_count));
+                    }
                 });
-                
-                ui.separator();
-            }
+
+                // Actions
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.button("Add").clicked() {
+                        self.add_component_to_canvas(&component_id);
+                    }
+
+                    if ui.small_button("⭐").clicked() {
+                        self.toggle_favorite(&component_id);
+                    }
+
+                    if ui.small_button("ℹ").clicked() {
+                        self.show_component_details(&component_id);
+                    }
+                });
+            });
         }
     }
     
     fn render_compact_view(&mut self, ui: &mut Ui) {
         let components_to_show = self.get_filtered_components();
-        
+
+        // Collect component data first to avoid borrowing issues
+        let component_data: Vec<_> = components_to_show.iter()
+            .filter_map(|component_id| {
+                self.components.get(component_id).map(|component| {
+                    (component_id.clone(), component.name.clone(), component.description.clone())
+                })
+            })
+            .collect();
+
         ui.horizontal_wrapped(|ui| {
-            for component_id in components_to_show {
-                if let Some(component) = self.components.get(&component_id) {
-                    if ui.small_button(&component.name).clicked() {
-                        self.add_component_to_canvas(component_id);
-                    }
-                    
-                    if ui.response().hovered() {
-                        ui.ctx().show_tooltip_text(&component.description);
-                    }
+            for (component_id, name, description) in component_data {
+                let button_response = ui.small_button(&name);
+                if button_response.clicked() {
+                    self.add_component_to_canvas(&component_id);
                 }
+
+                button_response.on_hover_text(&description);
             }
         });
     }
@@ -668,7 +685,6 @@ impl SmartPalette {
             
             CollapsingHeader::new(&category.name)
                 .default_open(is_expanded)
-                .icon(Self::category_icon)
                 .show(ui, |ui| {
                     self.render_category_components(ui, category);
                 });
@@ -680,7 +696,7 @@ impl SmartPalette {
         let rect = response.rect;
         
         // Draw card background
-        let bg_color = if self.selected_component.as_ref() == Some(component_id) {
+        let bg_color = if self.selected_component.as_deref() == Some(component_id) {
             Color32::from_rgb(70, 130, 200)
         } else if response.hovered() {
             Color32::from_rgb(60, 60, 70)
@@ -702,7 +718,7 @@ impl SmartPalette {
         
         ui.painter().text(
             text_rect.center(),
-            Anchor2::CENTER_CENTER,
+            Align2::CENTER_CENTER,
             &component.name,
             FontId::proportional(10.0),
             Color32::WHITE,
@@ -779,7 +795,7 @@ impl SmartPalette {
         
         ui.painter().text(
             text_rect.center(),
-            Anchor2::CENTER_CENTER,
+            Align2::CENTER_CENTER,
             &component.name,
             FontId::proportional(10.0),
             Color32::WHITE,
@@ -830,8 +846,6 @@ impl SmartPalette {
     }
     
     fn render_component_preview(&self, ui: &mut Ui, component: &PaletteComponent, rect: Rect) {
-        let painter = ui.painter();
-        
         match self.preview_mode {
             PreviewMode::Thumbnail => {
                 // Simple icon/thumbnail
@@ -839,13 +853,13 @@ impl SmartPalette {
             }
             PreviewMode::Detailed => {
                 // Detailed preview with more information
-                painter.rect_filled(rect, 2.0, Color32::from_gray(30));
+                ui.painter().rect_filled(rect, 2.0, Color32::from_gray(30));
                 self.render_component_icon(ui, &component.icon, Vec2::new(32.0, 32.0));
-                
+
                 // Show some properties
-                painter.text(
+                ui.painter().text(
                     rect.center() + Vec2::new(0.0, 20.0),
-                    Anchor2::CENTER_CENTER,
+                    Align2::CENTER_CENTER,
                     &format!("{}x{}", component.default_properties.len(), component.configurable_properties.len()),
                     FontId::proportional(8.0),
                     Color32::LIGHT_GRAY,
@@ -853,13 +867,13 @@ impl SmartPalette {
             }
             PreviewMode::Interactive => {
                 // Interactive preview
-                painter.rect_stroke(rect, 2.0, Stroke::new(1.0, Color32::BLUE));
+                ui.painter().rect_stroke(rect, 2.0, Stroke::new(1.0, Color32::BLUE));
                 self.render_component_icon(ui, &component.icon, rect.size() * 0.7);
-                
+
                 if component.has_interactions {
-                    painter.text(
+                    ui.painter().text(
                         rect.max - Vec2::new(5.0, 5.0),
-                        Anchor2::RIGHT_BOTTOM,
+                        Align2::RIGHT_BOTTOM,
                         "🖱",
                         FontId::proportional(12.0),
                         Color32::YELLOW,
@@ -868,10 +882,10 @@ impl SmartPalette {
             }
             PreviewMode::LivePreview => {
                 // Live preview - would show actual component rendering
-                painter.rect_filled(rect, 2.0, Color32::from_gray(20));
-                painter.text(
+                ui.painter().rect_filled(rect, 2.0, Color32::from_gray(20));
+                ui.painter().text(
                     rect.center(),
-                    Anchor2::CENTER_CENTER,
+                    Align2::CENTER_CENTER,
                     "Live",
                     FontId::proportional(10.0),
                     Color32::GREEN,
@@ -888,7 +902,7 @@ impl SmartPalette {
             ComponentIcon::Unicode(unicode) => {
                 painter.text(
                     rect.center(),
-                    Anchor2::CENTER_CENTER,
+                    Align2::CENTER_CENTER,
                     unicode,
                     FontId::proportional(size.y * 0.7),
                     Color32::WHITE,
@@ -899,7 +913,7 @@ impl SmartPalette {
                 painter.rect_filled(rect, 2.0, Color32::from_gray(100));
                 painter.text(
                     rect.center(),
-                    Anchor2::CENTER_CENTER,
+                    Align2::CENTER_CENTER,
                     "IMG",
                     FontId::proportional(size.y * 0.3),
                     Color32::BLACK,
@@ -910,7 +924,7 @@ impl SmartPalette {
                 painter.rect_filled(rect, 2.0, Color32::from_gray(120));
                 painter.text(
                     rect.center(),
-                    Anchor2::CENTER_CENTER,
+                    Align2::CENTER_CENTER,
                     "SVG",
                     FontId::proportional(size.y * 0.3),
                     Color32::BLACK,

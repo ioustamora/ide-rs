@@ -411,6 +411,8 @@ impl TextBuffer {
     /// Undo last operation
     pub fn undo(&mut self) -> Result<SelectionSet, TextBufferError> {
         if let Some(operation) = self.undo_stack.pop_undo() {
+            let old_selection = operation.old_selection.clone();
+            let operation_clone = operation.clone(); // Clone before partial moves
             match operation.operation {
                 OperationType::Insert => {
                     // Undo insert by deleting the inserted text
@@ -447,9 +449,9 @@ impl TextBuffer {
             self.update_metadata();
             
             // Move operation to redo stack
-            self.undo_stack.push_redo(operation.clone());
+            self.undo_stack.push_redo(operation_clone);
             
-            Ok(operation.old_selection)
+            Ok(old_selection)
         } else {
             Err(TextBufferError::NothingToUndo)
         }
@@ -458,6 +460,8 @@ impl TextBuffer {
     /// Redo last undone operation
     pub fn redo(&mut self) -> Result<SelectionSet, TextBufferError> {
         if let Some(operation) = self.undo_stack.pop_redo() {
+            let operation_clone = operation.clone(); // Clone before partial moves
+            let new_selection = operation.new_selection.clone(); // Extract before partial move
             match operation.operation {
                 OperationType::Insert => {
                     let offset = self.position_to_offset(&operation.position)?;
@@ -492,9 +496,9 @@ impl TextBuffer {
             self.update_metadata();
             
             // Move operation back to undo stack
-            self.undo_stack.push_operation(operation.clone());
-            
-            Ok(operation.new_selection)
+            self.undo_stack.push_operation(operation_clone);
+
+            Ok(new_selection)
         } else {
             Err(TextBufferError::NothingToRedo)
         }

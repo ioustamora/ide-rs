@@ -3,9 +3,9 @@
 //! This module provides theming capabilities for terminal appearance,
 //! including color schemes, fonts, and visual styling options.
 
-use egui::Color32;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
+use crate::editor::terminal::core::SerializableColor;
 
 /// Complete terminal theme configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,15 +32,15 @@ pub struct TerminalTheme {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminalColorScheme {
     /// Background color
-    pub background: Color32,
+    pub background: SerializableColor,
     /// Foreground (text) color
-    pub foreground: Color32,
+    pub foreground: SerializableColor,
     /// Cursor color
-    pub cursor: Color32,
+    pub cursor: SerializableColor,
     /// Selection background
-    pub selection_background: Color32,
+    pub selection_background: SerializableColor,
     /// Selection foreground
-    pub selection_foreground: Option<Color32>,
+    pub selection_foreground: Option<SerializableColor>,
     
     /// ANSI colors (16 colors total)
     pub ansi_colors: AnsiColors,
@@ -56,76 +56,76 @@ pub struct TerminalColorScheme {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnsiColors {
     /// Black (normal and bright)
-    pub black: Color32,
-    pub bright_black: Color32,
-    
+    pub black: SerializableColor,
+    pub bright_black: SerializableColor,
+
     /// Red (normal and bright)
-    pub red: Color32,
-    pub bright_red: Color32,
-    
+    pub red: SerializableColor,
+    pub bright_red: SerializableColor,
+
     /// Green (normal and bright)
-    pub green: Color32,
-    pub bright_green: Color32,
-    
+    pub green: SerializableColor,
+    pub bright_green: SerializableColor,
+
     /// Yellow (normal and bright)
-    pub yellow: Color32,
-    pub bright_yellow: Color32,
-    
+    pub yellow: SerializableColor,
+    pub bright_yellow: SerializableColor,
+
     /// Blue (normal and bright)
-    pub blue: Color32,
-    pub bright_blue: Color32,
-    
+    pub blue: SerializableColor,
+    pub bright_blue: SerializableColor,
+
     /// Magenta (normal and bright)
-    pub magenta: Color32,
-    pub bright_magenta: Color32,
-    
+    pub magenta: SerializableColor,
+    pub bright_magenta: SerializableColor,
+
     /// Cyan (normal and bright)
-    pub cyan: Color32,
-    pub bright_cyan: Color32,
-    
+    pub cyan: SerializableColor,
+    pub bright_cyan: SerializableColor,
+
     /// White (normal and bright)
-    pub white: Color32,
-    pub bright_white: Color32,
+    pub white: SerializableColor,
+    pub bright_white: SerializableColor,
 }
 
 /// Special terminal colors
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpecialColors {
     /// Error text color
-    pub error: Color32,
+    pub error: SerializableColor,
     /// Warning text color
-    pub warning: Color32,
+    pub warning: SerializableColor,
     /// Success text color
-    pub success: Color32,
+    pub success: SerializableColor,
     /// Info text color
-    pub info: Color32,
+    pub info: SerializableColor,
     /// System message color
-    pub system: Color32,
+    pub system: SerializableColor,
     /// User input color
-    pub user_input: Color32,
+    pub user_input: SerializableColor,
     /// Command prompt color
-    pub prompt: Color32,
+    pub prompt: SerializableColor,
     /// Line number color
-    pub line_numbers: Color32,
+    pub line_numbers: SerializableColor,
 }
 
 /// UI element colors
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiColors {
     /// Border color
-    pub border: Color32,
+    pub border: SerializableColor,
     /// Tab background
-    pub tab_background: Color32,
+    pub tab_background: SerializableColor,
     /// Active tab background
-    pub active_tab_background: Color32,
+    pub active_tab_background: SerializableColor,
     /// Tab text
-    pub tab_text: Color32,
+    pub tab_text: SerializableColor,
     /// Active tab text
-    pub active_tab_text: Color32,
+    pub active_tab_text: SerializableColor,
     /// Status bar background
-    pub status_bar_background: Color32,
+    pub status_bar_background: SerializableColor,
     /// Status bar text
-    pub status_bar_text: Color32,
+    pub status_bar_text: SerializableColor,
 }
 
 /// Font configuration
@@ -175,7 +175,7 @@ pub struct CursorSettings {
     /// Cursor shape
     pub shape: CursorShape,
     /// Cursor color (None = use theme default)
-    pub color: Option<Color32>,
+    pub color: Option<SerializableColor>,
     /// Cursor blink rate (0 = no blinking)
     pub blink_rate_ms: u32,
     /// Cursor width (for block cursors)
@@ -216,11 +216,11 @@ pub struct ScrollbarSettings {
     /// Scrollbar width
     pub width: f32,
     /// Scrollbar background color
-    pub background: Color32,
+    pub background: SerializableColor,
     /// Scrollbar thumb color
-    pub thumb: Color32,
+    pub thumb: SerializableColor,
     /// Scrollbar thumb hover color
-    pub thumb_hover: Color32,
+    pub thumb_hover: SerializableColor,
     /// Auto-hide scrollbar when not needed
     pub auto_hide: bool,
 }
@@ -229,13 +229,13 @@ pub struct ScrollbarSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelectionSettings {
     /// Selection background color
-    pub background: Color32,
+    pub background: SerializableColor,
     /// Selection foreground color (None = use normal text color)
-    pub foreground: Option<Color32>,
+    pub foreground: Option<SerializableColor>,
     /// Selection border width
     pub border_width: f32,
     /// Selection border color
-    pub border_color: Color32,
+    pub border_color: SerializableColor,
 }
 
 /// Theme manager for handling multiple themes
@@ -310,10 +310,10 @@ impl ThemeManager {
             name: "Dark".to_string(),
             description: "Default dark theme".to_string(),
             colors: TerminalColorScheme {
-                background: Color32::from_rgb(30, 30, 30),
-                foreground: Color32::from_rgb(204, 204, 204),
-                cursor: Color32::from_rgb(255, 255, 255),
-                selection_background: Color32::from_rgb(58, 58, 58),
+                background: SerializableColor { r: 30, g: 30, b: 30, a: 255 },
+                foreground: SerializableColor { r: 204, g: 204, b: 204, a: 255 },
+                cursor: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
+                selection_background: SerializableColor { r: 58, g: 58, b: 58, a: 255 },
                 selection_foreground: None,
                 ansi_colors: AnsiColors::default_dark(),
                 special: SpecialColors::default_dark(),
@@ -333,10 +333,10 @@ impl ThemeManager {
             name: "Light".to_string(),
             description: "Default light theme".to_string(),
             colors: TerminalColorScheme {
-                background: Color32::from_rgb(255, 255, 255),
-                foreground: Color32::from_rgb(51, 51, 51),
-                cursor: Color32::from_rgb(0, 0, 0),
-                selection_background: Color32::from_rgb(197, 197, 197),
+                background: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
+                foreground: SerializableColor { r: 51, g: 51, b: 51, a: 255 },
+                cursor: SerializableColor { r: 0, g: 0, b: 0, a: 255 },
+                selection_background: SerializableColor { r: 197, g: 197, b: 197, a: 255 },
                 selection_foreground: None,
                 ansi_colors: AnsiColors::default_light(),
                 special: SpecialColors::default_light(),
@@ -356,10 +356,10 @@ impl ThemeManager {
             name: "Solarized Dark".to_string(),
             description: "Solarized dark color scheme".to_string(),
             colors: TerminalColorScheme {
-                background: Color32::from_rgb(0, 43, 54),     // base03
-                foreground: Color32::from_rgb(131, 148, 150), // base0
-                cursor: Color32::from_rgb(147, 161, 161),     // base1
-                selection_background: Color32::from_rgb(7, 54, 66), // base02
+                background: SerializableColor { r: 0, g: 43, b: 54, a: 255 },     // base03
+                foreground: SerializableColor { r: 131, g: 148, b: 150, a: 255 }, // base0
+                cursor: SerializableColor { r: 147, g: 161, b: 161, a: 255 },     // base1
+                selection_background: SerializableColor { r: 7, g: 54, b: 66, a: 255 }, // base02
                 selection_foreground: None,
                 ansi_colors: AnsiColors::solarized(),
                 special: SpecialColors::solarized_dark(),
@@ -379,10 +379,10 @@ impl ThemeManager {
             name: "Solarized Light".to_string(),
             description: "Solarized light color scheme".to_string(),
             colors: TerminalColorScheme {
-                background: Color32::from_rgb(253, 246, 227), // base3
-                foreground: Color32::from_rgb(101, 123, 131), // base00
-                cursor: Color32::from_rgb(88, 110, 117),      // base01
-                selection_background: Color32::from_rgb(238, 232, 213), // base2
+                background: SerializableColor { r: 253, g: 246, b: 227, a: 255 }, // base3
+                foreground: SerializableColor { r: 101, g: 123, b: 131, a: 255 }, // base00
+                cursor: SerializableColor { r: 88, g: 110, b: 117, a: 255 },      // base01
+                selection_background: SerializableColor { r: 238, g: 232, b: 213, a: 255 }, // base2
                 selection_foreground: None,
                 ansi_colors: AnsiColors::solarized(),
                 special: SpecialColors::solarized_light(),
@@ -402,10 +402,10 @@ impl ThemeManager {
             name: "Monokai".to_string(),
             description: "Monokai color scheme".to_string(),
             colors: TerminalColorScheme {
-                background: Color32::from_rgb(39, 40, 34),
-                foreground: Color32::from_rgb(248, 248, 242),
-                cursor: Color32::from_rgb(248, 248, 240),
-                selection_background: Color32::from_rgb(73, 72, 62),
+                background: SerializableColor { r: 39, g: 40, b: 34, a: 255 },
+                foreground: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
+                cursor: SerializableColor { r: 248, g: 248, b: 240, a: 255 },
+                selection_background: SerializableColor { r: 73, g: 72, b: 62, a: 255 },
                 selection_foreground: None,
                 ansi_colors: AnsiColors::monokai(),
                 special: SpecialColors::monokai(),
@@ -425,10 +425,10 @@ impl ThemeManager {
             name: "Dracula".to_string(),
             description: "Dracula color scheme".to_string(),
             colors: TerminalColorScheme {
-                background: Color32::from_rgb(40, 42, 54),
-                foreground: Color32::from_rgb(248, 248, 242),
-                cursor: Color32::from_rgb(248, 248, 242),
-                selection_background: Color32::from_rgb(68, 71, 90),
+                background: SerializableColor { r: 40, g: 42, b: 54, a: 255 },
+                foreground: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
+                cursor: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
+                selection_background: SerializableColor { r: 68, g: 71, b: 90, a: 255 },
                 selection_foreground: None,
                 ansi_colors: AnsiColors::dracula(),
                 special: SpecialColors::dracula(),
@@ -447,106 +447,106 @@ impl ThemeManager {
 impl AnsiColors {
     fn default_dark() -> Self {
         Self {
-            black: Color32::from_rgb(0, 0, 0),
-            bright_black: Color32::from_rgb(128, 128, 128),
-            red: Color32::from_rgb(205, 49, 49),
-            bright_red: Color32::from_rgb(241, 76, 76),
-            green: Color32::from_rgb(13, 188, 121),
-            bright_green: Color32::from_rgb(35, 209, 139),
-            yellow: Color32::from_rgb(229, 229, 16),
-            bright_yellow: Color32::from_rgb(245, 245, 67),
-            blue: Color32::from_rgb(36, 114, 200),
-            bright_blue: Color32::from_rgb(59, 142, 234),
-            magenta: Color32::from_rgb(188, 63, 188),
-            bright_magenta: Color32::from_rgb(214, 112, 214),
-            cyan: Color32::from_rgb(17, 168, 205),
-            bright_cyan: Color32::from_rgb(41, 184, 219),
-            white: Color32::from_rgb(229, 229, 229),
-            bright_white: Color32::from_rgb(255, 255, 255),
+            black: SerializableColor { r: 0, g: 0, b: 0, a: 255 },
+            bright_black: SerializableColor { r: 128, g: 128, b: 128, a: 255 },
+            red: SerializableColor { r: 205, g: 49, b: 49, a: 255 },
+            bright_red: SerializableColor { r: 241, g: 76, b: 76, a: 255 },
+            green: SerializableColor { r: 13, g: 188, b: 121, a: 255 },
+            bright_green: SerializableColor { r: 35, g: 209, b: 139, a: 255 },
+            yellow: SerializableColor { r: 229, g: 229, b: 16, a: 255 },
+            bright_yellow: SerializableColor { r: 245, g: 245, b: 67, a: 255 },
+            blue: SerializableColor { r: 36, g: 114, b: 200, a: 255 },
+            bright_blue: SerializableColor { r: 59, g: 142, b: 234, a: 255 },
+            magenta: SerializableColor { r: 188, g: 63, b: 188, a: 255 },
+            bright_magenta: SerializableColor { r: 214, g: 112, b: 214, a: 255 },
+            cyan: SerializableColor { r: 17, g: 168, b: 205, a: 255 },
+            bright_cyan: SerializableColor { r: 41, g: 184, b: 219, a: 255 },
+            white: SerializableColor { r: 229, g: 229, b: 229, a: 255 },
+            bright_white: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
         }
     }
     
     fn default_light() -> Self {
         Self {
-            black: Color32::from_rgb(0, 0, 0),
-            bright_black: Color32::from_rgb(128, 128, 128),
-            red: Color32::from_rgb(170, 0, 0),
-            bright_red: Color32::from_rgb(255, 0, 0),
-            green: Color32::from_rgb(0, 170, 0),
-            bright_green: Color32::from_rgb(0, 255, 0),
-            yellow: Color32::from_rgb(170, 170, 0),
-            bright_yellow: Color32::from_rgb(255, 255, 0),
-            blue: Color32::from_rgb(0, 0, 170),
-            bright_blue: Color32::from_rgb(0, 0, 255),
-            magenta: Color32::from_rgb(170, 0, 170),
-            bright_magenta: Color32::from_rgb(255, 0, 255),
-            cyan: Color32::from_rgb(0, 170, 170),
-            bright_cyan: Color32::from_rgb(0, 255, 255),
-            white: Color32::from_rgb(170, 170, 170),
-            bright_white: Color32::from_rgb(255, 255, 255),
+            black: SerializableColor { r: 0, g: 0, b: 0, a: 255 },
+            bright_black: SerializableColor { r: 128, g: 128, b: 128, a: 255 },
+            red: SerializableColor { r: 170, g: 0, b: 0, a: 255 },
+            bright_red: SerializableColor { r: 255, g: 0, b: 0, a: 255 },
+            green: SerializableColor { r: 0, g: 170, b: 0, a: 255 },
+            bright_green: SerializableColor { r: 0, g: 255, b: 0, a: 255 },
+            yellow: SerializableColor { r: 170, g: 170, b: 0, a: 255 },
+            bright_yellow: SerializableColor { r: 255, g: 255, b: 0, a: 255 },
+            blue: SerializableColor { r: 0, g: 0, b: 170, a: 255 },
+            bright_blue: SerializableColor { r: 0, g: 0, b: 255, a: 255 },
+            magenta: SerializableColor { r: 170, g: 0, b: 170, a: 255 },
+            bright_magenta: SerializableColor { r: 255, g: 0, b: 255, a: 255 },
+            cyan: SerializableColor { r: 0, g: 170, b: 170, a: 255 },
+            bright_cyan: SerializableColor { r: 0, g: 255, b: 255, a: 255 },
+            white: SerializableColor { r: 170, g: 170, b: 170, a: 255 },
+            bright_white: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
         }
     }
     
     fn solarized() -> Self {
         Self {
-            black: Color32::from_rgb(7, 54, 66),      // base02
-            bright_black: Color32::from_rgb(0, 43, 54),     // base03
-            red: Color32::from_rgb(220, 50, 47),      // red
-            bright_red: Color32::from_rgb(203, 75, 22),     // orange
-            green: Color32::from_rgb(133, 153, 0),    // green
-            bright_green: Color32::from_rgb(88, 110, 117),  // base01
-            yellow: Color32::from_rgb(181, 137, 0),   // yellow
-            bright_yellow: Color32::from_rgb(101, 123, 131), // base00
-            blue: Color32::from_rgb(38, 139, 210),    // blue
-            bright_blue: Color32::from_rgb(131, 148, 150),  // base0
-            magenta: Color32::from_rgb(211, 54, 130), // magenta
-            bright_magenta: Color32::from_rgb(108, 113, 196), // violet
-            cyan: Color32::from_rgb(42, 161, 152),    // cyan
-            bright_cyan: Color32::from_rgb(147, 161, 161),  // base1
-            white: Color32::from_rgb(238, 232, 213),  // base2
-            bright_white: Color32::from_rgb(253, 246, 227), // base3
+            black: SerializableColor { r: 7, g: 54, b: 66, a: 255 },      // base02
+            bright_black: SerializableColor { r: 0, g: 43, b: 54, a: 255 },     // base03
+            red: SerializableColor { r: 220, g: 50, b: 47, a: 255 },      // red
+            bright_red: SerializableColor { r: 203, g: 75, b: 22, a: 255 },     // orange
+            green: SerializableColor { r: 133, g: 153, b: 0, a: 255 },    // green
+            bright_green: SerializableColor { r: 88, g: 110, b: 117, a: 255 },  // base01
+            yellow: SerializableColor { r: 181, g: 137, b: 0, a: 255 },   // yellow
+            bright_yellow: SerializableColor { r: 101, g: 123, b: 131, a: 255 }, // base00
+            blue: SerializableColor { r: 38, g: 139, b: 210, a: 255 },    // blue
+            bright_blue: SerializableColor { r: 131, g: 148, b: 150, a: 255 },  // base0
+            magenta: SerializableColor { r: 211, g: 54, b: 130, a: 255 }, // magenta
+            bright_magenta: SerializableColor { r: 108, g: 113, b: 196, a: 255 }, // violet
+            cyan: SerializableColor { r: 42, g: 161, b: 152, a: 255 },    // cyan
+            bright_cyan: SerializableColor { r: 147, g: 161, b: 161, a: 255 },  // base1
+            white: SerializableColor { r: 238, g: 232, b: 213, a: 255 },  // base2
+            bright_white: SerializableColor { r: 253, g: 246, b: 227, a: 255 }, // base3
         }
     }
     
     fn monokai() -> Self {
         Self {
-            black: Color32::from_rgb(39, 40, 34),
-            bright_black: Color32::from_rgb(117, 113, 94),
-            red: Color32::from_rgb(249, 38, 114),
-            bright_red: Color32::from_rgb(255, 89, 149),
-            green: Color32::from_rgb(166, 226, 46),
-            bright_green: Color32::from_rgb(182, 227, 84),
-            yellow: Color32::from_rgb(244, 191, 117),
-            bright_yellow: Color32::from_rgb(255, 214, 154),
-            blue: Color32::from_rgb(102, 217, 239),
-            bright_blue: Color32::from_rgb(129, 222, 240),
-            magenta: Color32::from_rgb(174, 129, 255),
-            bright_magenta: Color32::from_rgb(192, 152, 255),
-            cyan: Color32::from_rgb(161, 239, 228),
-            bright_cyan: Color32::from_rgb(177, 242, 232),
-            white: Color32::from_rgb(248, 248, 242),
-            bright_white: Color32::from_rgb(255, 255, 255),
+            black: SerializableColor { r: 39, g: 40, b: 34, a: 255 },
+            bright_black: SerializableColor { r: 117, g: 113, b: 94, a: 255 },
+            red: SerializableColor { r: 249, g: 38, b: 114, a: 255 },
+            bright_red: SerializableColor { r: 255, g: 89, b: 149, a: 255 },
+            green: SerializableColor { r: 166, g: 226, b: 46, a: 255 },
+            bright_green: SerializableColor { r: 182, g: 227, b: 84, a: 255 },
+            yellow: SerializableColor { r: 244, g: 191, b: 117, a: 255 },
+            bright_yellow: SerializableColor { r: 255, g: 214, b: 154, a: 255 },
+            blue: SerializableColor { r: 102, g: 217, b: 239, a: 255 },
+            bright_blue: SerializableColor { r: 129, g: 222, b: 240, a: 255 },
+            magenta: SerializableColor { r: 174, g: 129, b: 255, a: 255 },
+            bright_magenta: SerializableColor { r: 192, g: 152, b: 255, a: 255 },
+            cyan: SerializableColor { r: 161, g: 239, b: 228, a: 255 },
+            bright_cyan: SerializableColor { r: 177, g: 242, b: 232, a: 255 },
+            white: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
+            bright_white: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
         }
     }
     
     fn dracula() -> Self {
         Self {
-            black: Color32::from_rgb(40, 42, 54),
-            bright_black: Color32::from_rgb(98, 114, 164),
-            red: Color32::from_rgb(255, 85, 85),
-            bright_red: Color32::from_rgb(255, 110, 103),
-            green: Color32::from_rgb(80, 250, 123),
-            bright_green: Color32::from_rgb(90, 247, 142),
-            yellow: Color32::from_rgb(241, 250, 140),
-            bright_yellow: Color32::from_rgb(244, 249, 157),
-            blue: Color32::from_rgb(139, 233, 253),
-            bright_blue: Color32::from_rgb(154, 237, 254),
-            magenta: Color32::from_rgb(255, 121, 198),
-            bright_magenta: Color32::from_rgb(255, 146, 208),
-            cyan: Color32::from_rgb(139, 233, 253),
-            bright_cyan: Color32::from_rgb(154, 237, 254),
-            white: Color32::from_rgb(248, 248, 242),
-            bright_white: Color32::from_rgb(255, 255, 255),
+            black: SerializableColor { r: 40, g: 42, b: 54, a: 255 },
+            bright_black: SerializableColor { r: 98, g: 114, b: 164, a: 255 },
+            red: SerializableColor { r: 255, g: 85, b: 85, a: 255 },
+            bright_red: SerializableColor { r: 255, g: 110, b: 103, a: 255 },
+            green: SerializableColor { r: 80, g: 250, b: 123, a: 255 },
+            bright_green: SerializableColor { r: 90, g: 247, b: 142, a: 255 },
+            yellow: SerializableColor { r: 241, g: 250, b: 140, a: 255 },
+            bright_yellow: SerializableColor { r: 244, g: 249, b: 157, a: 255 },
+            blue: SerializableColor { r: 139, g: 233, b: 253, a: 255 },
+            bright_blue: SerializableColor { r: 154, g: 237, b: 254, a: 255 },
+            magenta: SerializableColor { r: 255, g: 121, b: 198, a: 255 },
+            bright_magenta: SerializableColor { r: 255, g: 146, b: 208, a: 255 },
+            cyan: SerializableColor { r: 139, g: 233, b: 253, a: 255 },
+            bright_cyan: SerializableColor { r: 154, g: 237, b: 254, a: 255 },
+            white: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
+            bright_white: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
         }
     }
 }
@@ -554,79 +554,79 @@ impl AnsiColors {
 impl SpecialColors {
     fn default_dark() -> Self {
         Self {
-            error: Color32::from_rgb(241, 76, 76),
-            warning: Color32::from_rgb(245, 245, 67),
-            success: Color32::from_rgb(35, 209, 139),
-            info: Color32::from_rgb(59, 142, 234),
-            system: Color32::from_rgb(128, 128, 128),
-            user_input: Color32::from_rgb(255, 255, 255),
-            prompt: Color32::from_rgb(35, 209, 139),
-            line_numbers: Color32::from_rgb(128, 128, 128),
+            error: SerializableColor { r: 241, g: 76, b: 76, a: 255 },
+            warning: SerializableColor { r: 245, g: 245, b: 67, a: 255 },
+            success: SerializableColor { r: 35, g: 209, b: 139, a: 255 },
+            info: SerializableColor { r: 59, g: 142, b: 234, a: 255 },
+            system: SerializableColor { r: 128, g: 128, b: 128, a: 255 },
+            user_input: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
+            prompt: SerializableColor { r: 35, g: 209, b: 139, a: 255 },
+            line_numbers: SerializableColor { r: 128, g: 128, b: 128, a: 255 },
         }
     }
     
     fn default_light() -> Self {
         Self {
-            error: Color32::from_rgb(255, 0, 0),
-            warning: Color32::from_rgb(255, 140, 0),
-            success: Color32::from_rgb(0, 200, 0),
-            info: Color32::from_rgb(0, 0, 255),
-            system: Color32::from_rgb(128, 128, 128),
-            user_input: Color32::from_rgb(0, 0, 0),
-            prompt: Color32::from_rgb(0, 150, 0),
-            line_numbers: Color32::from_rgb(100, 100, 100),
+            error: SerializableColor { r: 255, g: 0, b: 0, a: 255 },
+            warning: SerializableColor { r: 255, g: 140, b: 0, a: 255 },
+            success: SerializableColor { r: 0, g: 200, b: 0, a: 255 },
+            info: SerializableColor { r: 0, g: 0, b: 255, a: 255 },
+            system: SerializableColor { r: 128, g: 128, b: 128, a: 255 },
+            user_input: SerializableColor { r: 0, g: 0, b: 0, a: 255 },
+            prompt: SerializableColor { r: 0, g: 150, b: 0, a: 255 },
+            line_numbers: SerializableColor { r: 100, g: 100, b: 100, a: 255 },
         }
     }
     
     fn solarized_dark() -> Self {
         Self {
-            error: Color32::from_rgb(220, 50, 47),
-            warning: Color32::from_rgb(181, 137, 0),
-            success: Color32::from_rgb(133, 153, 0),
-            info: Color32::from_rgb(38, 139, 210),
-            system: Color32::from_rgb(88, 110, 117),
-            user_input: Color32::from_rgb(147, 161, 161),
-            prompt: Color32::from_rgb(133, 153, 0),
-            line_numbers: Color32::from_rgb(88, 110, 117),
+            error: SerializableColor { r: 220, g: 50, b: 47, a: 255 },
+            warning: SerializableColor { r: 181, g: 137, b: 0, a: 255 },
+            success: SerializableColor { r: 133, g: 153, b: 0, a: 255 },
+            info: SerializableColor { r: 38, g: 139, b: 210, a: 255 },
+            system: SerializableColor { r: 88, g: 110, b: 117, a: 255 },
+            user_input: SerializableColor { r: 147, g: 161, b: 161, a: 255 },
+            prompt: SerializableColor { r: 133, g: 153, b: 0, a: 255 },
+            line_numbers: SerializableColor { r: 88, g: 110, b: 117, a: 255 },
         }
     }
     
     fn solarized_light() -> Self {
         Self {
-            error: Color32::from_rgb(220, 50, 47),
-            warning: Color32::from_rgb(181, 137, 0),
-            success: Color32::from_rgb(133, 153, 0),
-            info: Color32::from_rgb(38, 139, 210),
-            system: Color32::from_rgb(147, 161, 161),
-            user_input: Color32::from_rgb(88, 110, 117),
-            prompt: Color32::from_rgb(133, 153, 0),
-            line_numbers: Color32::from_rgb(147, 161, 161),
+            error: SerializableColor { r: 220, g: 50, b: 47, a: 255 },
+            warning: SerializableColor { r: 181, g: 137, b: 0, a: 255 },
+            success: SerializableColor { r: 133, g: 153, b: 0, a: 255 },
+            info: SerializableColor { r: 38, g: 139, b: 210, a: 255 },
+            system: SerializableColor { r: 147, g: 161, b: 161, a: 255 },
+            user_input: SerializableColor { r: 88, g: 110, b: 117, a: 255 },
+            prompt: SerializableColor { r: 133, g: 153, b: 0, a: 255 },
+            line_numbers: SerializableColor { r: 147, g: 161, b: 161, a: 255 },
         }
     }
     
     fn monokai() -> Self {
         Self {
-            error: Color32::from_rgb(249, 38, 114),
-            warning: Color32::from_rgb(244, 191, 117),
-            success: Color32::from_rgb(166, 226, 46),
-            info: Color32::from_rgb(102, 217, 239),
-            system: Color32::from_rgb(117, 113, 94),
-            user_input: Color32::from_rgb(248, 248, 242),
-            prompt: Color32::from_rgb(166, 226, 46),
-            line_numbers: Color32::from_rgb(117, 113, 94),
+            error: SerializableColor { r: 249, g: 38, b: 114, a: 255 },
+            warning: SerializableColor { r: 244, g: 191, b: 117, a: 255 },
+            success: SerializableColor { r: 166, g: 226, b: 46, a: 255 },
+            info: SerializableColor { r: 102, g: 217, b: 239, a: 255 },
+            system: SerializableColor { r: 117, g: 113, b: 94, a: 255 },
+            user_input: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
+            prompt: SerializableColor { r: 166, g: 226, b: 46, a: 255 },
+            line_numbers: SerializableColor { r: 117, g: 113, b: 94, a: 255 },
         }
     }
     
     fn dracula() -> Self {
         Self {
-            error: Color32::from_rgb(255, 85, 85),
-            warning: Color32::from_rgb(241, 250, 140),
-            success: Color32::from_rgb(80, 250, 123),
-            info: Color32::from_rgb(139, 233, 253),
-            system: Color32::from_rgb(98, 114, 164),
-            user_input: Color32::from_rgb(248, 248, 242),
-            prompt: Color32::from_rgb(80, 250, 123),
-            line_numbers: Color32::from_rgb(98, 114, 164),
+            error: SerializableColor { r: 255, g: 85, b: 85, a: 255 },
+            warning: SerializableColor { r: 241, g: 250, b: 140, a: 255 },
+            success: SerializableColor { r: 80, g: 250, b: 123, a: 255 },
+            info: SerializableColor { r: 139, g: 233, b: 253, a: 255 },
+            system: SerializableColor { r: 98, g: 114, b: 164, a: 255 },
+            user_input: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
+            prompt: SerializableColor { r: 80, g: 250, b: 123, a: 255 },
+            line_numbers: SerializableColor { r: 98, g: 114, b: 164, a: 255 },
         }
     }
 }
@@ -673,9 +673,9 @@ impl ScrollbarSettings {
     fn default_dark() -> Self {
         Self {
             width: 14.0,
-            background: Color32::from_rgb(50, 50, 50),
-            thumb: Color32::from_rgb(100, 100, 100),
-            thumb_hover: Color32::from_rgb(130, 130, 130),
+            background: SerializableColor { r: 50, g: 50, b: 50, a: 255 },
+            thumb: SerializableColor { r: 100, g: 100, b: 100, a: 255 },
+            thumb_hover: SerializableColor { r: 130, g: 130, b: 130, a: 255 },
             auto_hide: true,
         }
     }
@@ -683,9 +683,9 @@ impl ScrollbarSettings {
     fn default_light() -> Self {
         Self {
             width: 14.0,
-            background: Color32::from_rgb(240, 240, 240),
-            thumb: Color32::from_rgb(150, 150, 150),
-            thumb_hover: Color32::from_rgb(120, 120, 120),
+            background: SerializableColor { r: 240, g: 240, b: 240, a: 255 },
+            thumb: SerializableColor { r: 150, g: 150, b: 150, a: 255 },
+            thumb_hover: SerializableColor { r: 120, g: 120, b: 120, a: 255 },
             auto_hide: true,
         }
     }
@@ -693,9 +693,9 @@ impl ScrollbarSettings {
     fn solarized_dark() -> Self {
         Self {
             width: 14.0,
-            background: Color32::from_rgb(7, 54, 66),
-            thumb: Color32::from_rgb(88, 110, 117),
-            thumb_hover: Color32::from_rgb(101, 123, 131),
+            background: SerializableColor { r: 7, g: 54, b: 66, a: 255 },
+            thumb: SerializableColor { r: 88, g: 110, b: 117, a: 255 },
+            thumb_hover: SerializableColor { r: 101, g: 123, b: 131, a: 255 },
             auto_hide: true,
         }
     }
@@ -703,9 +703,9 @@ impl ScrollbarSettings {
     fn solarized_light() -> Self {
         Self {
             width: 14.0,
-            background: Color32::from_rgb(238, 232, 213),
-            thumb: Color32::from_rgb(147, 161, 161),
-            thumb_hover: Color32::from_rgb(131, 148, 150),
+            background: SerializableColor { r: 238, g: 232, b: 213, a: 255 },
+            thumb: SerializableColor { r: 147, g: 161, b: 161, a: 255 },
+            thumb_hover: SerializableColor { r: 131, g: 148, b: 150, a: 255 },
             auto_hide: true,
         }
     }
@@ -713,9 +713,9 @@ impl ScrollbarSettings {
     fn monokai() -> Self {
         Self {
             width: 14.0,
-            background: Color32::from_rgb(73, 72, 62),
-            thumb: Color32::from_rgb(117, 113, 94),
-            thumb_hover: Color32::from_rgb(136, 131, 107),
+            background: SerializableColor { r: 73, g: 72, b: 62, a: 255 },
+            thumb: SerializableColor { r: 117, g: 113, b: 94, a: 255 },
+            thumb_hover: SerializableColor { r: 136, g: 131, b: 107, a: 255 },
             auto_hide: true,
         }
     }
@@ -723,9 +723,9 @@ impl ScrollbarSettings {
     fn dracula() -> Self {
         Self {
             width: 14.0,
-            background: Color32::from_rgb(68, 71, 90),
-            thumb: Color32::from_rgb(98, 114, 164),
-            thumb_hover: Color32::from_rgb(139, 233, 253),
+            background: SerializableColor { r: 68, g: 71, b: 90, a: 255 },
+            thumb: SerializableColor { r: 98, g: 114, b: 164, a: 255 },
+            thumb_hover: SerializableColor { r: 139, g: 233, b: 253, a: 255 },
             auto_hide: true,
         }
     }
@@ -734,73 +734,73 @@ impl ScrollbarSettings {
 impl UiColors {
     fn default_dark() -> Self {
         Self {
-            border: Color32::from_rgb(70, 70, 70),
-            tab_background: Color32::from_rgb(45, 45, 45),
-            active_tab_background: Color32::from_rgb(30, 30, 30),
-            tab_text: Color32::from_rgb(180, 180, 180),
-            active_tab_text: Color32::from_rgb(255, 255, 255),
-            status_bar_background: Color32::from_rgb(25, 25, 25),
-            status_bar_text: Color32::from_rgb(200, 200, 200),
+            border: SerializableColor { r: 70, g: 70, b: 70, a: 255 },
+            tab_background: SerializableColor { r: 45, g: 45, b: 45, a: 255 },
+            active_tab_background: SerializableColor { r: 30, g: 30, b: 30, a: 255 },
+            tab_text: SerializableColor { r: 180, g: 180, b: 180, a: 255 },
+            active_tab_text: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
+            status_bar_background: SerializableColor { r: 25, g: 25, b: 25, a: 255 },
+            status_bar_text: SerializableColor { r: 200, g: 200, b: 200, a: 255 },
         }
     }
     
     fn default_light() -> Self {
         Self {
-            border: Color32::from_rgb(190, 190, 190),
-            tab_background: Color32::from_rgb(230, 230, 230),
-            active_tab_background: Color32::from_rgb(255, 255, 255),
-            tab_text: Color32::from_rgb(80, 80, 80),
-            active_tab_text: Color32::from_rgb(0, 0, 0),
-            status_bar_background: Color32::from_rgb(240, 240, 240),
-            status_bar_text: Color32::from_rgb(60, 60, 60),
+            border: SerializableColor { r: 190, g: 190, b: 190, a: 255 },
+            tab_background: SerializableColor { r: 230, g: 230, b: 230, a: 255 },
+            active_tab_background: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
+            tab_text: SerializableColor { r: 80, g: 80, b: 80, a: 255 },
+            active_tab_text: SerializableColor { r: 0, g: 0, b: 0, a: 255 },
+            status_bar_background: SerializableColor { r: 240, g: 240, b: 240, a: 255 },
+            status_bar_text: SerializableColor { r: 60, g: 60, b: 60, a: 255 },
         }
     }
     
     fn solarized_dark() -> Self {
         Self {
-            border: Color32::from_rgb(88, 110, 117),
-            tab_background: Color32::from_rgb(7, 54, 66),
-            active_tab_background: Color32::from_rgb(0, 43, 54),
-            tab_text: Color32::from_rgb(131, 148, 150),
-            active_tab_text: Color32::from_rgb(147, 161, 161),
-            status_bar_background: Color32::from_rgb(7, 54, 66),
-            status_bar_text: Color32::from_rgb(131, 148, 150),
+            border: SerializableColor { r: 88, g: 110, b: 117, a: 255 },
+            tab_background: SerializableColor { r: 7, g: 54, b: 66, a: 255 },
+            active_tab_background: SerializableColor { r: 0, g: 43, b: 54, a: 255 },
+            tab_text: SerializableColor { r: 131, g: 148, b: 150, a: 255 },
+            active_tab_text: SerializableColor { r: 147, g: 161, b: 161, a: 255 },
+            status_bar_background: SerializableColor { r: 7, g: 54, b: 66, a: 255 },
+            status_bar_text: SerializableColor { r: 131, g: 148, b: 150, a: 255 },
         }
     }
     
     fn solarized_light() -> Self {
         Self {
-            border: Color32::from_rgb(147, 161, 161),
-            tab_background: Color32::from_rgb(238, 232, 213),
-            active_tab_background: Color32::from_rgb(253, 246, 227),
-            tab_text: Color32::from_rgb(101, 123, 131),
-            active_tab_text: Color32::from_rgb(88, 110, 117),
-            status_bar_background: Color32::from_rgb(238, 232, 213),
-            status_bar_text: Color32::from_rgb(101, 123, 131),
+            border: SerializableColor { r: 147, g: 161, b: 161, a: 255 },
+            tab_background: SerializableColor { r: 238, g: 232, b: 213, a: 255 },
+            active_tab_background: SerializableColor { r: 253, g: 246, b: 227, a: 255 },
+            tab_text: SerializableColor { r: 101, g: 123, b: 131, a: 255 },
+            active_tab_text: SerializableColor { r: 88, g: 110, b: 117, a: 255 },
+            status_bar_background: SerializableColor { r: 238, g: 232, b: 213, a: 255 },
+            status_bar_text: SerializableColor { r: 101, g: 123, b: 131, a: 255 },
         }
     }
     
     fn monokai() -> Self {
         Self {
-            border: Color32::from_rgb(117, 113, 94),
-            tab_background: Color32::from_rgb(73, 72, 62),
-            active_tab_background: Color32::from_rgb(39, 40, 34),
-            tab_text: Color32::from_rgb(204, 204, 204),
-            active_tab_text: Color32::from_rgb(248, 248, 242),
-            status_bar_background: Color32::from_rgb(73, 72, 62),
-            status_bar_text: Color32::from_rgb(248, 248, 242),
+            border: SerializableColor { r: 117, g: 113, b: 94, a: 255 },
+            tab_background: SerializableColor { r: 73, g: 72, b: 62, a: 255 },
+            active_tab_background: SerializableColor { r: 39, g: 40, b: 34, a: 255 },
+            tab_text: SerializableColor { r: 204, g: 204, b: 204, a: 255 },
+            active_tab_text: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
+            status_bar_background: SerializableColor { r: 73, g: 72, b: 62, a: 255 },
+            status_bar_text: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
         }
     }
     
     fn dracula() -> Self {
         Self {
-            border: Color32::from_rgb(98, 114, 164),
-            tab_background: Color32::from_rgb(68, 71, 90),
-            active_tab_background: Color32::from_rgb(40, 42, 54),
-            tab_text: Color32::from_rgb(248, 248, 242),
-            active_tab_text: Color32::from_rgb(255, 255, 255),
-            status_bar_background: Color32::from_rgb(68, 71, 90),
-            status_bar_text: Color32::from_rgb(248, 248, 242),
+            border: SerializableColor { r: 98, g: 114, b: 164, a: 255 },
+            tab_background: SerializableColor { r: 68, g: 71, b: 90, a: 255 },
+            active_tab_background: SerializableColor { r: 40, g: 42, b: 54, a: 255 },
+            tab_text: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
+            active_tab_text: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
+            status_bar_background: SerializableColor { r: 68, g: 71, b: 90, a: 255 },
+            status_bar_text: SerializableColor { r: 248, g: 248, b: 242, a: 255 },
         }
     }
 }
@@ -808,55 +808,55 @@ impl UiColors {
 impl SelectionSettings {
     fn default_dark() -> Self {
         Self {
-            background: Color32::from_rgb(58, 58, 58),
+            background: SerializableColor { r: 58, g: 58, b: 58, a: 255 },
             foreground: None,
             border_width: 0.0,
-            border_color: Color32::from_rgb(100, 100, 100),
+            border_color: SerializableColor { r: 100, g: 100, b: 100, a: 255 },
         }
     }
     
     fn default_light() -> Self {
         Self {
-            background: Color32::from_rgb(197, 197, 197),
+            background: SerializableColor { r: 197, g: 197, b: 197, a: 255 },
             foreground: None,
             border_width: 0.0,
-            border_color: Color32::from_rgb(150, 150, 150),
+            border_color: SerializableColor { r: 150, g: 150, b: 150, a: 255 },
         }
     }
     
     fn solarized_dark() -> Self {
         Self {
-            background: Color32::from_rgb(7, 54, 66),
+            background: SerializableColor { r: 7, g: 54, b: 66, a: 255 },
             foreground: None,
             border_width: 0.0,
-            border_color: Color32::from_rgb(88, 110, 117),
+            border_color: SerializableColor { r: 88, g: 110, b: 117, a: 255 },
         }
     }
     
     fn solarized_light() -> Self {
         Self {
-            background: Color32::from_rgb(238, 232, 213),
+            background: SerializableColor { r: 238, g: 232, b: 213, a: 255 },
             foreground: None,
             border_width: 0.0,
-            border_color: Color32::from_rgb(147, 161, 161),
+            border_color: SerializableColor { r: 147, g: 161, b: 161, a: 255 },
         }
     }
     
     fn monokai() -> Self {
         Self {
-            background: Color32::from_rgb(73, 72, 62),
+            background: SerializableColor { r: 73, g: 72, b: 62, a: 255 },
             foreground: None,
             border_width: 0.0,
-            border_color: Color32::from_rgb(117, 113, 94),
+            border_color: SerializableColor { r: 117, g: 113, b: 94, a: 255 },
         }
     }
     
     fn dracula() -> Self {
         Self {
-            background: Color32::from_rgb(68, 71, 90),
+            background: SerializableColor { r: 68, g: 71, b: 90, a: 255 },
             foreground: None,
             border_width: 0.0,
-            border_color: Color32::from_rgb(98, 114, 164),
+            border_color: SerializableColor { r: 98, g: 114, b: 164, a: 255 },
         }
     }
 }
@@ -900,10 +900,10 @@ mod tests {
             name: "Custom".to_string(),
             description: "Test theme".to_string(),
             colors: TerminalColorScheme {
-                background: Color32::RED,
-                foreground: Color32::WHITE,
-                cursor: Color32::BLUE,
-                selection_background: Color32::GRAY,
+                background: SerializableColor { r: 255, g: 0, b: 0, a: 255 },
+                foreground: SerializableColor { r: 255, g: 255, b: 255, a: 255 },
+                cursor: SerializableColor { r: 0, g: 0, b: 255, a: 255 },
+                selection_background: SerializableColor { r: 128, g: 128, b: 128, a: 255 },
                 selection_foreground: None,
                 ansi_colors: AnsiColors::default_dark(),
                 special: SpecialColors::default_dark(),
@@ -927,8 +927,8 @@ mod tests {
         let dark_theme = theme_manager.themes.get("dark").unwrap();
         
         // Test that colors are properly set
-        assert_ne!(dark_theme.colors.background, Color32::TRANSPARENT);
-        assert_ne!(dark_theme.colors.foreground, Color32::TRANSPARENT);
+        assert_ne!(dark_theme.colors.background.a, 0);
+        assert_ne!(dark_theme.colors.foreground.a, 0);
         
         // Test ANSI colors are different
         assert_ne!(dark_theme.colors.ansi_colors.red, dark_theme.colors.ansi_colors.blue);

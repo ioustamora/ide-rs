@@ -414,11 +414,12 @@ impl LanguageServiceManager {
         }
         
         // Store service
-        self.services.insert(name, Box::new(service));
+        self.services.insert(name.clone(), Box::new(service));
         self.stats.services_count += 1;
         
         // Emit event
         global_event_bus().publish(IdeEvent::LanguageServiceRegistered {
+            language: "rust".to_string(), // TODO: determine language from service
             service_name: name,
         });
     }
@@ -473,11 +474,12 @@ impl LanguageServiceManager {
     /// Request completion for a file
     pub async fn completion(&mut self, file_path: &Path, position: Position) -> Result<Vec<CompletionItem>, LanguageServiceError> {
         let service_name = self.get_service_for_file(file_path)
-            .ok_or_else(|| LanguageServiceError::FileNotSupported(file_path.to_path_buf()))?;
-            
-        if let Some(service) = self.services.get_mut(service_name) {
+            .ok_or_else(|| LanguageServiceError::FileNotSupported(file_path.to_path_buf()))?
+            .to_string(); // Clone to avoid borrow conflict
+
+        if let Some(service) = self.services.get_mut(&service_name) {
             let result = service.completion(file_path, position).await;
-            
+
             // Update stats
             self.stats.total_requests += 1;
             if result.is_ok() {
@@ -485,7 +487,7 @@ impl LanguageServiceManager {
             } else {
                 self.stats.failed_requests += 1;
             }
-            
+
             result
         } else {
             Err(LanguageServiceError::Other(format!("Service {} not found", service_name)))

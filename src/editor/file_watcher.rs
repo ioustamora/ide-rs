@@ -88,12 +88,21 @@ pub struct AdvancedFileWatcher {
 }
 
 /// Debouncing state for rapid file changes
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct DebounceState {
     /// Pending events waiting to be debounced
     pending_events: HashMap<PathBuf, (FileWatchEvent, Instant)>,
     /// Last debounce flush time
     last_flush: Instant,
+}
+
+impl Default for DebounceState {
+    fn default() -> Self {
+        Self {
+            pending_events: HashMap::new(),
+            last_flush: Instant::now(),
+        }
+    }
 }
 
 /// File watcher statistics

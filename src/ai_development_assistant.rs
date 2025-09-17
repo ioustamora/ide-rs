@@ -39,7 +39,7 @@ pub struct CoreAIEngine {
     pub metrics: AIPerformanceMetrics,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct AIModel {
     pub name: String,
     pub model_type: AIModelType,
@@ -48,16 +48,18 @@ pub struct AIModel {
     pub performance: ModelPerformance,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub enum AIModelType {
+    #[default]
     LanguageModel,
     CodeModel,
     MultiModal,
     SpecializedModel(String),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub enum AICapability {
+    #[default]
     CodeGeneration,
     CodeCompletion,
     CodeAnalysis,
@@ -73,7 +75,7 @@ pub enum AICapability {
     Security,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct AIModelParameters {
     pub temperature: f32,
     pub top_p: f32,
@@ -82,7 +84,7 @@ pub struct AIModelParameters {
     pub specialized_parameters: HashMap<String, f32>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct ModelPerformance {
     pub accuracy_score: f32,
     pub response_time_ms: f32,
@@ -782,6 +784,7 @@ pub struct MetricsCollector {
     pub dependency_metrics: DependencyMetrics,
 }
 
+#[derive(Default)]
 pub struct ComplexityMetrics {
     pub cyclomatic_complexity: f32,
     pub cognitive_complexity: f32,
@@ -789,6 +792,7 @@ pub struct ComplexityMetrics {
     pub nesting_depth: u32,
 }
 
+#[derive(Default)]
 pub struct HalsteadMetrics {
     pub vocabulary: u32,
     pub length: u32,
@@ -796,6 +800,7 @@ pub struct HalsteadMetrics {
     pub effort: f32,
 }
 
+#[derive(Default)]
 pub struct MaintainabilityMetrics {
     pub maintainability_index: f32,
     pub code_duplication: f32,
@@ -803,6 +808,7 @@ pub struct MaintainabilityMetrics {
     pub api_stability: f32,
 }
 
+#[derive(Default)]
 pub struct TestCoverageMetrics {
     pub line_coverage: f32,
     pub branch_coverage: f32,
@@ -810,6 +816,7 @@ pub struct TestCoverageMetrics {
     pub statement_coverage: f32,
 }
 
+#[derive(Default)]
 pub struct DependencyMetrics {
     pub coupling: f32,
     pub cohesion: f32,
@@ -829,6 +836,7 @@ pub struct HistoricalMetric {
     pub commit_hash: Option<String>,
 }
 
+#[derive(Default)]
 pub struct TrendAnalysis {
     pub improving_metrics: Vec<String>,
     pub declining_metrics: Vec<String>,
@@ -923,6 +931,7 @@ pub struct SecurityVulnerability {
     pub references: Vec<String>,
 }
 
+#[derive(Default)]
 pub struct SecurityPolicies {
     pub allowed_dependencies: Vec<String>,
     pub forbidden_functions: Vec<String>,
@@ -962,6 +971,7 @@ pub enum DeletionMethod {
     Archival,
 }
 
+#[derive(Default)]
 pub struct ThreatModel {
     pub assets: Vec<Asset>,
     pub threats: Vec<Threat>,
@@ -1145,6 +1155,7 @@ pub enum CommentStyle {
     Documentation,
 }
 
+#[derive(Default)]
 pub struct ProductivityMetrics {
     pub lines_of_code_per_hour: f32,
     pub functions_per_hour: f32,

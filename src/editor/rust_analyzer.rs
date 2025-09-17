@@ -14,10 +14,10 @@ use serde_json::{json, Value};
 
 use super::language_service::{
     LanguageService, LanguageServiceError, CompletionItem, CompletionKind,
-    HoverInfo, Location, Diagnostic, CodeAction, TextEdit, DocumentSymbol,
-    WorkspaceSymbol, SignatureHelp, SemanticToken, FoldingRange, Range, Position
+    HoverInfo, Location, CodeAction, TextEdit, DocumentSymbol,
+    WorkspaceSymbol, SignatureHelp, SemanticToken, FoldingRange
 };
-use super::lsp_integration::{LspClient, LspMessage};
+use super::lsp_integration::{LspClient, LspMessage, Diagnostic, Range, Position};
 
 /// Rust Analyzer language service implementation
 pub struct RustAnalyzerService {
@@ -95,7 +95,7 @@ impl RustAnalyzerService {
     }
     
     /// Start message handling task
-    async fn start_message_handler(&mut self, stdin: std::process::ChildStdin, stdout: std::process::ChildStdout) -> Result<(), LanguageServiceError> {
+    async fn start_message_handler(&mut self, _stdin: std::process::ChildStdin, _stdout: std::process::ChildStdout) -> Result<(), LanguageServiceError> {
         // TODO: Implement LSP message handling
         // This would involve:
         // 1. Reading messages from stdout in a separate task
@@ -352,7 +352,8 @@ impl LanguageService for RustAnalyzerService {
         
         // Parse completion response - this is simplified
         // In reality, you'd need to parse the LSP response format properly
-        let items = response.get("items").unwrap_or(&json!([]));
+        let empty_array = json!([]);
+        let items = response.get("items").unwrap_or(&empty_array);
         let mut completions = Vec::new();
         
         if let Some(items_array) = items.as_array() {

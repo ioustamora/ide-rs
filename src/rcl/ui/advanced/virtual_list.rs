@@ -210,7 +210,7 @@ impl<T> VirtualList<T> {
         let visible_range = self.calculate_visible_range(self.viewport_height);
         self.visible_range = visible_range.clone();
         
-        let response = ScrollArea::vertical()
+        let scroll_output = ScrollArea::vertical()
             .max_height(self.viewport_height)
             .show(ui, |ui| {
                 // Create a large invisible spacer for the total content height
@@ -268,12 +268,15 @@ impl<T> VirtualList<T> {
                         }
                     }
                 }
-            }).inner;
+            });
+
+        // Create a response from the scroll area
+        let response = ui.allocate_rect(scroll_output.inner_rect, Sense::click());
         
         // Update scroll position
         if let Some(scroll_delta) = ui.input(|i| {
-            if i.scroll_delta.y != 0.0 {
-                Some(-i.scroll_delta.y)
+            if i.smooth_scroll_delta.y != 0.0 {
+                Some(-i.smooth_scroll_delta.y)
             } else {
                 None
             }
@@ -283,8 +286,8 @@ impl<T> VirtualList<T> {
         
         // Update performance metrics
         self.performance.render_time_ms = start_time.elapsed().as_secs_f32() * 1000.0;
-        self.performance.rendered_items = visible_range.len();
-        self.performance.memory_usage_bytes = visible_range.len() * std::mem::size_of::<T>();
+        self.performance.rendered_items = self.visible_range.len();
+        self.performance.memory_usage_bytes = self.visible_range.len() * std::mem::size_of::<T>();
         
         response
     }

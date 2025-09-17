@@ -406,7 +406,7 @@ impl FileManager {
         }
         
         // Emit file opened event
-        global_event_bus().emit(IdeEvent::FileOpened { 
+        global_event_bus().publish(IdeEvent::FileOpened { 
             path: path.clone(), 
             buffer_id: None // We could add buffer IDs later if needed
         });
@@ -439,7 +439,7 @@ impl FileManager {
         }
         
         // Emit file closed event
-        global_event_bus().emit(IdeEvent::FileClosed { 
+        global_event_bus().publish(IdeEvent::FileClosed { 
             path: path.clone(), 
             buffer_id: None 
         });

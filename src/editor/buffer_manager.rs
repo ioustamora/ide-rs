@@ -342,7 +342,7 @@ pub enum TaskError {
 }
 
 /// Task history entry
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct TaskHistoryEntry {
     /// Task that was executed
     pub task: WorkspaceTask,
@@ -885,47 +885,46 @@ impl BufferManager {
     fn detect_language(path: &Path) -> Option<String> {
         path.extension()
             .and_then(|ext| ext.to_str())
-            .map(|ext| match ext.to_lowercase().as_str() {
-                "rs" => "rust",
-                "js" | "jsx" => "javascript",
-                "ts" | "tsx" => "typescript",
-                "py" => "python",
-                "java" => "java",
-                "cpp" | "cc" | "cxx" => "cpp",
-                "c" => "c",
-                "h" | "hpp" => "c",
-                "cs" => "csharp",
-                "go" => "go",
-                "php" => "php",
-                "rb" => "ruby",
-                "swift" => "swift",
-                "kt" => "kotlin",
-                "scala" => "scala",
-                "clj" => "clojure",
-                "hs" => "haskell",
-                "ml" => "ocaml",
-                "fs" => "fsharp",
-                "elm" => "elm",
-                "dart" => "dart",
-                "lua" => "lua",
-                "r" => "r",
-                "sql" => "sql",
-                "sh" | "bash" => "bash",
-                "ps1" => "powershell",
-                "bat" | "cmd" => "batch",
-                "html" | "htm" => "html",
-                "css" => "css",
-                "scss" | "sass" => "scss",
-                "less" => "less",
-                "xml" => "xml",
-                "json" => "json",
-                "yaml" | "yml" => "yaml",
-                "toml" => "toml",
-                "md" | "markdown" => "markdown",
-                "tex" => "latex",
-                _ => return None,
+            .and_then(|ext| match ext.to_lowercase().as_str() {
+                "rs" => Some("rust".to_string()),
+                "js" | "jsx" => Some("javascript".to_string()),
+                "ts" | "tsx" => Some("typescript".to_string()),
+                "py" => Some("python".to_string()),
+                "java" => Some("java".to_string()),
+                "cpp" | "cc" | "cxx" => Some("cpp".to_string()),
+                "c" => Some("c".to_string()),
+                "h" | "hpp" => Some("c".to_string()),
+                "cs" => Some("csharp".to_string()),
+                "go" => Some("go".to_string()),
+                "php" => Some("php".to_string()),
+                "rb" => Some("ruby".to_string()),
+                "swift" => Some("swift".to_string()),
+                "kt" => Some("kotlin".to_string()),
+                "scala" => Some("scala".to_string()),
+                "clj" => Some("clojure".to_string()),
+                "hs" => Some("haskell".to_string()),
+                "ml" => Some("ocaml".to_string()),
+                "fs" => Some("fsharp".to_string()),
+                "elm" => Some("elm".to_string()),
+                "dart" => Some("dart".to_string()),
+                "lua" => Some("lua".to_string()),
+                "r" => Some("r".to_string()),
+                "sql" => Some("sql".to_string()),
+                "sh" | "bash" => Some("bash".to_string()),
+                "ps1" => Some("powershell".to_string()),
+                "bat" | "cmd" => Some("batch".to_string()),
+                "html" | "htm" => Some("html".to_string()),
+                "css" => Some("css".to_string()),
+                "scss" | "sass" => Some("scss".to_string()),
+                "less" => Some("less".to_string()),
+                "xml" => Some("xml".to_string()),
+                "json" => Some("json".to_string()),
+                "yaml" | "yml" => Some("yaml".to_string()),
+                "toml" => Some("toml".to_string()),
+                "md" | "markdown" => Some("markdown".to_string()),
+                "tex" => Some("latex".to_string()),
+                _ => None,
             })
-            .map(String::from)
     }
 
     fn determine_file_type(path: &Path, metadata: &std::fs::Metadata) -> FileType {

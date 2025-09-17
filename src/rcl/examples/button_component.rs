@@ -80,7 +80,7 @@ pub fn generate_button_metadata() -> proc_macro2::TokenStream {
         }
     };
     
-    derive_component_metadata(input.into())
+    derive_component_metadata(quote::quote!(#input))
 }
 
 /// Manual implementation of what the derive macro would generate

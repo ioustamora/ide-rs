@@ -7,12 +7,11 @@
 use proc_macro2::TokenStream;
 use quote::{quote, format_ident};
 use syn::{
-    parse_macro_input, DeriveInput, Data, Fields, Field, Type, Attribute, 
-    Meta, Expr, Lit, LitStr, Path, PathSegment
+    DeriveInput, Data, Fields, Field, Type, Attribute, Meta
 };
 
 /// Derive macro for generating ComponentMetadata
-/// 
+///
 /// Usage:
 /// ```
 /// #[derive(ComponentMetadata)]
@@ -26,16 +25,16 @@ use syn::{
 /// struct Button {
 ///     #[property(default = "Click me", description = "Button text")]
 ///     text: String,
-///     
+///
 ///     #[property(default = false, description = "Whether the button is disabled")]
 ///     disabled: bool,
-///     
+///
 ///     #[property(advanced = true, description = "Custom CSS classes")]
 ///     classes: Vec<String>,
 /// }
 /// ```
 pub fn derive_component_metadata(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
+    let input: DeriveInput = syn::parse2(input).unwrap();
     let struct_name = &input.ident;
     
     // Parse component attributes
@@ -79,13 +78,13 @@ pub fn derive_component_metadata(input: TokenStream) -> TokenStream {
             pub fn component_metadata() -> crate::rcl::component_registry::ComponentMetadata {
                 use std::collections::HashMap;
                 use crate::rcl::component_registry::*;
-                
+
                 let mut properties = HashMap::new();
                 #(#property_definitions)*
-                
+
                 let mut defaults = HashMap::new();
                 #(#default_values)*
-                
+
                 ComponentMetadata {
                     component_type: #name.to_string(),
                     display_name: #display_name.to_string(),
@@ -103,7 +102,7 @@ pub fn derive_component_metadata(input: TokenStream) -> TokenStream {
                     tags: vec![],   // TODO: Parse tags
                 }
             }
-            
+
             /// Register this component with the registry
             pub fn register(registry: &mut ComponentRegistry) {
                 let metadata = Self::component_metadata();
@@ -129,7 +128,7 @@ fn parse_component_attributes(attrs: &[Attribute]) -> ComponentAttributes {
     
     for attr in attrs {
         if attr.path().is_ident("component") {
-            if let Ok(Meta::List(meta_list)) = attr.meta.require_list() {
+            if let Ok(meta_list) = attr.meta.require_list() {
                 // Parse nested meta items
                 // This is a simplified parser - in practice you'd want more robust parsing
                 let tokens = meta_list.tokens.to_string();
@@ -230,7 +229,7 @@ fn parse_property_attributes(attrs: &[Attribute]) -> PropertyAttributes {
     
     for attr in attrs {
         if attr.path().is_ident("property") {
-            if let Ok(Meta::List(meta_list)) = attr.meta.require_list() {
+            if let Ok(meta_list) = attr.meta.require_list() {
                 let tokens = meta_list.tokens.to_string();
                 
                 if let Some(description) = extract_string_attribute(&tokens, "description") {

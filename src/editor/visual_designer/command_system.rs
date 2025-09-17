@@ -110,7 +110,7 @@ impl CommandContext {
         if let Some(sender) = &self.event_sender {
             let _ = sender.send(event);
         } else {
-            global_event_bus().emit(event);
+            global_event_bus().publish(event);
         }
     }
     

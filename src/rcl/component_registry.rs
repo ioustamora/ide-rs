@@ -60,7 +60,7 @@ pub enum ComponentCategory {
 }
 
 /// Property schema definition
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PropertySchema {
     /// Properties by name
     pub properties: HashMap<String, PropertyDefinition>,
@@ -71,7 +71,7 @@ pub struct PropertySchema {
 }
 
 /// Individual property definition
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PropertyDefinition {
     /// Property name
     pub name: String,
@@ -172,7 +172,7 @@ pub enum PropertyType {
 }
 
 /// Property validation constraints
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum PropertyConstraint {
     // Numeric constraints
     Min(f64),
@@ -194,7 +194,7 @@ pub enum PropertyConstraint {
 }
 
 /// UI hints for property inspector rendering
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PropertyUIHints {
     /// Control type for rendering
     pub control_type: ControlType,
@@ -213,7 +213,7 @@ pub struct PropertyUIHints {
 }
 
 /// Control types for property inspector
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum ControlType {
     // Basic controls
     TextInput,
@@ -240,7 +240,7 @@ pub enum ControlType {
 }
 
 /// Option for select controls
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SelectOption {
     pub value: String,
     pub label: String,
@@ -248,7 +248,7 @@ pub struct SelectOption {
 }
 
 /// Property groups for organization in inspector
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PropertyGroup {
     /// Group name
     pub name: String,

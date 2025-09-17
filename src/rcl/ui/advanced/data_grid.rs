@@ -9,7 +9,7 @@ use std::cmp::Ordering;
 use serde::{Serialize, Deserialize};
 
 /// Advanced data grid component
-pub struct DataGrid<T> {
+pub struct DataGrid<T: Clone> {
     /// Grid data
     pub data: Vec<T>,
     /// Column definitions
@@ -202,8 +202,9 @@ pub struct SelectionManager {
 }
 
 /// Selection modes
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub enum SelectionMode {
+    #[default]
     None,
     SingleRow,
     MultipleRows,
@@ -229,7 +230,6 @@ pub struct FilterManager<T> {
 }
 
 /// Column filter types
-#[derive(Clone)]
 pub enum ColumnFilter {
     Text { 
         value: String, 
@@ -404,7 +404,7 @@ pub struct ColorScheme {
     pub info: Color32,
 }
 
-impl<T> DataGrid<T> {
+impl<T: Clone> DataGrid<T> {
     /// Create a new data grid
     pub fn new(data: Vec<T>) -> Self {
         Self {
@@ -666,12 +666,15 @@ impl<T> DataGrid<T> {
         let available_rect = ui.available_rect_before_wrap();
         self.state.viewport_size = available_rect.size();
         
-        ScrollArea::both()
+        let scroll_output = ScrollArea::both()
             .show(ui, |ui| {
                 self.render_header(ui);
                 self.render_rows(ui);
                 self.render_footer(ui);
-            }).inner
+            });
+
+        // Create a response from the scroll area
+        ui.allocate_rect(scroll_output.inner_rect, Sense::hover())
     }
     
     /// Update visible rows based on filters
@@ -756,9 +759,10 @@ impl<T> DataGrid<T> {
     fn render_rows(&mut self, ui: &mut Ui) {
         let visible_range = self.calculate_visible_row_range();
         
-        for &row_index in &self.state.visible_rows[visible_range] {
-            if let Some(row_data) = self.data.get(row_index) {
-                self.render_row(ui, row_index, row_data);
+        let visible_indices: Vec<usize> = self.state.visible_rows[visible_range].iter().copied().collect();
+        for row_index in visible_indices {
+            if let Some(row_data) = self.data.get(row_index).cloned() {
+                self.render_row(ui, row_index, &row_data);
             }
         }
     }

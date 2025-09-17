@@ -703,16 +703,14 @@ impl AnsiParser {
                     } else {
                         self.color_palette.default_foreground
                     }
-                } else if *index < 256 {
-                    // Grayscale ramp
+                } else {
+                    // Grayscale ramp (232-255)
                     let gray_index = (*index - 232) as usize;
                     if gray_index < 24 {
                         self.color_palette.grayscale[gray_index]
                     } else {
                         self.color_palette.default_foreground
                     }
-                } else {
-                    self.color_palette.default_foreground
                 }
             }
         }
@@ -827,7 +825,7 @@ impl StyledLine {
 
     /// Get total text content
     pub fn text(&self) -> String {
-        self.spans.iter().map(|span| &span.text).collect()
+        self.spans.iter().map(|span| span.text.as_str()).collect()
     }
 
     /// Get line length in characters

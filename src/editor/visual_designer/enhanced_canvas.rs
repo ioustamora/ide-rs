@@ -679,7 +679,7 @@ impl EnhancedCanvas {
             let text = component.name.clone();
             painter.text(
                 rect.center(),
-                Anchor2::CENTER_CENTER,
+                Align2::CENTER_CENTER,
                 text,
                 FontId::proportional(text_props.font_size),
                 text_props.color,
@@ -692,10 +692,10 @@ impl EnhancedCanvas {
         if let Some(text_props) = &component.properties.text_properties {
             let text = component.name.clone();
             let anchor = match text_props.alignment {
-                TextAlign::Left => Anchor2::LEFT_CENTER,
-                TextAlign::Center => Anchor2::CENTER_CENTER,
-                TextAlign::Right => Anchor2::RIGHT_CENTER,
-                TextAlign::Justify => Anchor2::CENTER_CENTER,
+                TextAlign::Left => Align2::LEFT_CENTER,
+                TextAlign::Center => Align2::CENTER_CENTER,
+                TextAlign::Right => Align2::RIGHT_CENTER,
+                TextAlign::Justify => Align2::CENTER_CENTER,
             };
             
             painter.text(
@@ -710,7 +710,7 @@ impl EnhancedCanvas {
     
     fn render_textbox_component(&self, painter: &Painter, component: &CanvasComponent, rect: Rect) {
         // TextBox-specific rendering logic with input field styling
-        let inner_rect = rect.shrink(component.properties.padding.sum());
+        let inner_rect = rect.shrink2(component.properties.padding.sum());
         
         // Render text cursor if focused
         if self.selected_components.contains(&(component.id as usize)) {
@@ -730,7 +730,7 @@ impl EnhancedCanvas {
         painter.rect_filled(rect, 0.0, Color32::LIGHT_GRAY);
         painter.text(
             rect.center(),
-            Anchor2::CENTER_CENTER,
+            Align2::CENTER_CENTER,
             "📷",
             FontId::proportional(24.0),
             Color32::DARK_GRAY,
@@ -741,7 +741,7 @@ impl EnhancedCanvas {
         // Generic component rendering
         painter.text(
             rect.center(),
-            Anchor2::CENTER_CENTER,
+            Align2::CENTER_CENTER,
             &component.component_type,
             FontId::proportional(12.0),
             Color32::BLACK,

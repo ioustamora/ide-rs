@@ -6,7 +6,7 @@
 use egui::*;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use serde::{Deserialize, Serialize};
 
 // Import types from other modules - only the ones that exist
@@ -14,7 +14,7 @@ use crate::ai_development_assistant::{AIModel, UserPreferences, ProductivityMetr
 // use crate::editor::visual_designer::smart_palette::LearningData; // Comment out if not exists
 
 // Define missing types that aren't imported
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CodeSuggestions {
     pub suggestions: Vec<String>,
     pub confidence: f32,
@@ -33,61 +33,70 @@ pub struct CodeIndex {
     pub last_update: Instant,
 }
 
-#[derive(Debug, Clone)]
+impl Default for CodeIndex {
+    fn default() -> Self {
+        Self {
+            indexed_files: HashMap::new(),
+            last_update: Instant::now(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct SymbolDatabase {
     pub symbols: HashMap<String, Vec<String>>,
     pub references: HashMap<String, Vec<PathBuf>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ReferenceGraph {
     pub nodes: HashMap<String, Vec<String>>,
     pub edges: Vec<(String, String)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SemanticSearch {
     pub enabled: bool,
     pub index: HashMap<String, Vec<String>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CodeNavigation {
     pub enabled: bool,
     pub history: VecDeque<PathBuf>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RefactoringEngine {
     pub enabled: bool,
     pub rules: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DependencyAnalysis {
     pub dependencies: HashMap<String, Vec<String>>,
     pub vulnerabilities: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ProjectInsights {
     pub insights: Vec<String>,
     pub recommendations: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct OptimizationRecommendations {
     pub recommendations: Vec<String>,
     pub priority: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AnomalyDetection {
     pub anomalies: Vec<String>,
     pub confidence: f32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct UsagePatterns {
     pub patterns: HashMap<String, u32>,
     pub trends: Vec<String>,
@@ -97,6 +106,15 @@ pub struct UsagePatterns {
 pub struct LearningData {
     pub data: HashMap<String, String>,
     pub last_update: Instant,
+}
+
+impl Default for LearningData {
+    fn default() -> Self {
+        Self {
+            data: HashMap::new(),
+            last_update: Instant::now(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -232,7 +250,8 @@ pub struct Project {
     pub deployment_config: DeploymentConfig,
     
     /// Project state
-    pub last_build: Option<Instant>,
+    #[serde(with = "crate::shared::serde_system_time::option")]
+pub last_build: Option<SystemTime>,
     pub build_status: BuildStatus,
     pub test_results: Option<TestResults>,
     pub health_status: HealthStatus,
@@ -260,7 +279,8 @@ pub struct Environment {
     /// Environment state
     pub is_active: bool,
     pub health_status: HealthStatus,
-    pub last_deployment: Option<Instant>,
+    #[serde(with = "crate::shared::serde_system_time::option")]
+pub last_deployment: Option<SystemTime>,
     pub resource_usage: ResourceUsage,
 }
 
@@ -306,6 +326,7 @@ pub struct BuildSystem {
 }
 
 /// AI-powered workspace assistant
+#[derive(Default)]
 pub struct WorkspaceAI {
     pub enabled: bool,
     pub ai_model: AIModel,
@@ -324,6 +345,7 @@ pub struct WorkspaceAI {
 }
 
 /// Code intelligence system
+#[derive(Default)]
 pub struct CodeIntelligence {
     pub language_servers: HashMap<String, LanguageServer>,
     pub code_index: CodeIndex,
@@ -339,6 +361,7 @@ pub struct CodeIntelligence {
 
 // Enums for various configurations
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug)]
 pub enum ProjectType {
     Library,
     Application,
@@ -354,6 +377,7 @@ pub enum ProjectType {
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug)]
 pub enum ProgrammingLanguage {
     Rust,
     TypeScript,
@@ -416,7 +440,8 @@ pub enum HealthStatus {
 pub struct WorkspaceInfo {
     pub name: String,
     pub path: PathBuf,
-    pub last_accessed: Instant,
+    #[serde(with = "crate::shared::serde_system_time")]
+pub last_accessed: SystemTime,
     pub project_count: usize,
     pub description: String,
 }
@@ -501,10 +526,10 @@ impl AdvancedWorkspace {
             health_monitoring: HealthMonitoring::new(),
             usage_tracking: UsageTracking::new(),
             
-            ai_assistant: WorkspaceAI::new(),
-            code_intelligence: CodeIntelligence::new(),
-            quality_gates: QualityGates::new(),
-            security_scanner: SecurityScanner::new(),
+            ai_assistant: WorkspaceAI::default(),
+            code_intelligence: CodeIntelligence::default(),
+            quality_gates: QualityGates::default(),
+            security_scanner: SecurityScanner::default(),
         }
     }
     
@@ -643,8 +668,9 @@ impl AdvancedWorkspace {
                 ui.separator();
                 
                 // Project hierarchy view
-                for (project_id, project) in &self.projects {
-                    self.render_project_item(ui, project_id, project);
+                let projects: Vec<_> = self.projects.iter().map(|(id, project)| (id.clone(), project.clone())).collect();
+                for (project_id, project) in projects {
+                    self.render_project_item(ui, &project_id, &project);
                 }
                 
                 ui.separator();
@@ -659,8 +685,8 @@ impl AdvancedWorkspace {
             columns[1].group(|ui| {
                 ui.heading("Project Details");
                 
-                if let Some(selected_project) = self.get_selected_project() {
-                    self.render_project_details(ui, selected_project);
+                if let Some(selected_project) = self.get_selected_project().cloned() {
+                    self.render_project_details(ui, &selected_project);
                 } else {
                     ui.centered_and_justified(|ui| {
                         ui.label("Select a project to view details");
@@ -700,7 +726,7 @@ impl AdvancedWorkspace {
                 if ui.selectable_label(false, &project.name).clicked() {
                     self.select_project(project_id);
                 }
-                ui.small(&project.path.to_string_lossy());
+                ui.small(&*project.path.to_string_lossy());
             });
             
             // Quick actions
@@ -845,7 +871,7 @@ impl AdvancedWorkspace {
                                 DependencyType::Runtime => Color32::BLUE,
                                 DependencyType::Development => Color32::GREEN,
                                 DependencyType::Build => Color32::YELLOW,
-                                DependencyType::Test => Color32::PURPLE,
+                                DependencyType::Test => Color32::from_rgb(128, 0, 128),
                                 _ => Color32::GRAY,
                             };
                             
@@ -939,7 +965,7 @@ impl AdvancedWorkspace {
         // Update build status to Building
         if let Some(project) = self.projects.get_mut(project_id) {
             project.build_status = BuildStatus::Building;
-            project.last_build = Some(Instant::now());
+            project.last_build = Some(SystemTime::now());
         }
     }
     
@@ -1269,7 +1295,8 @@ impl CollaborationHistory {
 pub struct CollaborationEvent {
     pub event_type: String,
     pub user: String,
-    pub timestamp: Instant,
+    #[serde(with = "crate::shared::serde_system_time")]
+    pub timestamp: SystemTime,
     pub details: String,
 }
 
@@ -1385,12 +1412,14 @@ pub struct AutomatedWorkflow {
     pub steps: Vec<WorkflowStep>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct EnvironmentConfig {
     pub name: String,
     pub variables: HashMap<String, String>,
     pub services: Vec<String>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Bookmark {
     pub id: String,
     pub name: String,
@@ -1398,19 +1427,23 @@ pub struct Bookmark {
     pub line: Option<usize>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SearchQuery {
     pub query: String,
     pub scope: SearchScope,
     pub results: Vec<SearchResult>,
 }
 
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub enum SearchScope {
+    #[default]
     CurrentFile,
     CurrentProject,
     AllProjects,
     Workspace,
 }
 
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct SearchResult {
     pub file_path: PathBuf,
     pub line: usize,
@@ -1418,6 +1451,7 @@ pub struct SearchResult {
     pub content: String,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TeamMember {
     pub id: String,
     pub name: String,
@@ -1426,6 +1460,7 @@ pub struct TeamMember {
     pub permissions: Vec<String>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct WorkspacePermissions {
     pub can_read: bool,
     pub can_write: bool,
@@ -1434,6 +1469,7 @@ pub struct WorkspacePermissions {
     pub can_share: bool,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SharingSettings {
     pub is_public: bool,
     pub allowed_users: Vec<String>,
@@ -1453,6 +1489,7 @@ pub struct PipelineStage {
     pub dependencies: Vec<String>,
 }
 
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct CiIntegration {
     pub provider: String,
     pub configuration: HashMap<String, String>,
@@ -1466,8 +1503,10 @@ pub struct AnalyticsReport {
     pub generated_at: Instant,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct DataPoint {
-    pub timestamp: Instant,
+    #[serde(with = "crate::shared::serde_system_time")]
+    pub timestamp: SystemTime,
     pub value: f64,
     pub category: String,
 }
@@ -1479,13 +1518,16 @@ pub struct HealthCheck {
     pub interval: Duration,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct HealthAlert {
     pub severity: AlertSeverity,
     pub message: String,
-    pub timestamp: Instant,
+    #[serde(with = "crate::shared::serde_system_time")]
+    pub timestamp: SystemTime,
     pub resolved: bool,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub enum AlertSeverity {
     Info,
     Warning,
@@ -1493,15 +1535,20 @@ pub enum AlertSeverity {
     Critical,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct UsageSession {
-    pub start_time: Instant,
-    pub end_time: Option<Instant>,
+    #[serde(with = "crate::shared::serde_system_time")]
+    pub start_time: SystemTime,
+    #[serde(with = "crate::shared::serde_system_time::option")]
+    pub end_time: Option<SystemTime>,
     pub actions: Vec<UserAction>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct UserAction {
     pub action_type: String,
-    pub timestamp: Instant,
+    #[serde(with = "crate::shared::serde_system_time")]
+    pub timestamp: SystemTime,
     pub details: HashMap<String, String>,
 }
 
@@ -1716,7 +1763,7 @@ pub struct VulnerabilityDatabase {
     pub last_updated: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct ScanSchedule {
     pub enabled: bool,
     pub frequency: String, // "daily", "weekly", "monthly"
@@ -2000,7 +2047,7 @@ pub struct NotificationFilter {
     pub enabled: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct QuietHours {
     pub enabled: bool,
     pub start_time: String,

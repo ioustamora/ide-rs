@@ -638,7 +638,7 @@ impl ModernCodeEditor {
             
             painter.text(
                 line_number_rect.center(),
-                Anchor2::CENTER_CENTER,
+                Align2::CENTER_CENTER,
                 format!("{:4}", line_idx + 1),
                 FontId::monospace(self.editor_settings.font_size * 0.8),
                 Color32::GRAY,
@@ -681,7 +681,7 @@ impl ModernCodeEditor {
             
             painter.text(
                 Pos2::new(rect.min.x + x_offset, rect.center().y),
-                Anchor2::LEFT_CENTER,
+                Align2::LEFT_CENTER,
                 token_text,
                 font_id.clone(),
                 token_color,

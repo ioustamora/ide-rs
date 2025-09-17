@@ -368,13 +368,15 @@ impl ToastManager {
     /// Render all toasts
     pub fn show(&mut self, ui: &mut Ui) {
         self.update();
-        
+
         let screen_rect = ui.ctx().screen_rect();
         let base_position = self.calculate_base_position(&screen_rect);
-        
+        let position = self.position.clone();
+        let style = &self.style;
+
         for (index, toast) in self.toasts.iter_mut().enumerate() {
-            let toast_position = self.calculate_toast_position(base_position, index);
-            toast.show_at_position(ui, toast_position, &self.style);
+            let toast_position = Self::calculate_toast_position_static(base_position, index, position.clone(), style);
+            toast.show_at_position(ui, toast_position, style);
         }
     }
     
@@ -411,9 +413,13 @@ impl ToastManager {
     
     /// Calculate position for individual toast
     fn calculate_toast_position(&self, base_position: Vec2, index: usize) -> Vec2 {
-        let offset_y = index as f32 * (self.style.min_height + self.style.toast_spacing);
-        
-        match self.position {
+        Self::calculate_toast_position_static(base_position, index, self.position.clone(), &self.style)
+    }
+
+    fn calculate_toast_position_static(base_position: Vec2, index: usize, position: ToastPosition, style: &ToastStyle) -> Vec2 {
+        let offset_y = index as f32 * (style.min_height + style.toast_spacing);
+
+        match position {
             ToastPosition::BottomLeft | ToastPosition::BottomCenter | ToastPosition::BottomRight => {
                 base_position - vec2(0.0, offset_y)
             }
@@ -600,7 +606,7 @@ impl Toast {
         
         // Render content
         let content_rect = toast_rect.shrink(8.0);
-        let mut content_ui = ui.child_ui(content_rect, Layout::top_down(Align::Left));
+        let mut content_ui = ui.child_ui(content_rect, Layout::top_down(Align::LEFT));
         
         match &self.content {
             ToastContent::Text(text) => {

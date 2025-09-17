@@ -12,8 +12,9 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::process::{Child, Command, Stdio};
 use std::io::{BufRead, BufReader, Write};
-use std::sync::mpsc::{Receiver, Sender};
-use std::thread;
+use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc::{UnboundedReceiver as Receiver, UnboundedSender as Sender};
+use tokio::task;
 
 /// LSP client for communicating with language servers
 pub struct LspClient {
@@ -22,7 +23,7 @@ pub struct LspClient {
     /// Request counter for LSP message IDs
     pub request_id: u64,
     /// Pending requests waiting for responses
-    pub pending_requests: HashMap<u64, PendingRequest>,
+    pub pending_requests: Arc<Mutex<HashMap<u64, PendingRequest>>>,
     /// Diagnostics cache
     pub diagnostics: HashMap<String, Vec<Diagnostic>>,
     /// Document versions for synchronization
@@ -31,7 +32,7 @@ pub struct LspClient {
     pub server_capabilities: Option<ServerCapabilities>,
     /// Message sender/receiver
     pub message_tx: Option<Sender<LspMessage>>,
-    pub message_rx: Option<Receiver<LspMessage>>,
+    pub message_rx: Arc<Mutex<Option<Receiver<LspMessage>>>>,
 }
 
 /// LSP message types
@@ -248,12 +249,12 @@ impl LspClient {
         Self {
             server_process: None,
             request_id: 0,
-            pending_requests: HashMap::new(),
+            pending_requests: Arc::new(Mutex::new(HashMap::new())),
             diagnostics: HashMap::new(),
             document_versions: HashMap::new(),
             server_capabilities: None,
             message_tx: None,
-            message_rx: None,
+            message_rx: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -265,13 +266,13 @@ impl LspClient {
             .stderr(Stdio::piped())
             .spawn()?;
 
-        let (tx, rx) = std::sync::mpsc::channel();
-        self.message_rx = Some(rx);
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        *self.message_rx.lock().unwrap() = Some(rx);
 
         // Start message handling thread
         if let Some(stdout) = child.stdout.take() {
             let tx_clone = tx.clone();
-            thread::spawn(move || {
+            std::thread::spawn(move || {
                 let reader = BufReader::new(stdout);
                 for line in reader.lines() {
                     if let Ok(line) = line {
@@ -358,7 +359,7 @@ impl LspClient {
             params,
         };
 
-        self.pending_requests.insert(id, PendingRequest {
+        self.pending_requests.lock().unwrap().insert(id, PendingRequest {
             method: method.to_string(),
             callback: Box::new(callback),
         });
@@ -664,11 +665,11 @@ impl LspClient {
         let mut messages = Vec::new();
         let mut notifications_to_handle = Vec::new();
         
-        if let Some(ref rx) = self.message_rx {
+        if let Some(rx) = &mut *self.message_rx.lock().unwrap() {
             while let Ok(message) = rx.try_recv() {
                 match &message {
                     LspMessage::Response { id, .. } => {
-                        if let Some(pending) = self.pending_requests.remove(id) {
+                        if let Some(pending) = self.pending_requests.lock().unwrap().remove(id) {
                             // Handle response
                             match &message {
                                 LspMessage::Response { result, error, .. } => {
@@ -802,7 +803,7 @@ impl LspClient {
             let _ = process.kill();
             let _ = process.wait();
         }
-        self.pending_requests.clear();
+        self.pending_requests.lock().unwrap().clear();
         self.diagnostics.clear();
         self.document_versions.clear();
         self.server_capabilities = None;

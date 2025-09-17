@@ -10,7 +10,6 @@ use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 
 /// Auto-completion system for terminal commands
-#[derive(Debug, Clone)]
 pub struct AutoCompletion {
     /// Completion providers
     pub providers: Vec<Box<dyn CompletionProvider>>,
@@ -18,6 +17,16 @@ pub struct AutoCompletion {
     pub cache: CompletionCache,
     /// Settings
     pub settings: AutoCompletionSettings,
+}
+
+impl std::fmt::Debug for AutoCompletion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AutoCompletion")
+            .field("providers", &format!("[{} providers]", self.providers.len()))
+            .field("cache", &self.cache)
+            .field("settings", &self.settings)
+            .finish()
+    }
 }
 
 /// Completion provider trait
@@ -315,7 +324,6 @@ pub struct CommandIntelligenceSettings {
 }
 
 /// Package manager integration
-#[derive(Debug, Clone)]
 pub struct PackageIntegration {
     /// Supported package managers
     pub package_managers: Vec<Box<dyn PackageManager>>,
@@ -323,6 +331,16 @@ pub struct PackageIntegration {
     pub package_cache: PackageCache,
     /// Settings
     pub settings: PackageIntegrationSettings,
+}
+
+impl std::fmt::Debug for PackageIntegration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PackageIntegration")
+            .field("package_managers", &format!("[{} managers]", self.package_managers.len()))
+            .field("package_cache", &self.package_cache)
+            .field("settings", &self.settings)
+            .finish()
+    }
 }
 
 /// Package manager trait
